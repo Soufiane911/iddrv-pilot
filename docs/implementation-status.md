@@ -4,7 +4,7 @@
 
 - Branch: `codex/iddrv-pilot`
 - Plan: `docs/orchestrated-implementation-plan.md`
-- Current gate: **G2 — incident S001 vertical et API v1**
+- Current gate: **G3 — interface atelier 2D**
 - State: **READY TO START**
 - Runtime OpenAI integration: **DEFERRED**
 
@@ -33,10 +33,19 @@
 - `codex --strict-config ...`: **passed**
 - Read-only Luna smoke: **passed**, model confirmed as `gpt-5.6-luna`
 
+## G2 verification
+
+- API contract: `docs/api-v1-contract.md`.
+- Migration 003: incidents, diagnostic runs, evidence, hypotheses, feedback and action proposals.
+- Deterministic S001 engine: baseline scrap rate, zone 2 temperature drift, quality defects and operator notes.
+- API smoke on live PostgreSQL: list incident **200**, investigation **200**, persisted evidence **200 / 3 items**.
+- Focused tests: **5 passed**; full pre-existing suite remains green through the implemented test set.
+- Commit: `5799046 feat(diagnostics): deliver S001 evidence-backed investigation`.
+
 ## Next gate
 
-G2 is ready to start. The next wave owns the deterministic S001 diagnostic, the
-first business API endpoints, and the first incident evidence contract.
+G3 is ready to start: workshop 2D with a real API client, state colors, machine
+selection and incident side panel.
 
 ## G1 verification
 
@@ -53,4 +62,4 @@ first business API endpoints, and the first incident evidence contract.
 
 ## G1 commit
 
-- Pending orchestrator commit: `feat(data): load complete industrial demo dataset`
+- `c04637a feat(data): load complete industrial demo dataset`
