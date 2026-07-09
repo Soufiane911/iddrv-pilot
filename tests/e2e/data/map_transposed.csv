@@ -1,0 +1,6 @@
+Variable,Cycle1
+Time,2026-07-09T12:00:00Z
+Machine,mach-A
+Cycle_Time,2.5
+Inj_Pres,180.5
+Cushion,12.4

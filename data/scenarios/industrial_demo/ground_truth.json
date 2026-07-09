@@ -1,0 +1,109 @@
+[
+  {
+    "scenario_id": "S001",
+    "title": "Température trop basse causant des short shots",
+    "machine_erp_ref": "152",
+    "production_order_id": "OF-2025-0012",
+    "start_time": "2025-02-12T00:21:43.617600",
+    "end_time": "2025-02-12T01:52:40.878807",
+    "expected_defect": "short_shot",
+    "root_cause": "barrel_temp_zone2_c below nominal range (205-215°C) -> material too viscous -> incomplete cavity fill",
+    "evidence_fields": [
+      "barrel_temp_zone2_c",
+      "quality_flag",
+      "scrap_flag",
+      "injection_time_s",
+      "operator_notes"
+    ],
+    "expected_agent_conclusion": "Les short shots sur la machine 152 (OF OF-2025-0012) sont probablement lies a une baisse de temperature de la zone 2 du fourreau sous le seuil nominal, rendant la matiere plus visqueuse et empechant le remplissage complet de l'empreinte."
+  },
+  {
+    "scenario_id": "S005",
+    "title": "Redemarrage machine causant un rebut temporaire",
+    "machine_erp_ref": "152",
+    "production_order_id": "OF-2025-0020",
+    "start_time": "2025-02-12T14:29:00",
+    "end_time": "2025-02-12T14:58:55.457255",
+    "expected_defect": "multiple (short_shot, flash, sink_mark)",
+    "root_cause": "Machine restart after stop -> thermal instability -> parameter deviation -> high defect rate until steady state",
+    "evidence_fields": [
+      "quality_flag",
+      "scrap_flag",
+      "barrel_temp_zone1_c",
+      "barrel_temp_zone2_c",
+      "maintenance_events",
+      "operator_notes"
+    ],
+    "expected_agent_conclusion": "Le taux de rebut eleve en debut d'OF est du a un redemarrage de la machine apres un arret. Les temperatures fourreau ne sont pas stabilisees, provoquant des defauts varies le temps que le regime thermique s'etablisse."
+  },
+  {
+    "scenario_id": "S002",
+    "title": "Pression injection trop elevee causant des bavures (flash)",
+    "machine_erp_ref": "1003",
+    "production_order_id": "OF-2025-0032",
+    "start_time": "2025-02-13T17:15:59.465139",
+    "end_time": "2025-02-13T18:15:54.982506",
+    "expected_defect": "flash",
+    "root_cause": "peak_pressure_bar above nominal (800-900 bar) combined with reduced clamp_force_kn -> mould separates -> flash formation",
+    "evidence_fields": [
+      "peak_pressure_bar",
+      "switchover_pressure_bar",
+      "clamp_force_kn",
+      "quality_flag",
+      "scrap_flag"
+    ],
+    "expected_agent_conclusion": "Les bavures (flash) sur la machine 1003 sont causees par une pression d'injection trop elevee associee a un effort de verrouillage insuffisant, permettant a la matiere de s'echapper entre les plans de joint."
+  },
+  {
+    "scenario_id": "S004",
+    "title": "Changement matiere provoquant des bulles",
+    "machine_erp_ref": "1003",
+    "production_order_id": "OF-2025-0013",
+    "start_time": "2025-02-11T06:51:00",
+    "end_time": "2025-02-11T08:27:05.586366",
+    "expected_defect": "bubbles",
+    "root_cause": "Material change without proper purging -> residual moisture or incompatible materials -> gas formation -> bubbles",
+    "evidence_fields": [
+      "quality_flag",
+      "scrap_flag",
+      "maintenance_events",
+      "operator_notes"
+    ],
+    "expected_agent_conclusion": "Les bulles observees juste apres le changement de matiere sont probablement dues a une purge insuffisante ou a un sechage inadequate de la nouvelle matiere, emprisonnant des gaz dans la cavite."
+  },
+  {
+    "scenario_id": "S003",
+    "title": "Refroidissement instable causant des deformations (warpage)",
+    "machine_erp_ref": "606",
+    "production_order_id": "OF-2025-0045",
+    "start_time": "2025-02-15T02:01:30.063143",
+    "end_time": "2025-02-15T04:02:25.590501",
+    "expected_defect": "warpage",
+    "root_cause": "cooling_time_s and mold_temperature_c oscillating -> uneven cooling -> internal stresses -> warpage",
+    "evidence_fields": [
+      "cooling_time_s",
+      "mold_temperature_c",
+      "quality_flag",
+      "scrap_flag",
+      "energy_kwh"
+    ],
+    "expected_agent_conclusion": "Les deformations (warpage) sont liees a une instabilite du refroidissement: le temps de refroidissement et la temperature du moule varient de maniere cyclique, creant des contraintes internes dans la piece."
+  },
+  {
+    "scenario_id": "S006",
+    "title": "Usure progressive du moule causant une derive dimensionnelle",
+    "machine_erp_ref": "606",
+    "production_order_id": "OF-2025-0043 to OF-2025-0059",
+    "start_time": "2025-02-14T06:18:00",
+    "end_time": "2025-02-16T12:44:00",
+    "expected_defect": "dimension_out_of_tolerance",
+    "root_cause": "Progressive mold wear on MOULE-606-A -> cavity dimensions increase -> part dimensions drift -> out-of-tolerance",
+    "evidence_fields": [
+      "dimension_deviation_mm",
+      "measured_weight_g",
+      "quality_flag",
+      "operator_notes"
+    ],
+    "expected_agent_conclusion": "La derive dimensionnelle observee sur les pieces produites par le moule MOULE-606-A est coherente avec une usure progressive de l'outillage. Les cotes augmentent lentement au fil des OF, depassant finalement les tolerances."
+  }
+]

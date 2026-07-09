@@ -1,0 +1,4 @@
+Variable,Cycle1,Cycle2,Cycle3
+timestamp,2026-07-09T12:00:00Z,2026-07-09T12:00:01Z,2026-07-09T12:00:02Z
+machine_id,m1,m1,m1
+cycle_time,2.5,2.4,2.6

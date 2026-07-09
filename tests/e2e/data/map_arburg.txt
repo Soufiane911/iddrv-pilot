@@ -1,0 +1,6 @@
+ARBURG Export File
+Machine: mach-Arburg-01
+Date: 09.07.2026 12:00:00
+Data:
+Cycle_Time;Inj_Pres;Cushion
+2.5;180.5;12.4

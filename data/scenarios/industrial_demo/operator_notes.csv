@@ -1,0 +1,11 @@
+note_id,timestamp,machine_erp_ref,production_order_id,operator_id,note_text
+NOTE-0001,2025-02-12 00:47:13.109108,152,OF-2025-0012,OP-042,Temperature matiere instable depuis changement lot. Plusieurs short shots constates.
+NOTE-0002,2025-02-12 03:46:58.388178,152,OF-2025-0012,OP-042,Zone 2 affiche des temperatures sous le seuil nominal. Verifier resistance chauffante.
+NOTE-0003,2025-02-12 13:47:27.889823,152,OF-2025-0020,OP-042,Plusieurs pieces avec bavures et short shots apres redemarrage. Temperatures pas stables.
+NOTE-0004,2025-02-11 08:29:36.313050,1003,OF-2025-0013,OP-037,Bulles dans les pieces apres changement matiere. Verifier sechage granules.
+NOTE-0005,2025-02-15 08:45:19.472694,606,OF-2025-0051,OP-051,Cotes des pieces augmentent anormalement. Moule commence a montrer des signes d'usure.
+NOTE-0006,2025-02-15 15:29:01.202507,606,OF-2025-0052,OP-051,Moule nettoye mais derive dimensionnelle toujours presente. Sera a surveiller.
+NOTE-0007,2025-02-14 08:00:00.000000,1003,OF-2025-0040,OP-037,Defauts intermittents. Cause possible: matiere ou parametres.
+NOTE-0008,2025-02-13 09:15:00.000000,152,OF-2025-0028,OP-053,Production nominale. Aucun probleme signale.
+NOTE-0009,2025-02-15 20:20:00.000000,1003,OF-2025-0049,OP-056,Nettoyage zone de travail effectue.
+NOTE-0010,2025-02-13 20:49:00.000000,606,OF-2025-0036,OP-034,"Controle qualite effectue, tout est conforme."

@@ -1,0 +1,13 @@
+event_id,timestamp,machine_erp_ref,production_order_id,event_type,duration_min,severity,description
+MAINT-0001,2025-02-12 08:00:00.000000,152,,maintenance preventive,118,low,Maintenance preventive programmee - Presse 152
+MAINT-0002,2025-02-12 08:00:00.000000,1003,,maintenance preventive,106,low,Maintenance preventive programmee - Presse 1003
+MAINT-0003,2025-02-12 08:00:00.000000,606,,maintenance preventive,63,low,Maintenance preventive programmee - Presse 606
+MAINT-0004,2025-02-15 08:00:00.000000,152,,maintenance preventive,72,low,Maintenance preventive programmee - Presse 152
+MAINT-0005,2025-02-15 08:00:00.000000,1003,,maintenance preventive,78,low,Maintenance preventive programmee - Presse 1003
+MAINT-0006,2025-02-15 08:00:00.000000,606,,maintenance preventive,113,low,Maintenance preventive programmee - Presse 606
+MAINT-0007,2025-02-13 12:00:00.000000,152,,nettoyage moule,26,low,Nettoyage moule Presse 152
+MAINT-0008,2025-02-14 12:00:00.000000,1003,,nettoyage moule,41,low,Nettoyage moule Presse 1003
+MAINT-0009,2025-02-15 12:00:00.000000,606,,nettoyage moule,35,low,Nettoyage moule Presse 606
+MAINT-0010,2025-02-12 12:39:32.108331,152,,arret machine,120,medium,Arret machine 152 pour maintenance
+MAINT-0011,2025-02-12 14:07:00.000000,152,OF-2025-0020,redemarrage,15,medium,Redemarrage machine 152 apres maintenance
+MAINT-0012,2025-02-11 06:02:00.000000,1003,OF-2025-0013,changement matiere,45,medium,Changement matiere sur presse 1003 suite au scenario S004

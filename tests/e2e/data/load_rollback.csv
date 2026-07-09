@@ -1,0 +1,4 @@
+Time,Machine,Cycle_Time,Inj_Pres,Cushion
+2026-07-09T15:00:00Z,mach-A,2.5,180.5,12.4
+2026-07-09T15:00:01Z,mach-A,2.5,180.5,12.4
+2026-07-09T15:00:02Z,non-existent-machine,2.5,180.5,12.4

@@ -1,0 +1,147 @@
+[
+  {
+    "canonical_metric": "cycle_time_s",
+    "description": "Temps de cycle total (fermeture moule → ouverture moule)",
+    "unit": "s",
+    "mappings": [
+      { "brand": "arburg",       "source_labels": ["t4012", "T4012", "Temps de cycle, valeur réelle", "tc"] },
+      { "brand": "engel",        "source_labels": ["t_cycle", "CycleTime", "cycle_t"] },
+      { "brand": "haitian",      "source_labels": ["CycleTime", "tCycle", "Cycle_T"] },
+      { "brand": "kraussmaffei", "source_labels": ["CycleTime", "t_zyklus"] },
+      { "brand": "sumitomo",     "source_labels": ["CycleTime", "tc_s"] },
+      { "brand": "fanuc",        "source_labels": ["CycleTime", "CYCLE_TIME"] },
+      { "brand": "generic",      "source_labels": ["cycle_time_s", "cycle_time", "CycleTime", "t_cycle", "tc", "temps_cycle", "cycle", "Cycle_Time", "Cycle_Time_ms"] }
+    ]
+  },
+  {
+    "canonical_metric": "dosing_time_s",
+    "description": "Temps de dosage / plastification",
+    "unit": "s",
+    "mappings": [
+      { "brand": "arburg",       "source_labels": ["t4015", "T4015", "Temps de dosage, valeur réelle", "t_dos"] },
+      { "brand": "engel",        "source_labels": ["t_dos", "ActivePlastificationTime", "PlastTime"] },
+      { "brand": "haitian",      "source_labels": ["DosingTime", "t_plast", "DosingT"] },
+      { "brand": "kraussmaffei", "source_labels": ["PlastificationTime", "t_dosage", "t_plast"] },
+      { "brand": "sumitomo",     "source_labels": ["ChargingTime", "t_charge"] },
+      { "brand": "fanuc",        "source_labels": ["DOSING_TIME", "DosingTime"] },
+      { "brand": "generic",      "source_labels": ["dosing_time_s", "dosing_time", "DosingTime", "t_dos", "t_dosage", "plastification"] }
+    ]
+  },
+  {
+    "canonical_metric": "injection_time_s",
+    "description": "Temps d'injection réel",
+    "unit": "s",
+    "mappings": [
+      { "brand": "arburg",       "source_labels": ["t4018", "T4018", "Temps d'injection, valeur réelle"] },
+      { "brand": "engel",        "source_labels": ["t_inj", "InjectionTime", "Inj_t"] },
+      { "brand": "haitian",      "source_labels": ["InjectionTime", "t_injection"] },
+      { "brand": "kraussmaffei", "source_labels": ["InjectionTime", "t_einspritzen"] },
+      { "brand": "sumitomo",     "source_labels": ["InjectionTime", "t_inj"] },
+      { "brand": "generic",      "source_labels": ["injection_time_s", "injection_time", "InjectionTime", "t_injection", "t_inj"] }
+    ]
+  },
+  {
+    "canonical_metric": "cushion_mm",
+    "description": "Matelas de matière (volume/position restant dans le fourreau après injection)",
+    "unit": "mm_or_cm3",
+    "mappings": [
+      { "brand": "arburg",       "source_labels": ["V4062", "v4062", "Matelas de matière, valeur réelle", "matelas"] },
+      { "brand": "engel",        "source_labels": ["v_mat", "Cushion", "cushion_vol"] },
+      { "brand": "haitian",      "source_labels": ["CushionVolume", "Cushion", "v_cushion"] },
+      { "brand": "kraussmaffei", "source_labels": ["Staukissen", "cushion", "v_staukissen"] },
+      { "brand": "sumitomo",     "source_labels": ["CushionPosition", "cushion_pos"] },
+      { "brand": "generic",      "source_labels": ["cushion_mm", "cushion", "matelas", "CushionVolume", "v_mat"] }
+    ]
+  },
+  {
+    "canonical_metric": "switchover_pressure_bar",
+    "description": "Pression au point de commutation injection → maintien",
+    "unit": "bar",
+    "mappings": [
+      { "brand": "arburg",       "source_labels": ["p4072", "P4072", "Pression de commutation, valeur réelle"] },
+      { "brand": "engel",        "source_labels": ["p_sw", "SwitchoverPressure", "p_umschalt"] },
+      { "brand": "haitian",      "source_labels": ["SwitchoverPressure", "p_switch"] },
+      { "brand": "kraussmaffei", "source_labels": ["UmschaltDruck", "switchover_pressure"] },
+      { "brand": "generic",      "source_labels": ["switchover_pressure_bar", "switchover_pressure", "SwitchoverPressure", "p4072", "p_switch", "pression_commut"] }
+    ]
+  },
+  {
+    "canonical_metric": "switchover_position",
+    "description": "Position de la vis au point de commutation",
+    "unit": "mm_or_cm3",
+    "mappings": [
+      { "brand": "arburg",       "source_labels": ["V4065", "v4065", "Volume de commutation, valeur réelle"] },
+      { "brand": "engel",        "source_labels": ["v_sw", "SwitchoverPosition", "pos_sw"] },
+      { "brand": "haitian",      "source_labels": ["SwitchoverPos", "v_switch"] },
+      { "brand": "generic",      "source_labels": ["switchover_position_mm", "switchover_position", "SwitchoverPos", "V4065", "v_switch", "v_commut"] }
+    ]
+  },
+  {
+    "canonical_metric": "good_parts",
+    "description": "Nombre de pièces bonnes pour ce cycle",
+    "unit": "count",
+    "mappings": [
+      { "brand": "arburg",       "source_labels": ["f077", "F077", "Pièces bonnes"] },
+      { "brand": "engel",        "source_labels": ["n_good", "GoodParts", "good_pc"] },
+      { "brand": "haitian",      "source_labels": ["GoodParts", "pieces_bonnes"] },
+      { "brand": "generic",      "source_labels": ["good_part", "good_parts", "GoodParts", "f077", "pieces_bonnes"] }
+    ]
+  },
+  {
+    "canonical_metric": "cycle_counter",
+    "description": "Compteur total de cycles machine",
+    "unit": "count",
+    "mappings": [
+      { "brand": "arburg",       "source_labels": ["f1403", "F1403", "Compteur cycles protocolés"] },
+      { "brand": "engel",        "source_labels": ["n_cycle", "CycleCounter", "cycle_count"] },
+      { "brand": "haitian",      "source_labels": ["CycleCount", "cycle_no"] },
+      { "brand": "generic",      "source_labels": ["cycle_counter", "CycleCounter", "f1403", "num_cycle"] }
+    ]
+  },
+  {
+    "canonical_metric": "oil_temperature_c",
+    "description": "Température de l'huile hydraulique",
+    "unit": "celsius",
+    "mappings": [
+      { "brand": "arburg",       "source_labels": ["t5001", "T_huile", "OilTemp"] },
+      { "brand": "engel",        "source_labels": ["T_oil", "OilTemperature"] },
+      { "brand": "haitian",      "source_labels": ["OilTemp", "t_huile"] },
+      { "brand": "generic",      "source_labels": ["oil_temperature_c", "oil_temperature", "OilTemp", "T_oil", "t_huile"] }
+    ]
+  },
+  {
+    "canonical_metric": "peak_pressure_bar",
+    "description": "Pression d'injection maximale (pression de pointe)",
+    "unit": "bar",
+    "mappings": [
+      { "brand": "arburg",       "source_labels": ["p4073", "Pression de pointe"] },
+      { "brand": "engel",        "source_labels": ["p_max", "PeakPressure"] },
+      { "brand": "generic",      "source_labels": ["peak_pressure_bar", "peak_pressure", "PeakPressure", "Inj_Pres", "Inj_Pres_psi"] }
+    ]
+  },
+  {
+    "canonical_metric": "clamp_force_kn",
+    "description": "Effort de verrouillage du moule",
+    "unit": "kn",
+    "mappings": [
+      { "brand": "engel",        "source_labels": ["f_clamp", "ClampForce"] },
+      { "brand": "generic",      "source_labels": ["clamp_force_kn", "clamp_force"] }
+    ]
+  },
+  {
+    "canonical_metric": "scrap_flag",
+    "description": "Indique si la pièce est un rebut",
+    "unit": "boolean",
+    "mappings": [
+      { "brand": "generic",      "source_labels": ["scrap_flag"] }
+    ]
+  },
+  {
+    "canonical_metric": "barrel_temp_zone1_c",
+    "description": "Température de la zone 1 du fourreau",
+    "unit": "celsius",
+    "mappings": [
+      { "brand": "generic",      "source_labels": ["barrel_temp_zone1_c", "barrel_temp_zone1"] }
+    ]
+  }
+]

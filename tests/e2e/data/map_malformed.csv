@@ -1,0 +1,4 @@
+Time,Machine,Cycle_Time
+2026-07-09T12:00:00Z,mach-A,2.5
+2026-07-09T12:00:01Z;mach-A;bad_val
+2026-07-09T12:00:02Z,mach-A,2.7
