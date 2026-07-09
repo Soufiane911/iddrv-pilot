@@ -2,16 +2,20 @@
 
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
+from fastapi import HTTPException
 
 from .config import settings
 from .db import check_connection
-from .errors import unhandled_exception_handler, validation_exception_handler
+from .errors import unhandled_exception_handler, validation_exception_handler, http_exception_handler
 from .schemas import HealthResponse
+from .api.incidents import router as incidents_router
 
 
 app = FastAPI(title=settings.app_name, version=settings.app_version)
 app.add_exception_handler(RequestValidationError, validation_exception_handler)
+app.add_exception_handler(HTTPException, http_exception_handler)
 app.add_exception_handler(Exception, unhandled_exception_handler)
+app.include_router(incidents_router)
 
 
 @app.get("/health", response_model=HealthResponse, tags=["system"])
