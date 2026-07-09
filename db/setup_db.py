@@ -340,11 +340,10 @@ def main():
         _ok("init.sql exécuté avec succès")
 
         # 3.5 Exécuter les migrations
-        migration_sql = SCRIPT_DIR / "migrations" / "001_multisite_and_status.sql"
-        if migration_sql.exists():
-            print("\n  ⚙️   Exécution de la migration 001_multisite_and_status.sql …")
+        for migration_sql in sorted((SCRIPT_DIR / "migrations").glob("*.sql")):
+            print(f"\n  ⚙️   Exécution de la migration {migration_sql.name} …")
             execute_sql_file(cursor, migration_sql)
-            _ok("Migration 001_multisite_and_status.sql exécutée avec succès")
+            _ok(f"Migration {migration_sql.name} exécutée avec succès")
 
         # 4. Exécuter seed_data.sql
         print("\n  🌱  Insertion des données de référence (seed_data.sql) …")

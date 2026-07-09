@@ -179,6 +179,7 @@ CREATE TABLE IF NOT EXISTS machine_cycles (
     cycle_time_s NUMERIC(7,3),
     dosing_time_s NUMERIC(7,3),
     injection_time_s NUMERIC(7,3),
+    cooling_time_s NUMERIC(7,3),
     cushion_mm NUMERIC(6,3),
     switchover_pressure_bar NUMERIC(8,2),
     switchover_position NUMERIC(6,3),
@@ -192,10 +193,15 @@ CREATE TABLE IF NOT EXISTS machine_cycles (
     barrel_temp_zone1_c NUMERIC(6,2),
     barrel_temp_zone2_c NUMERIC(6,2),
     barrel_temp_zone3_c NUMERIC(6,2),
+    mold_temperature_c NUMERIC(6,2),
     oil_temperature_c NUMERIC(6,2),
+    energy_kwh NUMERIC(10,4),
     -- Métadonnées de réconciliation
     link_confidence NUMERIC(4,3) DEFAULT 1.0,
     quality_flag VARCHAR(20) DEFAULT 'valid' CHECK (quality_flag IN ('valid', 'suspect', 'outlier', 'sensor_error')),
+    data_quality_status VARCHAR(20) DEFAULT 'valid',
+    part_quality_status VARCHAR(30),
+    defect_type VARCHAR(100),
     -- Données brutes supplémentaires (colonnes non canoniques)
     raw_data JSONB
 );

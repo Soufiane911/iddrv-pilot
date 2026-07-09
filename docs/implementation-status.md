@@ -4,7 +4,7 @@
 
 - Branch: `codex/iddrv-pilot`
 - Plan: `docs/orchestrated-implementation-plan.md`
-- Current gate: **G1 — dataset réaliste intégral en base**
+- Current gate: **G2 — incident S001 vertical et API v1**
 - State: **READY TO START**
 - Runtime OpenAI integration: **DEFERRED**
 
@@ -35,5 +35,22 @@
 
 ## Next gate
 
-G1 is ready to start. It requires three workers with non-overlapping ownership:
-`iddrv_data_worker`, `iddrv_backend_worker`, and `iddrv_frontend_worker`.
+G2 is ready to start. The next wave owns the deterministic S001 diagnostic, the
+first business API endpoints, and the first incident evidence contract.
+
+## G1 verification
+
+- Dataset database counts: **60 OF / 38 313 cycles / 408 quality checks / 12 maintenance events / 10 operator notes**.
+- Import passports: **7 completed, 0 pending, 0 rejected rows**.
+- Second complete scenario import: **38313 cycles before and after**.
+- Canonical process fields populated when present in source; missing source values remain null.
+- Defect types: **797** cycles; part quality: **37 516 good / 797 scrap**.
+- `python -m pytest -q`: **80 passed**.
+- Isolated E2E database: **50 passed in 36.72s**.
+- Backend skeleton: **2 tests passed**, compileall passed.
+- Frontend: lint passed, 1 Vitest passed, production build passed.
+- `docker compose config --quiet`: passed.
+
+## G1 commit
+
+- Pending orchestrator commit: `feat(data): load complete industrial demo dataset`

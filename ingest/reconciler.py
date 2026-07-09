@@ -25,6 +25,28 @@ DB_URL = os.getenv("DATABASE_URL", "postgresql://iddrv_user:iddrv_secret_2024@lo
 OVERLAP_WINDOW = timedelta(minutes=30)
 
 
+def normalize_bool_flag(value, default=False) -> bool:
+    """Normalise les booléens des CSV (True/False, 1/0) sans envoyer du texte SQL."""
+    if value is None or value == "":
+        return default
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return value != 0
+    return str(value).strip().lower() in {"true", "1", "yes", "y", "oui"}
+
+
+def normalize_good_parts(value) -> int:
+    """Retourne 0/1 pour la colonne SMALLINT good_parts."""
+    return 1 if normalize_bool_flag(value, default=True) else 0
+
+
+def derive_part_quality(raw_data, scrap_flag) -> tuple[str, str | None]:
+    """Retourne le statut pièce et le défaut canonique depuis la source brute."""
+    source = str((raw_data or {}).get("quality_flag", "good")).strip()
+    return ("scrap" if scrap_flag else "good", None if source.lower() in {"", "good", "ok", "valid"} else source)
+
+
 def get_db_connection():
     """Retourne une connexion à la base de données PostgreSQL."""
     return psycopg2.connect(DB_URL)
@@ -265,6 +287,11 @@ def insert_cycles(machine_cycles: list[dict], machine_id: int, passport_id: str)
         # Construction de la valeur pour raw_data (JSONB)
         raw_data = cycle.get("raw_data")
         raw_data_json = json.dumps(raw_data) if raw_data else None
+        def source_value(name):
+            value = cycle.get(name)
+            return value if value is not None else (raw_data or {}).get(name)
+        scrap_flag = normalize_bool_flag(cycle.get("scrap_flag", False))
+        part_quality_status, defect_type = derive_part_quality(raw_data, scrap_flag)
         source_row_hash = cycle.get("source_row_hash") or compute_source_row_hash(cycle)
 
         # Insertion du cycle
@@ -273,20 +300,22 @@ def insert_cycles(machine_cycles: list[dict], machine_id: int, passport_id: str)
                 time, machine_id, production_order_id, shift_id, passport_id,
                 source_line_no, source_row_hash, cycle_counter,
                 cycle_time_s, dosing_time_s, injection_time_s,
+                cooling_time_s,
                 cushion_mm, switchover_pressure_bar, switchover_position,
                 peak_pressure_bar, clamp_force_kn, mold_open_time_s,
                 good_parts, scrap_flag,
-                barrel_temp_zone1_c, oil_temperature_c,
-                link_confidence, quality_flag, raw_data
+                barrel_temp_zone1_c, barrel_temp_zone2_c, barrel_temp_zone3_c,
+                mold_temperature_c, oil_temperature_c, energy_kwh,
+                link_confidence, quality_flag, part_quality_status, defect_type, raw_data
             ) VALUES (
                 %s, %s, %s, %s, %s,
-                %s, %s, %s,
+                %s, %s, %s, %s, %s, %s,
                 %s, %s, %s,
                 %s, %s, %s,
                 %s, %s, %s,
                 %s, %s,
-                %s, %s,
-                %s, %s, %s
+                %s, %s, %s, %s,
+                %s, %s, %s, %s, %s
             )
             ON CONFLICT DO NOTHING
         """, (
@@ -298,20 +327,28 @@ def insert_cycles(machine_cycles: list[dict], machine_id: int, passport_id: str)
             cycle.get("source_line_no"),
             source_row_hash,
             cycle.get("cycle_counter"),
-            cycle.get("cycle_time_s"),
-            cycle.get("dosing_time_s"),
-            cycle.get("cushion_mm"),
-            cycle.get("switchover_pressure_bar"),
-            cycle.get("switchover_position"),
-            cycle.get("peak_pressure_bar"),
-            cycle.get("clamp_force_kn"),
-            cycle.get("mold_open_time_s"),
-            cycle.get("good_parts", 1),
-            bool(cycle.get("scrap_flag", False)),
-            cycle.get("barrel_temp_zone1_c"),
-            cycle.get("oil_temperature_c"),
+                source_value("cycle_time_s"),
+                source_value("dosing_time_s"),
+                source_value("injection_time_s"),
+                source_value("cooling_time_s"),
+                source_value("cushion_mm"),
+            source_value("switchover_pressure_bar"),
+            source_value("switchover_position"),
+            source_value("peak_pressure_bar"),
+            source_value("clamp_force_kn"),
+            source_value("mold_open_time_s"),
+            normalize_good_parts(cycle.get("good_parts", cycle.get("good_part", 1))),
+            scrap_flag,
+            source_value("barrel_temp_zone1_c"),
+            source_value("barrel_temp_zone2_c"),
+            source_value("barrel_temp_zone3_c"),
+            source_value("mold_temperature_c"),
+            source_value("oil_temperature_c"),
+            source_value("energy_kwh"),
             link_confidence,
             quality_flag,
+            part_quality_status,
+            defect_type,
             raw_data_json
         ))
         inserted += cursor.rowcount

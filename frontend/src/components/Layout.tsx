@@ -1,0 +1,3 @@
+import { NavLink, Outlet } from 'react-router-dom';
+import './layout.css';
+export function Layout() { return <div className="app-shell"><aside><div className="brand"><span className="brand-mark">I</span><span><strong>IDDRV</strong><small>Industrial data vault</small></span></div><nav><NavLink to="/" end>Vue atelier</NavLink><NavLink to="/health">Santé API</NavLink><NavLink to="/incidents">Incidents <span className="soon">bientôt</span></NavLink></nav><div className="sidebar-foot">G1 · socle application<br/><span>Mode démonstration</span></div></aside><main><header><div><p className="eyebrow">SUPERVISION INDUSTRIELLE</p><h1>Atelier</h1></div><div className="header-meta"><span className="live-dot"/> Environnement local</div></header><Outlet /></main></div> }

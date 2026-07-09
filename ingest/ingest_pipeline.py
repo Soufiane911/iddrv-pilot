@@ -15,6 +15,7 @@ import sys
 import json
 import hashlib
 import shutil
+import csv
 from types import SimpleNamespace
 import psycopg2
 import psycopg2.extras
@@ -442,9 +443,54 @@ def ingest_erp_file(file_path: str):
         raise e
 
 
+def ingest_context_file(file_path: str, kind: str):
+    """Import quality/maintenance/operator CSVs with stable IDs and provenance."""
+    path = Path(file_path)
+    rows = list(csv.DictReader(path.open(encoding="utf-8", newline="")))
+    if not rows:
+        return 0
+    conn = get_db_connection(); cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    file_hash = compute_file_hash(file_path)
+    cur.execute("SELECT id FROM import_passports WHERE file_hash=%s AND status='completed'", (file_hash,))
+    if cur.fetchone():
+        cur.close(); conn.close(); return 0
+    profile = SimpleNamespace(brand_detected=kind, is_transposed=False, encoding="utf-8", delimiter=",")
+    passport = create_import_passport(cur, file_path, file_hash, profile, {}, rows, len(rows), 0)
+    table = {"quality": "quality_checks", "maintenance": "maintenance_events", "notes": "operator_notes"}[kind]
+    for n, row in enumerate(rows, 1):
+        mid = resolve_machine_id(cur, str(row.get("machine_erp_ref", "")))
+        ts = _as_datetime(row.get("timestamp")); oid = row.get("production_order_id") or None
+        if kind == "quality":
+            sql = """INSERT INTO quality_checks (quality_check_id,time,production_order_id,machine_id,product_ref,sample_size,defect_count,defect_type,severity,measured_weight_g,target_weight_g,dimension_deviation_mm,visual_result,comment,passport_id,source_row_hash,part_quality_status) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING"""
+            vals = (row.get("quality_check_id"),ts,oid,mid,row.get("product_ref"),row.get("sample_size") or None,row.get("defect_count") or None,row.get("defect_type") or None,row.get("severity"),row.get("measured_weight_g") or None,row.get("target_weight_g") or None,row.get("dimension_deviation_mm") or None,row.get("visual_result"),row.get("comment"),passport,_row_hash(row),"defective" if int(row.get("defect_count") or 0)>0 else "conforming")
+        elif kind == "maintenance":
+            sql = """INSERT INTO maintenance_events (event_id,time,machine_id,production_order_id,event_type,duration_min,severity,description,passport_id,source_row_hash) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING"""
+            vals = (row.get("event_id"),ts,mid,oid,row.get("event_type"),row.get("duration_min") or None,row.get("severity"),row.get("description"),passport,_row_hash(row))
+        else:
+            sql = """INSERT INTO operator_notes (note_id,time,machine_id,production_order_id,operator_id,note_text,passport_id,source_row_hash) VALUES (%s,%s,%s,%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING"""
+            vals = (row.get("note_id"),ts,mid,oid,row.get("operator_id"),row.get("note_text"),passport,_row_hash(row))
+        cur.execute(sql, vals)
+        staging_kind = {"quality": "quality_check", "maintenance": "maintenance_event", "notes": "operator_note"}[kind]
+        cur.execute("INSERT INTO staging_import_rows (passport_id,source_line_no,source_kind,raw_data,normalized_data,source_row_hash,status) VALUES (%s,%s,%s,%s,%s,%s,'accepted') ON CONFLICT DO NOTHING", (passport,n,staging_kind,json.dumps(row),json.dumps(row),_row_hash(row)))
+    cur.execute("UPDATE import_passports SET status='completed', row_count_accepted=%s WHERE id=%s", (len(rows),passport)); conn.commit(); cur.close(); conn.close(); return len(rows)
+
+
+def ingest_scenario(directory: str):
+    """Import the complete industrial_demo scenario (ground_truth is never read)."""
+    root = Path(directory)
+    ingest_erp_file(str(root / "erp_orders.xlsx"))
+    for machine in ("152", "1003", "606"):
+        ingest_machine_file(str(root / f"machine_cycles_{machine}.csv"), machine)
+    ingest_context_file(str(root / "quality_checks.csv"), "quality")
+    ingest_context_file(str(root / "maintenance_events.csv"), "maintenance")
+    ingest_context_file(str(root / "operator_notes.csv"), "notes")
+
+
 if __name__ == "__main__":
     if len(sys.argv) >= 3 and sys.argv[1] == "--erp":
         ingest_erp_file(sys.argv[2])
+    elif len(sys.argv) >= 3 and sys.argv[1] == "--scenario":
+        ingest_scenario(sys.argv[2])
     elif len(sys.argv) >= 3:
         file_arg = sys.argv[1]
         machine_ref = sys.argv[2]
