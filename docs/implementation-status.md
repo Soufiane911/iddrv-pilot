@@ -4,8 +4,8 @@
 
 - Branch: `codex/iddrv-pilot`
 - Plan: `docs/orchestrated-implementation-plan.md`
-- Current gate: **G3 — interface atelier 2D**
-- State: **READY TO START**
+- Current gate: **G6 — packaging pilote on-premise**
+- State: **VALIDATION FINALE**
 - Runtime OpenAI integration: **DEFERRED**
 
 ## Baseline evidence
@@ -42,10 +42,40 @@
 - Focused tests: **5 passed**; full pre-existing suite remains green through the implemented test set.
 - Commit: `5799046 feat(diagnostics): deliver S001 evidence-backed investigation`.
 
-## Next gate
+## G3 verification
 
-G3 is ready to start: workshop 2D with a real API client, state colors, machine
-selection and incident side panel.
+- React/Vite routes: sites, workshop, incidents, incident detail, imports and login.
+- SVG workshop map: state colors, machine selection, keyboard activation, replay slider and loading/empty/error states.
+- Evidence-backed incident detail: investigation, hypotheses, proofs and human feedback.
+- Browser smoke: site → workshop → machine → replay → incident → investigation control; **passed** with Playwright.
+- Frontend checks: lint **passed**, Vitest **2 passed**, production build **passed**.
+- Commit: `4b1ca77 feat(ui): add workshop replay and incident investigation`.
+
+## G4 verification
+
+- Auth: Argon2id password hashes, HttpOnly/SameSite=Strict session cookie, signed identity, RBAC viewer/analyst/supervisor/admin.
+- Site isolation smoke: same ERP reference can exist on two sites; cross-site viewer receives **404**.
+- Viewer investigation blocked with **403**; analyst investigation and feedback succeed.
+- Diagnostic evaluation: six scenarios, Top-2 recall **1.0**, all cited evidence resolves.
+- Healthy windows: **6/6 abstentions**, abstention rate **1.0**.
+- Runtime scan: no OpenAI dependency/call and no runtime ground-truth access.
+- Commit: `1017ec0 feat(pilot): add local investigation, auth and multisite isolation`.
+
+## G5 verification
+
+- Watched-folder state: stable file, inbox → processing → archive/quarantine, retries/backoff and restart recovery.
+- SHA-256/advisory lock idempotence: duplicate deposit produces no second business import.
+- Probe mode is read-only and reports parser/mapping/unknown columns/units/invalid values/confidence.
+- Arburg Selogica/Gestica mapping version `arburg-selogica-gestica-v1` is ready to qualify; not declared field-validated.
+- Targeted data/ingestion checks: **16 passed**.
+- Commit: `819fa9b feat(ingestion): automate watched-folder imports`.
+
+## G6 validation in progress
+
+- Docker Compose services: TimescaleDB, API, worker, Redis and web gateway.
+- DB/Redis remain local-only; web is the only LAN-facing service.
+- Three.js is opt-in via `VITE_ENABLE_3D=false` and 2D remains complete fallback.
+- Backup/restore scripts and on-prem runbook are present.
 
 ## G1 verification
 

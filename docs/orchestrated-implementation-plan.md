@@ -6,8 +6,8 @@ Ce document constitue le plan exécutable pour transformer le socle IDDRV en app
 
 ### État du plan
 
-- **Exécution suspendue** jusqu'à confirmation explicite du retour des quotas.
-- Aucun nouvel agent ne doit être lancé avant cette confirmation.
+- **Exécution active** : le quota a été réinitialisé et les gates sont exécutés par vagues Luna.
+- Aucun agent ne crée de commit ; l'orchestrateur valide les handoffs et les tests.
 - L'intégration OpenAI de l'agent applicatif est reportée à une phase ultérieure.
 - Le premier pilote fonctionne entièrement avec un moteur de diagnostic déterministe local.
 
@@ -564,4 +564,3 @@ Lorsque les quotas reviennent, l'orchestrateur doit exécuter strictement :
 5. Attente des trois handoffs.
 6. Revue, tests, corrections et commit G1.
 7. Passage à G2 uniquement après validation complète de G1.
-

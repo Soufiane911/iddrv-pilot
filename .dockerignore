@@ -1,0 +1,13 @@
+.git
+.codex
+.agents
+**/__pycache__
+frontend/node_modules
+frontend/dist
+data/raw
+data/archive
+data/quarantine
+data/inbox
+tests/e2e/report.*
+*.pyc
+.env

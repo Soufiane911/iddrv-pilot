@@ -23,5 +23,10 @@ ingest/data/raw/
 
 tests/e2e/report.json
 tests/e2e/report.txt
+backups/
+data/inbox/
+data/archive/
+data/quarantine/
+data/watch/
 
 .DS_Store

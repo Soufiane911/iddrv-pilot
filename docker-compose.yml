@@ -10,8 +10,9 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-iddrv_user}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-iddrv_secret_2024}
       TIMESCALEDB_TELEMETRY: "off"
+    # DB remains local-only; the web gateway is the only LAN-facing service.
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - timescaledb_data:/var/lib/postgresql/data
       - ./db/init.sql:/docker-entrypoint-initdb.d/01_init.sql
@@ -30,7 +31,7 @@ services:
     container_name: iddrv_redis
     restart: unless-stopped
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     volumes:
       - redis_data:/data
     command: >
@@ -43,6 +44,64 @@ services:
       interval: 10s
       timeout: 3s
       retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-iddrv_user}:${POSTGRES_PASSWORD:-iddrv_secret_2024}@timescaledb:5432/${POSTGRES_DB:-iddrv}
+      REDIS_URL: redis://redis:6379/0
+      APP_ENV: ${APP_ENV:-pilot}
+      # Override in .env before any pilot deployment; this fallback is only for local compose validation.
+      SESSION_SECRET: ${SESSION_SECRET:-local-development-only-change-me}
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+    command: ["sh", "-c", "python db/setup_db.py --db-url \"$$DATABASE_URL\" && uvicorn backend.app.main:app --host 0.0.0.0 --port 8000"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
+  worker:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-iddrv_user}:${POSTGRES_PASSWORD:-iddrv_secret_2024}@timescaledb:5432/${POSTGRES_DB:-iddrv}
+      REDIS_URL: redis://redis:6379/0
+      INBOX_ROOT: /var/lib/iddrv/inbox
+      ARCHIVE_ROOT: /var/lib/iddrv/archive
+      QUARANTINE_ROOT: /var/lib/iddrv/quarantine
+      INGEST_WATCH_ROOT: /var/lib/iddrv
+      WATCH_INTERVAL_S: ${WATCH_INTERVAL_S:-5}
+    depends_on:
+      api:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: ["sh", "-c", "python -m ingest.watcher"]
+    volumes:
+      - ./data/inbox:/var/lib/iddrv/inbox
+      - ./data/archive:/var/lib/iddrv/archive
+      - ./data/quarantine:/var/lib/iddrv/quarantine
+
+  web:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      args:
+        VITE_ENABLE_3D: ${VITE_ENABLE_3D:-false}
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT:-8080}:80"
+    depends_on:
+      api:
+        condition: service_healthy
 
   # ─────────────────────────────────────────────────────
   # Redis Commander — Interface Web de monitoring Redis
