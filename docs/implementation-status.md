@@ -5,7 +5,7 @@
 - Branch: `codex/iddrv-pilot`
 - Plan: `docs/orchestrated-implementation-plan.md`
 - Current gate: **G6 — packaging pilote on-premise**
-- State: **VALIDATION FINALE**
+- State: **PASS — prêt pour pilote**
 - Runtime OpenAI integration: **DEFERRED**
 
 ## Baseline evidence
@@ -76,6 +76,22 @@
 - DB/Redis remain local-only; web is the only LAN-facing service.
 - Three.js is opt-in via `VITE_ENABLE_3D=false` and 2D remains complete fallback.
 - Backup/restore scripts and on-prem runbook are present.
+
+## G6 verification
+
+- `docker compose config --quiet`: **passed**; services are `timescaledb`, `api`, `worker`, `redis` and `web`.
+- `python tests/e2e/run_tests.py -t 1,2`: **50 passed, 0 failed** on a fresh isolated database.
+- Backup/restore smoke: **38 313 cycles restored** with the Timescale sidecar strategy.
+- Browser smoke 2D and opt-in Three.js smoke: **passed**.
+- No OpenAI call/dependency is present in runtime code.
+- Docker image build was not completed on this host because Docker registry metadata pulls hung; the Compose/Dockerfile recipe remains ready to build in a connected deployment environment.
+
+## Final verification
+
+- Python suite excluding the dedicated E2E harness: **47 passed**.
+- Frontend: lint **passed**, Vitest **2 passed**, production build **passed**.
+- Diagnostic evaluation: Top-2 recall **100 %**, healthy-window abstention **100 %**.
+- Final release commit: `d3e1965 release: package IDDRV on-prem pilot`.
 
 ## G1 verification
 
