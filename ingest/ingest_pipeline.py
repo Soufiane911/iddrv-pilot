@@ -487,7 +487,18 @@ def ingest_scenario(directory: str):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) >= 3 and sys.argv[1] == "--erp":
+    if len(sys.argv) >= 3 and sys.argv[1] == "--probe":
+        # Qualification is deliberately delegated to the pure probe module;
+        # this branch never opens PostgreSQL or creates an import passport.
+        try:
+            from ingest.probe import main as probe_main
+        except ModuleNotFoundError:
+            # ``python ingest/ingest_pipeline.py`` puts only ``ingest/`` on
+            # sys.path; add the project root for package-style probe imports.
+            sys.path.insert(0, str(PROJECT_ROOT))
+            from ingest.probe import main as probe_main
+        raise SystemExit(probe_main(sys.argv[2:]))
+    elif len(sys.argv) >= 3 and sys.argv[1] == "--erp":
         ingest_erp_file(sys.argv[2])
     elif len(sys.argv) >= 3 and sys.argv[1] == "--scenario":
         ingest_scenario(sys.argv[2])

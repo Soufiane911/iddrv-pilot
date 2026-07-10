@@ -1,0 +1,20 @@
+{
+  "version": "arburg-selogica-gestica-v1",
+  "brand": "arburg",
+  "site_id": "*",
+  "machine_erp_ref": "*",
+  "controllers": ["Selogica", "Gestica"],
+  "description": "Arburg text protocol exports qualified for pilot probing; field validation pending",
+  "aliases": {
+    "t4012": {"canonical": "cycle_time_s", "unit": "s"},
+    "t4015": {"canonical": "dosing_time_s", "unit": "s"},
+    "t4018": {"canonical": "injection_time_s", "unit": "s"},
+    "v4062": {"canonical": "cushion_mm", "unit": "mm_or_cm3"},
+    "p4072": {"canonical": "switchover_pressure_bar", "unit": "bar"},
+    "v4065": {"canonical": "switchover_position", "unit": "mm_or_cm3"},
+    "p4073": {"canonical": "peak_pressure_bar", "unit": "bar"},
+    "f077": {"canonical": "good_parts", "unit": "count"},
+    "f1403": {"canonical": "cycle_counter", "unit": "count"},
+    "t5001": {"canonical": "oil_temperature_c", "unit": "celsius"}
+  }
+}
