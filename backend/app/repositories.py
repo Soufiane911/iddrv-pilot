@@ -7,20 +7,28 @@ def _incident(row):
     keys = ("id","site_id","machine_id","machine_erp_ref","production_order_id","status","severity","symptom","defect_type","started_at","ended_at","created_at","data_cutoff","confidence")
     return dict(zip(keys, row))
 
-def list_incidents(site_id=None, start=None, end=None, status=None):
+def list_incidents(site_id=None, start=None, end=None, status=None, machine_id=None, allowed_site_ids=None, limit=None, offset=0):
     clauses, args = [], []
     if site_id is not None: clauses.append("i.site_id=%s"); args.append(site_id)
+    if machine_id is not None: clauses.append("i.machine_id=%s"); args.append(machine_id)
+    if allowed_site_ids is not None:
+        if not allowed_site_ids:
+            return []
+        clauses.append("i.site_id = ANY(%s)"); args.append(list(allowed_site_ids))
     if start is not None: clauses.append("i.started_at >= %s"); args.append(start)
     if end is not None: clauses.append("i.started_at <= %s"); args.append(end)
     if status is not None: clauses.append("i.status=%s"); args.append(status)
     where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
     sql = """SELECT i.id,i.site_id,i.machine_id,m.erp_ref,i.production_order_id,i.status,i.severity,i.symptom,i.defect_type,i.started_at,i.ended_at,i.created_at,i.data_cutoff,i.confidence FROM incidents i LEFT JOIN machines m ON m.id=i.machine_id""" + where + " ORDER BY i.started_at DESC"
+    if limit is not None:
+        sql += " LIMIT %s OFFSET %s"
+        args.extend([limit, max(0, offset)])
     with get_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(sql, args); return [_incident(r) for r in cur.fetchall()]
 
-def get_incident(incident_id: UUID):
-    rows = list_incidents()
+def get_incident(incident_id: UUID, allowed_site_ids=None):
+    rows = list_incidents(allowed_site_ids=allowed_site_ids)
     return next((r for r in rows if str(r["id"]) == str(incident_id)), None)
 
 def get_evidence(incident_id: UUID):
@@ -38,6 +46,86 @@ def save_feedback(incident_id: UUID, verdict: str, comment: str | None):
         with conn.cursor() as cur:
             cur.execute(sql,(str(incident_id),verdict,comment)); row=cur.fetchone(); conn.commit()
             return dict(id=row[0],incident_id=row[1],verdict=row[2],comment=row[3])
+
+
+def list_proposals(incident_id: UUID | None = None, allowed_site_ids=None):
+    clauses, args = [], []
+    if incident_id is not None:
+        clauses.append("p.incident_id=%s"); args.append(str(incident_id))
+    if allowed_site_ids is not None:
+        if not allowed_site_ids:
+            return []
+        clauses.append("i.site_id=ANY(%s)"); args.append(list(allowed_site_ids))
+    where = " WHERE " + " AND ".join(clauses) if clauses else ""
+    sql = """SELECT p.id,p.incident_id,p.run_id,p.action_code,p.label,p.status,p.created_at
+             FROM action_proposals p JOIN incidents i ON i.id=p.incident_id""" + where + " ORDER BY p.created_at DESC"
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql, args)
+            rows = cur.fetchall()
+    return [dict(id=r[0], incident_id=r[1], run_id=r[2], action_code=r[3], label=r[4], status=r[5], created_at=r[6]) for r in rows]
+
+
+def get_proposal(proposal_id: UUID, allowed_site_ids=None):
+    clauses, args = ["p.id=%s"], [str(proposal_id)]
+    if allowed_site_ids is not None:
+        if not allowed_site_ids:
+            return None
+        clauses.append("i.site_id=ANY(%s)"); args.append(list(allowed_site_ids))
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""SELECT p.id,p.incident_id,p.run_id,p.action_code,p.label,p.status,p.created_at
+                           FROM action_proposals p JOIN incidents i ON i.id=p.incident_id
+                           WHERE """ + " AND ".join(clauses), args)
+            row = cur.fetchone()
+    if row is None:
+        return None
+    return dict(id=row[0], incident_id=row[1], run_id=row[2], action_code=row[3], label=row[4], status=row[5], created_at=row[6])
+
+
+def create_proposal(incident_id: UUID, action_code: str, label: str, run_id: UUID | None = None):
+    sql = """INSERT INTO action_proposals(incident_id,run_id,action_code,label)
+             VALUES (%s,%s,%s,%s)
+             ON CONFLICT (incident_id,action_code) DO UPDATE SET label=EXCLUDED.label
+             RETURNING id,incident_id,run_id,action_code,label,status,created_at"""
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql, (str(incident_id), str(run_id) if run_id else None, action_code, label))
+            row = cur.fetchone(); conn.commit()
+    return dict(id=row[0], incident_id=row[1], run_id=row[2], action_code=row[3], label=row[4], status=row[5], created_at=row[6])
+
+
+def decide_proposal(proposal_id: UUID, user_id: str, status: str, reason: str | None):
+    sql = """WITH decision AS (
+               INSERT INTO action_proposal_decisions(proposal_id,decided_by,status,reason)
+               VALUES (%s,%s,%s,%s) RETURNING id,proposal_id,status,reason,decided_at
+             )
+             UPDATE action_proposals p SET status=CASE WHEN %s='approved' THEN 'accepted' ELSE 'rejected' END
+             FROM decision d WHERE p.id=d.proposal_id
+             RETURNING d.id,d.proposal_id,d.status,d.reason,d.decided_at"""
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql, (str(proposal_id), str(user_id), status, reason, status))
+            row = cur.fetchone(); conn.commit()
+    if row is None:
+        return None
+    return dict(id=row[0], proposal_id=row[1], status=row[2], reason=row[3], decided_at=row[4])
+
+
+def get_investigation(run_id: UUID, allowed_site_ids=None):
+    clauses, args = ["r.id=%s"], [str(run_id)]
+    if allowed_site_ids is not None:
+        if not allowed_site_ids:
+            return None
+        clauses.append("i.site_id=ANY(%s)"); args.append(list(allowed_site_ids))
+    where = " AND ".join(clauses)
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT r.id,r.incident_id,r.engine,r.status,r.started_at,r.completed_at,r.data_cutoff,r.result FROM diagnostic_runs r JOIN incidents i ON i.id=r.incident_id WHERE " + where, args)
+            row = cur.fetchone()
+    if row is None:
+        return None
+    return dict(id=row[0], incident_id=row[1], engine=row[2], status=row[3], started_at=row[4], completed_at=row[5], data_cutoff=row[6], result=row[7])
 
 def persist_investigation(incident_id, result, as_of):
     """Persist engine output and return its run id (JSONB values are adapted by psycopg)."""

@@ -1,4 +1,4 @@
-"""IDDVR FastAPI application skeleton (G1)."""
+"""IDDVR FastAPI application."""
 
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
@@ -9,6 +9,12 @@ from .db import check_connection
 from .errors import unhandled_exception_handler, validation_exception_handler, http_exception_handler
 from .schemas import HealthResponse
 from .api.incidents import router as incidents_router
+from .api.sites import router as sites_router
+from .api.machines import router as machines_router
+from .api.auth import router as auth_router
+from .api.imports import router as imports_router
+from .api.actions import router as actions_router
+from .api.investigations import router as investigations_router
 
 
 app = FastAPI(title=settings.app_name, version=settings.app_version)
@@ -16,6 +22,12 @@ app.add_exception_handler(RequestValidationError, validation_exception_handler)
 app.add_exception_handler(HTTPException, http_exception_handler)
 app.add_exception_handler(Exception, unhandled_exception_handler)
 app.include_router(incidents_router)
+app.include_router(sites_router)
+app.include_router(machines_router)
+app.include_router(auth_router)
+app.include_router(imports_router)
+app.include_router(actions_router)
+app.include_router(investigations_router)
 
 
 @app.get("/health", response_model=HealthResponse, tags=["system"])

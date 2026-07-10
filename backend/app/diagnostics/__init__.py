@@ -5,12 +5,14 @@ repository implementing :class:`DiagnosticRepository` and serialize the
 returned dataclasses to the v1 contract.
 """
 
-from .engine import DiagnosticEngine
+from .engine import DiagnosticEngine, DeterministicInvestigator, Investigator
 from .models import Investigation, InsufficientDataError
 from .repository import DiagnosticRepository, InMemoryDiagnosticRepository
 
 __all__ = [
     "DiagnosticEngine",
+    "DeterministicInvestigator",
+    "Investigator",
     "DiagnosticRepository",
     "InMemoryDiagnosticRepository",
     "Investigation",
