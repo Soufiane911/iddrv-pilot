@@ -11,7 +11,7 @@
 - Work only inside the file ownership declared in the task briefing.
 - Preserve user changes and unrelated work.
 - Never run destructive Git commands or delete Docker volumes.
-- Never commit, stage, create branches, push, or rewrite history. Git belongs to the orchestrator.
+- Never commit unless the user explicitly asks you to. Before committing, run the full verification suite and stage only intended files. Never push or rewrite history.
 - Use `apply_patch` for hand-written file changes.
 - Keep secrets out of the repository and never print credentials.
 - Do not add an OpenAI dependency or make OpenAI API calls before the deferred phase is explicitly activated.

@@ -8,6 +8,8 @@ data/raw
 data/archive
 data/quarantine
 data/inbox
+data/processing
+data/scenarios/**/ground_truth.json
 tests/e2e/report.*
 *.pyc
 .env

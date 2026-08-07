@@ -3,10 +3,15 @@ __pycache__/
 *$py.class
 
 .pytest_cache/
+.ruff_cache/
 .coverage
 htmlcov/
 
 .agents/
+.claude/
+.factory/
+.pi/
+.vite/
 
 .env
 .venv/
@@ -25,8 +30,13 @@ tests/e2e/report.json
 tests/e2e/report.txt
 backups/
 data/inbox/
+data/processing/
 data/archive/
 data/quarantine/
 data/watch/
 
 .DS_Store
+
+# Veille documents (PDF/archives) are evidence on disk, not versioned
+source-plasturgie/**/*.pdf
+source-plasturgie/**/*.zip

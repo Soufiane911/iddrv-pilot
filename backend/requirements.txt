@@ -1,4 +1,12 @@
-fastapi>=0.117,<1
+fastapi>=0.117,<0.118
 uvicorn[standard]>=0.30,<1
 psycopg2-binary>=2.9
 argon2-cffi>=23.1,<26
+prometheus-client>=0.21,<1
+chardet>=5.0
+pandas>=2.0
+openpyxl>=3.1
+xlrd>=2.0,<3
+redis>=5.0,<7
+scikit-learn>=1.5,<2
+joblib>=1.4,<2

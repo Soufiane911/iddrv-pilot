@@ -9,7 +9,7 @@ RUN pip install --no-cache-dir -r /app/backend/requirements.txt
 COPY backend /app/backend
 COPY db /app/db
 COPY ingest /app/ingest
-COPY data/scenarios/industrial_demo /app/data/scenarios/industrial_demo
-
-RUN mkdir -p /var/lib/iddrv/inbox /var/lib/iddrv/archive /var/lib/iddrv/quarantine
+COPY ml /app/ml
+COPY models /app/models
+RUN mkdir -p /var/lib/iddrv/inbox /var/lib/iddrv/processing /var/lib/iddrv/archive /var/lib/iddrv/quarantine /var/lib/iddrv/raw
 EXPOSE 8000

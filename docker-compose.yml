@@ -8,9 +8,9 @@ services:
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-iddrv}
       POSTGRES_USER: ${POSTGRES_USER:-iddrv_user}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-iddrv_secret_2024}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
       TIMESCALEDB_TELEMETRY: "off"
-    # DB remains local-only; the web gateway is the only LAN-facing service.
+    # Database remains local-only.
     ports:
       - "127.0.0.1:5432:5432"
     volumes:
@@ -51,11 +51,18 @@ services:
       dockerfile: backend/Dockerfile
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-iddrv_user}:${POSTGRES_PASSWORD:-iddrv_secret_2024}@timescaledb:5432/${POSTGRES_DB:-iddrv}
+      DATABASE_URL: ${DOCKER_DATABASE_URL:?DOCKER_DATABASE_URL must be set with URL-encoded credentials}
       REDIS_URL: redis://redis:6379/0
       APP_ENV: ${APP_ENV:-pilot}
-      # Override in .env before any pilot deployment; this fallback is only for local compose validation.
-      SESSION_SECRET: ${SESSION_SECRET:-local-development-only-change-me}
+      ALLOW_ANONYMOUS_READS: ${ALLOW_ANONYMOUS_READS:-false}
+      # The API refuses to start in pilot mode unless this is explicitly set.
+      SESSION_SECRET: ${SESSION_SECRET:-}
+      # Set true whenever the web gateway is served through HTTPS.
+      SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-false}
+      # Optional scraper secret for GET /metrics (X-Metrics-Token or Bearer).
+      # Without it in pilot mode, only an admin session can read metrics.
+      METRICS_TOKEN: ${METRICS_TOKEN:-}
+      METRICS_PUBLIC: ${METRICS_PUBLIC:-false}
     depends_on:
       timescaledb:
         condition: service_healthy
@@ -72,23 +79,42 @@ services:
       dockerfile: backend/Dockerfile
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-iddrv_user}:${POSTGRES_PASSWORD:-iddrv_secret_2024}@timescaledb:5432/${POSTGRES_DB:-iddrv}
+      DATABASE_URL: ${DOCKER_DATABASE_URL:?DOCKER_DATABASE_URL must be set with URL-encoded credentials}
       REDIS_URL: redis://redis:6379/0
       INBOX_ROOT: /var/lib/iddrv/inbox
       ARCHIVE_ROOT: /var/lib/iddrv/archive
       QUARANTINE_ROOT: /var/lib/iddrv/quarantine
+      RAW_STORE_PATH: /var/lib/iddrv/raw
       INGEST_WATCH_ROOT: /var/lib/iddrv
       WATCH_INTERVAL_S: ${WATCH_INTERVAL_S:-5}
+      # Liveness file written each poll by ingest.watcher (see heartbeat_is_fresh).
+      WORKER_HEARTBEAT_PATH: /var/lib/iddrv/processing/.worker_heartbeat
+      WORKER_HEARTBEAT_MAX_AGE_S: ${WORKER_HEARTBEAT_MAX_AGE_S:-90}
     depends_on:
       api:
         condition: service_healthy
       redis:
         condition: service_healthy
-    command: ["sh", "-c", "python -m ingest.watcher"]
+    command: ["python", "-m", "ingest.watcher", "--root", "/var/lib/iddrv", "--poll-seconds", "${WATCH_INTERVAL_S:-5}", "--stable-seconds", "${STABLE_SECONDS:-10}"]
     volumes:
       - ./data/inbox:/var/lib/iddrv/inbox
+      - ./data/processing:/var/lib/iddrv/processing
       - ./data/archive:/var/lib/iddrv/archive
       - ./data/quarantine:/var/lib/iddrv/quarantine
+      - ./data/raw:/var/lib/iddrv/raw
+    healthcheck:
+      # Fresh heartbeat proves the poll loop is alive (not merely that PID 1 exists).
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import os, sys; from pathlib import Path; from ingest.watcher import heartbeat_is_fresh; path = Path(os.environ.get('WORKER_HEARTBEAT_PATH', '/var/lib/iddrv/processing/.worker_heartbeat')); max_age = float(os.environ.get('WORKER_HEARTBEAT_MAX_AGE_S', '90')); sys.exit(0 if heartbeat_is_fresh(path, max_age_seconds=max_age) else 1)",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 45s
 
   web:
     build:
@@ -96,9 +122,11 @@ services:
       dockerfile: frontend/Dockerfile
       args:
         VITE_ENABLE_3D: ${VITE_ENABLE_3D:-false}
+        VITE_SKIP_AUTH: ${VITE_SKIP_AUTH:-false}
     restart: unless-stopped
+    # Safe default: local HTTP only. Publish through an HTTPS reverse proxy for LAN access.
     ports:
-      - "${WEB_PORT:-8080}:80"
+      - "${WEB_BIND_ADDRESS:-127.0.0.1}:${WEB_PORT:-8080}:80"
     depends_on:
       api:
         condition: service_healthy
