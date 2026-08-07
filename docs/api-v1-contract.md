@@ -9,6 +9,9 @@ Ce contrat est la source partagée de G2. Les agents backend et frontend ne doiv
 - Les périodes historiques utilisent toujours `from`, `to` ou `as_of`.
 - Les réponses d'erreur utilisent `{ "error": { "code": "...", "message": "...", "details": {} } }`.
 - Les identifiants sont opaques pour le frontend.
+- Les cycles bruts sont exposés uniquement par une route authentifiée et bornée,
+  pour alimenter l'inférence HDT ; ils ne doivent jamais inclure la vérité
+  terrain d'évaluation.
 
 ## Incident
 
@@ -61,6 +64,18 @@ Ce contrat est la source partagée de G2. Les agents backend et frontend ne doiv
   "next_check": "inspect_barrel_zone_2_heating"
 }
 ```
+
+## Cycles bruts pour HDT
+
+```text
+GET /api/v1/machines/{machine_id}/cycles?to=&limit=20
+```
+
+La route vérifie l'isolation par site, accepte une date `to` ISO-8601 avec
+fuseau et une limite de 1 à 100, puis retourne les cycles `time <= to` en ordre
+chronologique. Les champs process correspondent au contrat
+`ml.process_drift.RAW_NUMERIC_FEATURES`. Les points agrégés de timeline ne
+peuvent pas être utilisés comme substitut.
 
 ## Endpoints G2
 

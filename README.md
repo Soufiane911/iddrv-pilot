@@ -14,9 +14,10 @@
 5. [Formats de fichiers supportés](#5-formats-de-fichiers-supportés)
 6. [Modèle canonique EUROMAP 77/83](#6-modèle-canonique-euromap-7783)
 7. [Structure du projet](#7-structure-du-projet)
-8. [Variables d'environnement](#8-variables-denvironnement)
-9. [Tests](#9-tests)
-10. [Contribuer](#10-contribuer)
+8. [Documentation](#8-documentation)
+9. [Variables d'environnement](#9-variables-denvironnement)
+10. [Tests](#10-tests)
+11. [Contribuer](#11-contribuer)
 
 ---
 
@@ -262,70 +263,70 @@ Pour chaque cycle machine horodaté :
 
 ```
 ProjetSeptembre/
-│
-├── docker-compose.yml          <- PostgreSQL + TimescaleDB + Redis
-├── requirements.txt            <- Dépendances Python
-├── demo_end_to_end.py          <- Démonstration complète (point d'entrée)
-├── README.md                   <- Ce fichier
-│
-├── db/
-│   ├── init.sql                <- Schéma complet (tables, hypertable, index, vues)
-│   ├── seed_data.sql           <- Données de référence (5 machines, aliases)
-│   └── setup_db.py             <- Script de setup autonome (Python + psycopg2)
-│
-├── ingest/
-│   ├── profiler.py             <- Détection de format (encodage, délimiteur, marque)
-│   ├── loader.py               <- Chargement et normalisation des fichiers
-│   ├── mapper.py               <- Traduction colonnes -> modèle canonique
-│   ├── reconciler.py           <- Réconciliation ERP <-> cycles + insertion DB
-│   ├── ingest_pipeline.py      <- Orchestrateur complet (CLI standalone)
-│   ├── generate_samples.py     <- Générateur de données d'exemples réalistes
-│   └── mappers/
-│       └── canonical_dict.json <- Dictionnaire de mapping EUROMAP 77/83
-│
-├── data/
-│   ├── samples/                <- Fichiers d'exemples générés
-│   │   ├── arburg_1003_cycles.txt
-│   │   ├── engel_152_cycles.csv
-│   │   ├── transposed_606_tubes.txt
-│   │   └── erp_trs_fevrier.xlsx
-│   └── raw/                    <- Archivage des fichiers bruts (créé automatiquement)
-│
-├── tests/
-│   └── test_ingestion.py       <- Suite de tests (32 tests, pytest)
-│
-└── docs/
-    └── superpowers/specs/
-        └── industrial-ingestion-backend-db-design.md
+├── backend/              <- API FastAPI, sécurité et diagnostic
+├── frontend/             <- Application React, vues 2D et 3D
+├── ingest/               <- Profilage, mapping, ingestion et worker
+├── db/                   <- Schéma, migrations et données de référence
+├── data/                 <- Échantillons et scénario industriel
+├── evals/                <- Évaluation du moteur de diagnostic
+├── tests/                <- Tests Python, API et E2E
+├── scripts/              <- Administration, sauvegarde et restauration
+├── docs/                 <- Documentation technique et universitaire
+├── docker-compose.yml    <- Déploiement local on-premise
+├── demo_end_to_end.py    <- Démonstration d'ingestion et réconciliation
+└── README.md             <- Point d'entrée du projet
 ```
 
 ---
 
-## 8. Variables d'environnement
+## 8. Documentation
+
+La documentation est indexée dans [`docs/README.md`](docs/README.md).
+
+- `docs/project/` : demande et cadrage initial ;
+- `docs/product/` : brief produit, design et preuves frontend ;
+- `docs/certification/` : matrice C1-C21, soutenance et références ;
+- `docs/superpowers/` : spécifications et plans détaillés ;
+- `docs/archive/` : documents historiques qui ne décrivent plus l'état courant.
+
+---
+
+## 9. Variables d'environnement
 
 | Variable | Défaut | Description |
 |----------|--------|-------------|
-| `DATABASE_URL` | `postgresql://iddrv_user:iddrv_secret_2024@localhost:5432/iddrv` | URL PostgreSQL complète |
+| `DATABASE_URL` | requis (voir `.env.example`) | URL PostgreSQL locale complète pour les scripts hôte |
+| `DOCKER_DATABASE_URL` | requis | URL PostgreSQL utilisée par API/worker dans Compose (`timescaledb` comme hôte) |
 | `RAW_STORE_PATH` | `./data/raw` | Répertoire d'archivage des fichiers bruts |
 | `POSTGRES_DB` | `iddrv` | Nom de la base (Docker) |
 | `POSTGRES_USER` | `iddrv_user` | Utilisateur PostgreSQL (Docker) |
-| `POSTGRES_PASSWORD` | `iddrv_secret_2024` | Mot de passe PostgreSQL (Docker) |
+| `POSTGRES_PASSWORD` | requis, sans valeur par défaut | Mot de passe PostgreSQL (Docker) |
 
 ```bash
 cp .env.example .env
-# Éditez .env selon votre environnement
+# Éditez .env selon votre environnement.
+# Les caractères réservés du mot de passe doivent être encodés dans les URL PostgreSQL.
 ```
 
 ---
 
-## 9. Tests
+## 10. Tests
 
 ```bash
 cd ingest
 python -m pytest ../tests/test_ingestion.py -v
 ```
 
-La suite couvre **32 tests unitaires** :
+Pour la suite E2E destructive, utiliser exclusivement PostgreSQL local `iddrv_test` et Redis local DB 1, puis définir explicitement dans l’environnement local protégé :
+
+```dotenv
+E2E_DATABASE_URL=postgresql://<utilisateur>:<mot-de-passe-encodé>@localhost:5432/iddrv_test
+E2E_DESTRUCTIVE_CLEANUP_CONFIRMATION=iddrv_test:truncate-and-redis-1:flush
+```
+
+Le runner refuse toute autre cible, les paramètres de routage dans les URL et une base dépourvue de sentinelle E2E. Lancer ensuite `python tests/e2e/run_tests.py --tier 1,2`.
+
+La suite d’ingestion couvre notamment :
 - Profiling de format (encodage, délimiteur, marque, transposition)
 - Mapping de colonnes (Arburg, Engel, générique, confiance)
 - Chargement des 4 types de fichiers exemples
@@ -334,7 +335,7 @@ La suite couvre **32 tests unitaires** :
 
 ---
 
-## 10. Contribuer
+## 11. Contribuer
 
 ### Ajouter le support d'une nouvelle marque
 
