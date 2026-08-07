@@ -1,0 +1,21 @@
+{
+  "schema": "iddrv.structural-profile",
+  "schema_version": 1,
+  "profile_id": "kistler-process-v1",
+  "profile_version": "1.0.0",
+  "status": "candidate",
+  "match_enabled": false,
+  "fingerprint": null,
+  "mapping": {
+    "parser_version": "kistler-process-v1"
+  },
+  "qualification": {
+    "evidence": "real export family observed; headers pending controlled capture",
+    "reason_disabled": "no field-validated structural fingerprint",
+    "field_validated": false
+  },
+  "approval": {
+    "approved_at": null,
+    "approved_by": null
+  }
+}

@@ -34,7 +34,7 @@ SAMPLES_DIR  = PROJECT_ROOT / "data" / "samples"
 
 DB_URL = os.getenv(
     "DATABASE_URL",
-    "postgresql://iddrv_user:iddrv_secret_2024@localhost:5432/iddrv"
+    "postgresql://iddrv_user@localhost:5432/iddrv"
 )
 
 ERP_FILE = "erp_trs_fevrier.xlsx"

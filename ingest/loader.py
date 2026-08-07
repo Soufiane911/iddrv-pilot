@@ -16,9 +16,14 @@ import pandas as pd
 from datetime import datetime, date, timedelta, timezone
 from pathlib import Path
 from typing import Generator
+from zoneinfo import ZoneInfo
 
-from profiler import FileProfile, profile_file
-from mapper import build_column_map, map_row, get_mapping_confidence
+try:
+    from .profiler import FileProfile, profile_file
+    from .mapper import build_column_map, map_row, get_mapping_confidence
+except ImportError:  # direct script compatibility
+    from profiler import FileProfile, profile_file
+    from mapper import build_column_map, map_row, get_mapping_confidence
 
 
 def compute_file_hash(file_path: str) -> str:
@@ -57,9 +62,10 @@ def _parse_source_datetime(value) -> datetime | None:
     if value is None:
         return None
     if isinstance(value, datetime):
-        return _normalize_datetime_utc(value)
+        return value if value.tzinfo is None else value.astimezone(timezone.utc)
     if hasattr(value, "to_pydatetime"):
-        return _normalize_datetime_utc(value.to_pydatetime())
+        parsed = value.to_pydatetime()
+        return parsed if parsed.tzinfo is None else parsed.astimezone(timezone.utc)
 
     text = str(value).strip()
     if not text or text.lower() in {"nan", "nat"}:
@@ -73,7 +79,8 @@ def _parse_source_datetime(value) -> datetime | None:
 
     iso_text = text.replace("Z", "+00:00")
     try:
-        return _normalize_datetime_utc(datetime.fromisoformat(iso_text))
+        parsed = datetime.fromisoformat(iso_text)
+        return parsed if parsed.tzinfo is None else parsed.astimezone(timezone.utc)
     except ValueError:
         pass
 
@@ -88,7 +95,7 @@ def _parse_source_datetime(value) -> datetime | None:
         "%d.%m.%y %H:%M",
     ):
         try:
-            return _normalize_datetime_utc(datetime.strptime(text, fmt))
+            return datetime.strptime(text, fmt)
         except ValueError:
             continue
     return None
@@ -132,7 +139,7 @@ def _decimal_fraction_to_time(fraction: str, ref_date: date = None) -> datetime 
         return None
 
 
-def read_arburg_protocol(profile: FileProfile) -> list[dict]:
+def read_arburg_protocol(profile: FileProfile, mapping_builder=build_column_map) -> list[dict]:
     """
     Lit un fichier protocole Arburg (format tabulaire avec métadonnées en haut).
     Structure attendue :
@@ -169,7 +176,7 @@ def read_arburg_protocol(profile: FileProfile) -> list[dict]:
                 machine_id_meta = line.split(";", 1)[1].strip()
 
     # Construction du mapping de colonnes
-    col_map = build_column_map(headers, brand=profile.brand_detected)
+    col_map = mapping_builder(headers, brand=profile.brand_detected)
 
     # Lecture des lignes de données
     current_date = ref_date
@@ -221,7 +228,7 @@ def read_arburg_protocol(profile: FileProfile) -> list[dict]:
     return rows, col_map
 
 
-def read_transposed_file(profile: FileProfile) -> list[dict]:
+def read_transposed_file(profile: FileProfile, mapping_builder=build_column_map) -> list[dict]:
     """
     Lit un fichier transposé (ex: data février tubes.txt en UTF-16).
     Chaque ligne = un paramètre, chaque colonne = un cycle.
@@ -302,7 +309,7 @@ def read_transposed_file(profile: FileProfile) -> list[dict]:
     real_param_names = param_names[param_start_idx:]
 
     # Construire le mapping de colonnes sur les noms de paramètres
-    col_map = build_column_map(real_param_names, brand=profile.brand_detected)
+    col_map = mapping_builder(real_param_names, brand=profile.brand_detected)
 
     # Assembler les cycles
     for cycle_idx in range(num_cycles):
@@ -396,7 +403,14 @@ def read_erp_trs_xlsx(file_path: str, sheet_name: str = "Données_Audit") -> lis
     return orders
 
 
-def load_file(file_path: str) -> tuple[list[dict], FileProfile, dict]:
+def load_file(
+    file_path: str,
+    *,
+    site_id: int | str | None = None,
+    machine_erp_ref: str | None = None,
+    parser_version: str = "arburg-selogica-gestica-v1",
+    source_timezone: str | None = None,
+) -> tuple[list[dict], FileProfile, dict]:
     """
     Point d'entrée principal du loader.
     Profile le fichier puis le lit avec le bon lecteur.
@@ -404,11 +418,24 @@ def load_file(file_path: str) -> tuple[list[dict], FileProfile, dict]:
     Retourne (lignes_canoniques, profil, mapping_colonnes).
     """
     profile = profile_file(file_path)
+    mapping_builder = build_column_map
+    if site_id is not None or machine_erp_ref is not None:
+        from .mappers.versioned import build_versioned_column_map
+
+        def mapping_builder(headers, *, brand="generic"):
+            column_map, _ = build_versioned_column_map(
+                headers,
+                brand=brand,
+                site_id=site_id,
+                machine_erp_ref=machine_erp_ref,
+                parser_version=parser_version,
+            )
+            return column_map
 
     if profile.is_transposed:
-        rows, col_map = read_transposed_file(profile)
+        rows, col_map = read_transposed_file(profile, mapping_builder=mapping_builder)
     elif profile.brand_detected == "arburg" or profile.metadata_lines:
-        rows, col_map = read_arburg_protocol(profile)
+        rows, col_map = read_arburg_protocol(profile, mapping_builder=mapping_builder)
     else:
         # Fichier CSV/XLSX générique
         try:
@@ -419,7 +446,7 @@ def load_file(file_path: str) -> tuple[list[dict], FileProfile, dict]:
                 df = pd.read_csv(file_path, sep=profile.delimiter,
                                  encoding=profile.encoding, decimal=",")
             headers = df.columns.tolist()
-            col_map = build_column_map(headers, brand=profile.brand_detected)
+            col_map = mapping_builder(headers, brand=profile.brand_detected)
             timestamp_col = _find_timestamp_column([str(h) for h in headers])
             rows = []
             for _, row_data in df.iterrows():
@@ -431,6 +458,16 @@ def load_file(file_path: str) -> tuple[list[dict], FileProfile, dict]:
         except Exception as e:
             print(f"[ERREUR] {e}")
             rows, col_map = [], {}
+
+    timezone_value = ZoneInfo(source_timezone) if source_timezone else timezone.utc
+    for row in rows:
+        value = row.get("time")
+        if not value:
+            continue
+        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone_value)
+        row["time"] = parsed.astimezone(timezone.utc).isoformat()
 
     print(f"[LOADER] {Path(file_path).name} → {len(rows)} cycles chargés "
           f"(brand: {profile.brand_detected}, transposé: {profile.is_transposed})", file=sys.stderr)

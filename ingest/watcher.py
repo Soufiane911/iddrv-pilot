@@ -30,11 +30,19 @@ from typing import Any, Callable, Iterable, Mapping
 
 DEFAULT_DB_URL = os.getenv(
     "DATABASE_URL",
-    "postgresql://iddrv_user:iddrv_secret_2024@localhost:5432/iddrv",
+    "postgresql://iddrv_user@localhost:5432/iddrv",
 )
 RETRYABLE_STATUSES = {"discovered", "retry_wait", "failed"}
 TERMINAL_STATUSES = {"completed", "quarantined"}
 IGNORED_SUFFIXES = {".part", ".partial", ".tmp", ".lock", ".crdownload"}
+
+
+class PostCommitRetryError(RuntimeError):
+    """Post-commit work must retry without quarantining imported data."""
+
+
+class DetectorTriggerError(PostCommitRetryError):
+    """The idempotent detector failed after the business commit."""
 
 
 def utc_now() -> datetime:
@@ -54,6 +62,30 @@ def _json(value: Any) -> str:
     return json.dumps(value, ensure_ascii=False, default=str)
 
 
+def write_worker_heartbeat(path: Path, *, now: Callable[[], datetime] = utc_now) -> None:
+    """Atomically refresh the liveness file used by Docker healthchecks."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {"ts": now().isoformat(), "pid": os.getpid()}
+    tmp = path.with_name(f".{path.name}.tmp")
+    tmp.write_text(_json(payload) + "\n", encoding="utf-8")
+    tmp.replace(path)
+
+
+def heartbeat_is_fresh(
+    path: Path,
+    *,
+    max_age_seconds: float,
+    clock: Callable[[], float] | None = None,
+) -> bool:
+    """Return True when the heartbeat file exists and is recent enough."""
+    if max_age_seconds <= 0:
+        raise ValueError("max_age_seconds must be > 0")
+    if not path.is_file():
+        return False
+    age = (clock or time.time)() - path.stat().st_mtime
+    return 0 <= age <= max_age_seconds
+
+
 @dataclass(frozen=True)
 class WatcherConfig:
     """Filesystem and retry policy for one worker instance."""
@@ -65,6 +97,8 @@ class WatcherConfig:
     backoff_seconds: float = 30.0
     site_id: int | None = None
     db_url: str = DEFAULT_DB_URL
+    heartbeat_path: Path | None = None
+    heartbeat_max_age_seconds: float = 90.0
 
     def __post_init__(self) -> None:
         if self.stable_seconds < 0:
@@ -75,6 +109,8 @@ class WatcherConfig:
             raise ValueError("max_attempts must be >= 1")
         if self.backoff_seconds < 0:
             raise ValueError("backoff_seconds must be >= 0")
+        if self.heartbeat_max_age_seconds <= 0:
+            raise ValueError("heartbeat_max_age_seconds must be > 0")
 
     @property
     def inbox(self) -> Path:
@@ -91,6 +127,12 @@ class WatcherConfig:
     @property
     def quarantine(self) -> Path:
         return self.root / "quarantine"
+
+    @property
+    def resolved_heartbeat_path(self) -> Path:
+        if self.heartbeat_path is not None:
+            return self.heartbeat_path
+        return self.processing / ".worker_heartbeat"
 
     def ensure_directories(self) -> None:
         for directory in (self.inbox, self.processing, self.archive, self.quarantine):
@@ -191,6 +233,29 @@ class ImportJobStore:
 
         return psycopg2.connect(self.db_url)
 
+    def acquire_worker_lock(self):
+        conn = self.connect()
+        conn.autocommit = True
+        with conn.cursor() as cursor:
+            cursor.execute(
+                "SELECT pg_try_advisory_lock(hashtextextended('iddrv_watcher_global',0))"
+            )
+            acquired = bool(_scalar(cursor.fetchone()))
+        if not acquired:
+            conn.close()
+            return None
+        return conn
+
+    @staticmethod
+    def release_worker_lock(conn) -> None:
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    "SELECT pg_advisory_unlock(hashtextextended('iddrv_watcher_global',0))"
+                )
+        finally:
+            conn.close()
+
     def _select_job(self, cursor, job_id: str) -> ImportJob | None:
         cursor.execute(f"SELECT {self._SELECT_COLUMNS} FROM import_jobs WHERE id = %s", (job_id,))
         row = cursor.fetchone()
@@ -223,15 +288,15 @@ class ImportJobStore:
                     # explicit and complements SELECT ... FOR UPDATE.
                     cursor.execute(
                         "SELECT pg_try_advisory_xact_lock(hashtextextended(%s, 0))",
-                        (file_hash,),
+                        (f"{site_id}:{file_hash}",),
                     )
                     if not _scalar(cursor.fetchone()):
                         return None, False
 
                     cursor.execute(
                         f"SELECT {self._SELECT_COLUMNS} FROM import_jobs "
-                        "WHERE file_hash = %s FOR UPDATE",
-                        (file_hash,),
+                        "WHERE site_id = %s AND file_hash = %s FOR UPDATE",
+                        (site_id, file_hash),
                     )
                     row = cursor.fetchone()
                     if row:
@@ -366,6 +431,20 @@ class ImportJobStore:
         finally:
             conn.close()
 
+    def set_passport(self, job: ImportJob, passport_id: str | None) -> ImportJob:
+        conn = self.connect()
+        try:
+            with conn:
+                with conn.cursor() as cursor:
+                    cursor.execute(
+                        "UPDATE import_jobs SET passport_id=%s,updated_at=NOW() WHERE id=%s",
+                        (passport_id, job.id),
+                    )
+            job.passport_id = passport_id
+            return job
+        finally:
+            conn.close()
+
     def complete(self, job: ImportJob, *, passport_id: str | None = None) -> ImportJob:
         conn = self.connect()
         try:
@@ -409,6 +488,34 @@ class ImportJobStore:
                         (status, next_attempt, error_code, error[:8000], job.id),
                     )
             job.status = status
+            job.last_error_code = error_code
+            job.last_error = error[:8000]
+            return job
+        finally:
+            conn.close()
+
+    def defer_post_commit(self, job: ImportJob, *, error: str,
+                          error_code: str, backoff_seconds: float,
+                          now: datetime | None = None) -> ImportJob:
+        now = now or utc_now()
+        next_attempt = now + timedelta(seconds=backoff_seconds)
+        conn = self.connect()
+        try:
+            with conn:
+                with conn.cursor() as cursor:
+                    cursor.execute(
+                        """
+                        UPDATE import_jobs
+                           SET status='retry_wait',next_attempt_at=%s,
+                               attempt_count=0,
+                               last_error_code=%s,last_error=%s,
+                               updated_at=NOW()
+                         WHERE id=%s
+                        """,
+                        (next_attempt, error_code, error[:8000], job.id),
+                    )
+            job.status = "retry_wait"
+            job.attempt_count = 0
             job.last_error_code = error_code
             job.last_error = error[:8000]
             return job
@@ -523,6 +630,22 @@ def machine_ref_for_path(path: Path) -> str | None:
     return match.group(1) if match else None
 
 
+def site_id_for_path(path: Path, inbox_root: Path, configured_site_id: int | None = None) -> int:
+    """Resolve the mandatory site from ``inbox/<site>/...`` without guessing."""
+    relative = _safe_relative(path, inbox_root)
+    if len(relative.parts) < 2:
+        raise ValueError("site_id_missing_from_path")
+    match = re.fullmatch(r"(?:site-)?(\d+)", relative.parts[0], re.IGNORECASE)
+    if not match:
+        raise ValueError("site_id_invalid_in_path")
+    site_id = int(match.group(1))
+    if site_id <= 0:
+        raise ValueError("site_id_invalid_in_path")
+    if configured_site_id is not None and configured_site_id != site_id:
+        raise ValueError("site_id_path_mismatch")
+    return site_id
+
+
 def _safe_relative(path: Path, root: Path) -> Path:
     try:
         return path.resolve().relative_to(root.resolve())
@@ -547,7 +670,11 @@ class WatchedFolderWorker:
         self.config.ensure_directories()
         self.store = store or ImportJobStore(config.db_url)
         self.importer = importer or self._default_importer
-        self.on_import_committed = on_import_committed
+        self.on_import_committed = (
+            on_import_committed
+            if on_import_committed is not None
+            else (self._default_detector if importer is None else None)
+        )
         self._clock = clock
         self._now = now
         self._observations: dict[str, FileObservation] = {}
@@ -557,16 +684,20 @@ class WatchedFolderWorker:
         key = str(path.resolve())
         current = FileObservation(stat.st_size, stat.st_mtime_ns, self._clock())
         previous = self._observations.get(key)
-        self._observations[key] = current
         if self.config.stable_seconds == 0:
+            self._observations[key] = current
             return True
-        if not previous:
+        if (
+            previous is None
+            or previous.size != current.size
+            or previous.mtime_ns != current.mtime_ns
+        ):
+            # Start (or restart) the unchanged-duration clock.
+            self._observations[key] = current
             return False
-        return (
-            previous.size == current.size
-            and previous.mtime_ns == current.mtime_ns
-            and current.observed_at - previous.observed_at >= self.config.stable_seconds
-        )
+        # Keep the first unchanged observation so 5s polls can accumulate to
+        # the configured 10s stability threshold.
+        return current.observed_at - previous.observed_at >= self.config.stable_seconds
 
     def _scan(self) -> list[Path]:
         self.config.ensure_directories()
@@ -609,14 +740,21 @@ class WatchedFolderWorker:
         Machine files must carry their machine ERP reference in a parent folder
         (``.../inbox/site/machine/1003/file.csv``) or in their filename.  This
         fails closed instead of guessing a machine.
+
+        The watcher propagates the site resolved when the file was claimed.
+        Imports without an explicit site directory are refused.
         """
         from . import ingest_pipeline
 
+        site_id = job.site_id
+        if site_id is None:
+            raise ValueError("site_id_missing_from_job")
+
         if job.source_kind == "erp_order":
-            return ingest_pipeline.ingest_erp_file(str(path))
+            return ingest_pipeline.ingest_erp_file(str(path), site_id=site_id)
         if job.source_kind in {"quality", "maintenance", "operator_note"}:
             kind = {"quality": "quality", "maintenance": "maintenance", "operator_note": "notes"}[job.source_kind]
-            return ingest_pipeline.ingest_context_file(str(path), kind)
+            return ingest_pipeline.ingest_context_file(str(path), kind, site_id=site_id)
         if job.source_kind == "machine_cycle":
             machine_ref = machine_ref_for_path(path)
             if not machine_ref:
@@ -624,8 +762,14 @@ class WatchedFolderWorker:
                     "machine_ref_missing: place the file under a numeric machine folder "
                     "or use machine_<erp_ref> in the filename"
                 )
-            return ingest_pipeline.ingest_machine_file(str(path), machine_ref)
+            return ingest_pipeline.ingest_machine_file(str(path), machine_ref, site_id=site_id)
         raise ValueError(f"unsupported_source_kind:{job.source_kind}")
+
+    @staticmethod
+    def _default_detector(job: ImportJob, result: Any) -> Any:
+        from backend.app.diagnostics.runtime import trigger_after_import
+
+        return trigger_after_import(job, result)
 
     def _event(self, job: ImportJob, event_type: str, **kwargs: Any) -> None:
         try:
@@ -655,6 +799,16 @@ class WatchedFolderWorker:
                 self.store.requeue_processing(job, reason="worker_restart")
                 self._event(job, "worker_restart", status="retry_wait", source_path=str(processing), destination_path=str(moved))
                 recovered += 1
+            elif job.archive_path and Path(job.archive_path).exists():
+                # Archive is only moved after the idempotent detector succeeds.
+                completed = self.store.complete(job, passport_id=job.passport_id)
+                self._event(
+                    completed,
+                    "worker_restart_archive_recovered",
+                    status="completed",
+                    destination_path=job.archive_path,
+                )
+                recovered += 1
             else:
                 self.store.requeue_processing(job, reason="processing_file_missing")
                 self._event(job, "worker_restart", status="retry_wait", detail={"reason": "processing_file_missing"})
@@ -668,6 +822,7 @@ class WatchedFolderWorker:
 
         file_hash = compute_sha256(source)
         relative = _safe_relative(source, self.config.inbox)
+        site_id = site_id_for_path(source, self.config.inbox, self.config.site_id)
         source_kind = source_kind_for_path(source, self.config.inbox)
         metadata = {
             "relative_path": relative.as_posix(),
@@ -678,7 +833,7 @@ class WatchedFolderWorker:
             source_path=source,
             source_kind=source_kind,
             file_name=source.name,
-            site_id=self.config.site_id,
+            site_id=site_id,
             max_attempts=self.config.max_attempts,
             metadata=metadata,
             now=self._now(),
@@ -694,36 +849,86 @@ class WatchedFolderWorker:
             return "duplicate"
 
         processing = self._destination(self.config.processing, source)
+        if processing.exists():
+            processing = processing.with_name(
+                f"{processing.stem}.{int(time.time() * 1000)}{processing.suffix}"
+            )
+        # Persist the intended destination before the filesystem move. A crash
+        # now leaves either the source in inbox or a recoverable processing path.
+        self.store.set_paths(job, processing_path=processing)
         moved_processing = self._move(source, processing)
-        self.store.set_paths(job, processing_path=moved_processing)
         self._event(job, "claimed", status="processing", source_path=str(source), destination_path=str(moved_processing))
 
         result: Any = None
         try:
             result = self.importer(moved_processing, job)
-            passport_id = None
-            if isinstance(result, Mapping):
-                passport_id = result.get("passport_id")
-                if result.get("transaction_committed") is False:
-                    raise RuntimeError("importer returned transaction_committed=false")
-            completed = self.store.complete(job, passport_id=passport_id)
-            self._event(completed, "import_committed", status="completed", source_path=str(moved_processing), detail={"passport_id": passport_id})
-            # This is deliberately after complete(): detectors never observe a
-            # job that is still marked processing or retry_wait.
+            if not isinstance(result, Mapping) or result.get("transaction_committed") is not True:
+                raise RuntimeError("importer did not confirm a committed transaction")
+            passport_id = result.get("passport_id")
+            if hasattr(self.store, "set_passport"):
+                self.store.set_passport(job, passport_id)
+            else:
+                job.passport_id = passport_id
+            self._event(job, "import_committed", status="processing", source_path=str(moved_processing), detail={"passport_id": passport_id})
+            if result.get("post_commit_error"):
+                raise PostCommitRetryError(str(result["post_commit_error"]))
             if self.on_import_committed:
                 try:
-                    self.on_import_committed(completed, result)
-                    self._event(completed, "detectors_triggered", status="completed")
+                    self.on_import_committed(job, result)
                 except Exception as trigger_error:
-                    self._event(completed, "detector_trigger_failed", status="completed", detail={"error": str(trigger_error)})
+                    self._event(
+                        job,
+                        "detector_trigger_failed",
+                        status="retry_wait",
+                        detail={"error": str(trigger_error)},
+                    )
+                    raise DetectorTriggerError(f"detector_failed:{trigger_error}") from trigger_error
+                self._event(job, "detectors_triggered", status="processing")
             archive = self._destination(self.config.archive, source)
+            if archive.exists():
+                archive = archive.with_name(
+                    f"{archive.stem}.{int(time.time() * 1000)}{archive.suffix}"
+                )
+            self.store.set_paths(job, archive_path=archive)
             moved_archive = self._move(moved_processing, archive)
-            self.store.set_paths(completed, archive_path=moved_archive)
+            completed = self.store.complete(job, passport_id=passport_id)
             self._event(completed, "archived", status="completed", source_path=str(moved_processing), destination_path=str(moved_archive))
             return "completed"
         except Exception as exc:
             error = str(exc) or exc.__class__.__name__
             traceback_text = "".join(traceback.format_exception_only(type(exc), exc)).strip()
+            if isinstance(exc, PostCommitRetryError):
+                error_code = (
+                    "detector_failed" if isinstance(exc, DetectorTriggerError)
+                    else "post_commit_failed"
+                )
+                if hasattr(self.store, "defer_post_commit"):
+                    failed = self.store.defer_post_commit(
+                        job,
+                        error=traceback_text or error,
+                        error_code=error_code,
+                        backoff_seconds=self.config.backoff_seconds,
+                        now=self._now(),
+                    )
+                else:
+                    job.status = "retry_wait"
+                    job.attempt_count = 0
+                    job.last_error_code = error_code
+                    job.last_error = traceback_text or error
+                    failed = job
+                retry_source = self._destination(self.config.inbox, source)
+                moved = self._move(moved_processing, retry_source)
+                if hasattr(self.store, "set_source_path"):
+                    self.store.set_source_path(failed, moved)
+                self._event(
+                    failed,
+                    "post_commit_retry_scheduled",
+                    status="retry_wait",
+                    source_path=str(moved_processing),
+                    destination_path=str(moved),
+                    detail={"error": error},
+                )
+                return "retry_wait"
             failed = self.store.fail(
                 job,
                 error_code="import_failed",
@@ -744,17 +949,36 @@ class WatchedFolderWorker:
             self._event(failed, "retry_scheduled", status="retry_wait", source_path=str(moved_processing), destination_path=str(moved), detail={"error": error})
             return "retry_wait"
 
+    def touch_heartbeat(self) -> None:
+        """Refresh liveness marker; best-effort so IO errors never stop imports."""
+        try:
+            write_worker_heartbeat(self.config.resolved_heartbeat_path, now=self._now)
+        except OSError:
+            return
+
     def run_once(self) -> list[str]:
-        self.recover_processing()
-        outcomes = []
-        for source in self._scan():
-            try:
-                outcomes.append(self.process_file(source))
-            except Exception as exc:
-                # A malformed path or an unavailable DB should be visible to a
-                # caller but should not stop the next file from being observed.
-                outcomes.append(f"worker_error:{type(exc).__name__}")
-        return outcomes
+        # Touch before lock acquisition so a live-but-busy worker stays healthy.
+        self.touch_heartbeat()
+        lock = None
+        if hasattr(self.store, "acquire_worker_lock"):
+            lock = self.store.acquire_worker_lock()
+            if lock is None:
+                return ["worker_busy"]
+        try:
+            self.recover_processing()
+            outcomes = []
+            for source in self._scan():
+                try:
+                    outcomes.append(self.process_file(source))
+                except Exception as exc:
+                    # A malformed path or an unavailable DB should be visible to a
+                    # caller but should not stop the next file from being observed.
+                    outcomes.append(f"worker_error:{type(exc).__name__}")
+            self.touch_heartbeat()
+            return outcomes
+        finally:
+            if lock is not None:
+                self.store.release_worker_lock(lock)
 
     def run_forever(self, stop_event: Event | None = None) -> None:
         stop_event = stop_event or Event()
@@ -778,11 +1002,15 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: Iterable[str] | None = None) -> int:
     args = build_parser().parse_args(list(argv) if argv is not None else None)
+    heartbeat_raw = os.getenv("WORKER_HEARTBEAT_PATH")
+    heartbeat_max_age = float(os.getenv("WORKER_HEARTBEAT_MAX_AGE_S", "90"))
     worker = WatchedFolderWorker(
         WatcherConfig(
             root=Path(args.root), db_url=args.db_url, site_id=args.site_id,
             stable_seconds=args.stable_seconds, poll_seconds=args.poll_seconds,
             max_attempts=args.max_attempts, backoff_seconds=args.backoff_seconds,
+            heartbeat_path=Path(heartbeat_raw) if heartbeat_raw else None,
+            heartbeat_max_age_seconds=heartbeat_max_age,
         )
     )
     if args.once:

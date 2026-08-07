@@ -21,7 +21,7 @@ import hashlib
 import json
 
 
-DB_URL = os.getenv("DATABASE_URL", "postgresql://iddrv_user:iddrv_secret_2024@localhost:5432/iddrv")
+DB_URL = os.getenv("DATABASE_URL", "postgresql://iddrv_user@localhost:5432/iddrv")
 OVERLAP_WINDOW = timedelta(minutes=30)
 
 
@@ -66,11 +66,12 @@ def resolve_of_for_cycle(
     cursor,
     machine_id: int,
     cycle_time: datetime,
+    site_id: int | None = None,
     window: timedelta = OVERLAP_WINDOW
 ) -> tuple[Optional[str], float]:
     """
     Recherche l'OF correspondant pour un cycle donné.
-    
+
     Retourne (production_order_id, link_confidence).
     """
     if cycle_time.tzinfo is None:
@@ -79,14 +80,20 @@ def resolve_of_for_cycle(
     window_start = cycle_time - window
     window_end = cycle_time + window
 
-    cursor.execute("""
+    site_filter = "AND po.site_id = %s" if site_id is not None else ""
+    params = [machine_id, window_end, window_start]
+    if site_id is not None:
+        params.append(site_id)
+
+    cursor.execute(f"""
         SELECT id, started_at, ended_at
-        FROM production_orders
-        WHERE machine_id = %s
-          AND started_at <= %s
-          AND (ended_at IS NULL OR ended_at >= %s)
-        ORDER BY started_at ASC
-    """, (machine_id, window_end, window_start))
+        FROM production_orders po
+        WHERE po.machine_id = %s
+          AND po.started_at <= %s
+          AND (po.ended_at IS NULL OR po.ended_at >= %s)
+          {site_filter}
+        ORDER BY po.started_at ASC
+    """, params)
 
     candidates = cursor.fetchall()
 
@@ -131,19 +138,25 @@ def resolve_of_for_cycle(
     return None, 0.0
 
 
-def resolve_shift_for_cycle(cursor, machine_id: int, cycle_time: datetime, production_order_id: str | None = None) -> int | None:
+def resolve_shift_for_cycle(cursor, machine_id: int, cycle_time: datetime, production_order_id: str | None = None, site_id: int | None = None) -> int | None:
     """Retourne le shift actif couvrant réellement le cycle."""
-    cursor.execute("""
+    site_filter = "AND s.order_site_id = %s" if site_id is not None else ""
+    params = [machine_id, cycle_time, cycle_time]
+    if site_id is not None:
+        params.append(site_id)
+    params.append(production_order_id)
+    cursor.execute(f"""
         SELECT id
-        FROM shifts
-        WHERE machine_id = %s
-          AND started_at <= %s
-          AND (ended_at IS NULL OR ended_at >= %s)
+        FROM shifts s
+        WHERE s.machine_id = %s
+          AND s.started_at <= %s
+          AND (s.ended_at IS NULL OR s.ended_at >= %s)
+          {site_filter}
         ORDER BY
-            CASE WHEN production_order_id = %s THEN 0 ELSE 1 END,
-            started_at DESC
+            CASE WHEN s.production_order_id = %s THEN 0 ELSE 1 END,
+            s.started_at DESC
         LIMIT 1
-    """, (machine_id, cycle_time, cycle_time, production_order_id))
+    """, params)
     row = cursor.fetchone()
     return row["id"] if row else None
 
@@ -167,39 +180,45 @@ def count_overlapping_production_orders() -> int:
     return count
 
 
-def reconcile_existing_cycles() -> int:
-    """Rattache les cycles sans OF aux ordres ERP maintenant disponibles."""
+def reconcile_existing_cycles(site_id: int | None = None) -> int:
+    """Rattache les cycles sans OF sans franchir la frontière d'un site."""
     conn = get_db_connection()
     cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
     cursor.execute("""
-        SELECT time, machine_id
-        FROM machine_cycles
-        WHERE production_order_id IS NULL
-        ORDER BY time, machine_id
-    """)
+        SELECT c.time, c.machine_id, m.site_id
+        FROM machine_cycles c
+        JOIN machines m ON m.id = c.machine_id
+        WHERE c.production_order_id IS NULL
+          AND (%s IS NULL OR m.site_id = %s)
+        ORDER BY c.time, c.machine_id
+    """, (site_id, site_id))
     cycles = cursor.fetchall()
 
     updated = 0
     for cycle in cycles:
         cycle_time = cycle["time"]
         machine_id = cycle["machine_id"]
+        cycle_site_id = int(cycle["site_id"])
         production_order_id, link_confidence = resolve_of_for_cycle(
             cursor,
             machine_id,
             cycle_time,
+            site_id=cycle_site_id,
         )
-        
+
         shift_id = resolve_shift_for_cycle(
             cursor,
             machine_id,
             cycle_time,
             production_order_id,
+            site_id=cycle_site_id,
         )
 
         cursor.execute("""
             UPDATE machine_cycles
             SET production_order_id = %s,
+                order_site_id = %s,
                 shift_id = %s,
                 link_confidence = %s
             WHERE time = %s
@@ -207,6 +226,7 @@ def reconcile_existing_cycles() -> int:
               AND production_order_id IS NULL
         """, (
             production_order_id,
+            cycle_site_id if production_order_id is not None else None,
             shift_id,
             link_confidence,
             cycle_time,
@@ -220,7 +240,7 @@ def reconcile_existing_cycles() -> int:
     return updated
 
 
-def insert_cycles(machine_cycles: list[dict], machine_id: int, passport_id: str):
+def insert_cycles(machine_cycles: list[dict], machine_id: int, passport_id: str, site_id: int | None = None):
     """
     Insère les cycles machine dans la base de données avec réconciliation temporelle.
     
@@ -256,7 +276,7 @@ def insert_cycles(machine_cycles: list[dict], machine_id: int, passport_id: str)
 
         # Réconciliation temporelle avec l'ERP et résolution du poste (shift)
         production_order_id, link_confidence = resolve_of_for_cycle(
-            cursor, machine_id, cycle_time
+            cursor, machine_id, cycle_time, site_id=site_id
         )
         
         shift_id = resolve_shift_for_cycle(
@@ -264,6 +284,7 @@ def insert_cycles(machine_cycles: list[dict], machine_id: int, passport_id: str)
             machine_id,
             cycle_time,
             production_order_id,
+            site_id=site_id,
         )
 
         # Validation de plausibilité des valeurs (détection d'outliers simples)
@@ -297,7 +318,7 @@ def insert_cycles(machine_cycles: list[dict], machine_id: int, passport_id: str)
         # Insertion du cycle
         cursor.execute("""
             INSERT INTO machine_cycles (
-                time, machine_id, production_order_id, shift_id, passport_id,
+                time, machine_id, production_order_id, order_site_id, shift_id, passport_id,
                 source_line_no, source_row_hash, cycle_counter,
                 cycle_time_s, dosing_time_s, injection_time_s,
                 cooling_time_s,
@@ -308,7 +329,7 @@ def insert_cycles(machine_cycles: list[dict], machine_id: int, passport_id: str)
                 mold_temperature_c, oil_temperature_c, energy_kwh,
                 link_confidence, quality_flag, part_quality_status, defect_type, raw_data
             ) VALUES (
-                %s, %s, %s, %s, %s,
+                %s, %s, %s, %s, %s, %s,
                 %s, %s, %s, %s, %s, %s,
                 %s, %s, %s,
                 %s, %s, %s,
@@ -322,6 +343,7 @@ def insert_cycles(machine_cycles: list[dict], machine_id: int, passport_id: str)
             cycle_time,
             machine_id,
             production_order_id,
+            site_id,
             shift_id,
             passport_id,
             cycle.get("source_line_no"),
@@ -353,8 +375,6 @@ def insert_cycles(machine_cycles: list[dict], machine_id: int, passport_id: str)
         ))
         inserted += cursor.rowcount
 
-    conn.commit()
-
     # Insertion des problèmes de qualité détectés
     if quality_issues:
         for issue in quality_issues:
@@ -370,7 +390,7 @@ def insert_cycles(machine_cycles: list[dict], machine_id: int, passport_id: str)
                 issue.get("raw_value"),
                 issue.get("description")
             ))
-        conn.commit()
+    conn.commit()
 
     cursor.close()
     conn.close()

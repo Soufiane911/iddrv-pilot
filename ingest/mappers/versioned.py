@@ -8,6 +8,7 @@ machine-specific JSON can be added later without changing parser code.
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -19,17 +20,30 @@ except ImportError:  # direct ``python ingest/probe.py`` execution
 
 REGISTRY_ROOT = Path(__file__).parent / "versions"
 DEFAULT_PARSER_VERSION = "arburg-selogica-gestica-v1"
+_SAFE_SEGMENT = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
+
+
+def _selector(value: int | str | None, *, wildcard: bool = True) -> str:
+    if value is None or value == "":
+        if wildcard:
+            return "*"
+        raise ValueError("unsafe mapping selector")
+    segment = str(value)
+    if segment in {".", ".."} or not _SAFE_SEGMENT.fullmatch(segment):
+        raise ValueError("unsafe mapping selector")
+    return segment
 
 
 def _candidates(site_id: int | str | None, machine_erp_ref: str | None, parser_version: str):
-    site = str(site_id) if site_id is not None else "*"
-    machine = str(machine_erp_ref) if machine_erp_ref else "*"
+    site = _selector(site_id)
+    machine = _selector(machine_erp_ref)
+    version = _selector(parser_version, wildcard=False)
     # Most specific first, then the version's wildcard fallback.
     return (
-        REGISTRY_ROOT / f"site-{site}-machine-{machine}-{parser_version}.json",
-        REGISTRY_ROOT / f"site-{site}-{parser_version}.json",
-        REGISTRY_ROOT / f"machine-{machine}-{parser_version}.json",
-        REGISTRY_ROOT / f"{parser_version}.json",
+        REGISTRY_ROOT / f"site-{site}-machine-{machine}-{version}.json",
+        REGISTRY_ROOT / f"site-{site}-{version}.json",
+        REGISTRY_ROOT / f"machine-{machine}-{version}.json",
+        REGISTRY_ROOT / f"{version}.json",
     )
 
 
@@ -40,7 +54,11 @@ def load_mapping(
     parser_version: str = DEFAULT_PARSER_VERSION,
 ) -> dict[str, Any] | None:
     """Load the immutable mapping metadata selected for a source."""
+    registry = REGISTRY_ROOT.resolve()
     for candidate in _candidates(site_id, machine_erp_ref, parser_version):
+        resolved = candidate.resolve()
+        if not resolved.is_relative_to(registry):
+            raise ValueError("unsafe mapping path")
         if candidate.exists():
             payload = json.loads(candidate.read_text(encoding="utf-8"))
             payload["mapping_file"] = str(candidate)
@@ -76,9 +94,13 @@ def build_versioned_column_map(
         original = normalized_headers.get(_normalize_label(source_label))
         if original is None:
             continue
+        scale = float(spec.get("scale", 1.0))
         result[original] = {
             "canonical": spec.get("canonical"),
             "unit": spec.get("unit"),
+            "source_unit": spec.get("source_unit", spec.get("unit")),
+            "scale": scale,
+            "conversion_applied": scale != 1.0,
             "confidence": float(spec.get("confidence", 1.0)),
             "matched_by": source_label,
             "brand": brand,

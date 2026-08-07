@@ -18,7 +18,10 @@ if __name__ == "__main__":
     if args.db_url:
         os.environ["DATABASE_URL"] = args.db_url
 
-    from reconciler import count_overlapping_production_orders, reconcile_existing_cycles
+    try:
+        from .reconciler import count_overlapping_production_orders, reconcile_existing_cycles
+    except ImportError:
+        from reconciler import count_overlapping_production_orders, reconcile_existing_cycles
 
     # If --simulate-drift, output drift metrics
     if args.simulate_drift:
