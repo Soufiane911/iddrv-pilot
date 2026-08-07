@@ -11,6 +11,7 @@ requires a real session.
 from __future__ import annotations
 
 import base64
+import binascii
 import hashlib
 import hmac
 import json
@@ -45,13 +46,21 @@ class Identity:
     site_ids: tuple[int, ...] = ()
     session_id: str | None = None
     anonymous: bool = False
+    site_roles: tuple[tuple[int, str], ...] = ()
 
     @property
     def is_admin(self) -> bool:
         return self.role == "admin"
 
     def can_access_site(self, site_id: int) -> bool:
-        return self.is_admin or site_id in self.site_ids
+        return self.anonymous or site_id in self.site_ids
+
+    def role_for_site(self, site_id: int) -> str | None:
+        if self.anonymous:
+            return "viewer"
+        if self.site_roles:
+            return dict(self.site_roles).get(site_id)
+        return self.role if site_id in self.site_ids else None
 
 
 def _b64(value: bytes) -> str:
@@ -112,6 +121,7 @@ def create_session_token(identity: Identity, *, expires_at: datetime | None = No
         "name": identity.display_name,
         "role": identity.role,
         "sites": list(identity.site_ids),
+        "site_roles": {str(site_id): role for site_id, role in identity.site_roles},
         "sid": identity.session_id or secrets.token_urlsafe(18),
         "exp": int(expires.timestamp()),
         "nonce": secrets.token_urlsafe(12),
@@ -133,33 +143,57 @@ def decode_session_token(token: str) -> Identity | None:
         role = str(payload.get("role", ""))
         if role not in ROLE_LEVEL:
             return None
+        session_id = payload.get("sid")
+        if not isinstance(session_id, str) or not session_id.strip():
+            return None
+        site_ids = tuple(int(value) for value in payload.get("sites", []))
+        raw_site_roles = payload.get("site_roles", {})
+        if not isinstance(raw_site_roles, dict):
+            return None
+        site_roles = tuple(
+            sorted((int(site_id), str(site_role)) for site_id, site_role in raw_site_roles.items())
+        )
+        if any(site_role not in ROLE_LEVEL or site_id not in site_ids for site_id, site_role in site_roles):
+            return None
+        if not site_roles:
+            site_roles = tuple((site_id, role) for site_id in site_ids)
         return Identity(
             user_id=str(payload["sub"]),
             email=str(payload.get("email", "")),
             display_name=str(payload.get("name", payload.get("email", ""))),
             role=role,
-            site_ids=tuple(int(value) for value in payload.get("sites", [])),
-            session_id=str(payload.get("sid")) if payload.get("sid") else None,
+            site_ids=site_ids,
+            session_id=session_id,
+            site_roles=site_roles,
         )
-    except (ValueError, KeyError, TypeError, json.JSONDecodeError, UnicodeDecodeError):
+    except (ValueError, KeyError, TypeError, binascii.Error, json.JSONDecodeError, UnicodeDecodeError):
         return None
 
 
 def _token_from_request(request: Request) -> str | None:
     authorization = request.headers.get(SESSION_HEADER, "")
-    if authorization.lower().startswith("bearer "):
-        return authorization[7:].strip()
+    if authorization:
+        if not authorization.lower().startswith("bearer "):
+            raise HTTPException(status_code=401, detail="invalid_token")
+        token = authorization[7:].strip()
+        if not token:
+            raise HTTPException(status_code=401, detail="invalid_token")
+        return token
     return request.cookies.get(settings.session_cookie_name)
 
 
 def get_identity_optional(request: Request) -> Identity | None:
     token = _token_from_request(request)
     if token:
-        return decode_session_token(token)
-    if settings.app_environment in {"development", "test"}:
-        # Anonymous reads are useful for local API smoke and do not grant any
-        # write or action permission.  Site isolation remains enforced when a
-        # real identity is supplied.
+        identity = decode_session_token(token)
+        if identity is None:
+            raise HTTPException(status_code=401, detail="invalid_token")
+        from .auth_repository import session_is_active
+        if not session_is_active(identity, token):
+            raise HTTPException(status_code=401, detail="session_revoked")
+        return identity
+    if settings.allow_anonymous_reads:
+        # Anonymous reads are an explicit local-only opt-in.
         return Identity("anonymous", "", "Anonymous", "viewer", (), anonymous=True)
     raise HTTPException(status_code=401, detail="authentication_required")
 
@@ -168,11 +202,6 @@ def get_current_identity(request: Request) -> Identity:
     identity = get_identity_optional(request)
     if identity is None or identity.anonymous:
         raise HTTPException(status_code=401, detail="authentication_required")
-    token = _token_from_request(request)
-    if token:
-        from .auth_repository import session_is_active
-        if not session_is_active(identity, token):
-            raise HTTPException(status_code=401, detail="session_revoked")
     return identity
 
 
@@ -194,6 +223,12 @@ def require_site(identity: Identity, site_id: int) -> None:
         return
     if not identity.can_access_site(site_id):
         raise HTTPException(status_code=404, detail="resource_not_found")
+
+
+def require_site_roles(identity: Identity, site_id: int, *roles: str) -> None:
+    require_site(identity, site_id)
+    if identity.role_for_site(site_id) not in set(roles):
+        raise HTTPException(status_code=403, detail="insufficient_role")
 
 
 def set_session_cookie(response, token: str) -> None:

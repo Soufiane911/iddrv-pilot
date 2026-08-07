@@ -19,8 +19,9 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("email")
     parser.add_argument("--display-name", default="IDDVR administrator")
-    parser.add_argument("--site-id", type=int, action="append", default=[1])
+    parser.add_argument("--site-id", type=int, action="append", default=None)
     args = parser.parse_args()
+    site_ids = args.site_id or [1]
     password = getpass.getpass("Mot de passe admin (non affiché) : ")
     if not password:
         raise SystemExit("Le mot de passe ne peut pas être vide")
@@ -37,7 +38,9 @@ def main() -> int:
             (args.email, hash_password(password), args.display_name),
         )
         user_id = cur.fetchone()[0]
-        for site_id in sorted(set(args.site_id)):
+        # A password reset invalidates every previously issued session.
+        cur.execute("DELETE FROM sessions WHERE user_id=%s", (user_id,))
+        for site_id in sorted(set(site_ids)):
             cur.execute(
                 """INSERT INTO user_site_roles(user_id,site_id,role) VALUES (%s,%s,'admin')
                    ON CONFLICT (user_id,site_id) DO UPDATE SET role='admin'""",

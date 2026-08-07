@@ -2,9 +2,9 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from ..read_repositories import get_machine, machine_status, quality, timeline
+from ..read_repositories import get_machine, machine_status, quality, raw_cycles, timeline
 from ..repositories import list_incidents
-from ..schemas import IncidentPage, Machine, MachineStatusResponse, QualityResponse, TimelineResponse
+from ..schemas import IncidentPage, Machine, MachineStatusResponse, QualityResponse, RawMachineCyclePage, TimelineResponse
 from ..security import Identity, get_identity_optional, require_site
 
 
@@ -36,6 +36,21 @@ def status(
     if identity is not None:
         require_site(identity, int(value["site_id"]))
     return machine_status(machine_id, as_of or datetime.now(timezone.utc))
+
+
+@router.get("/{machine_id}/cycles", response_model=RawMachineCyclePage)
+def machine_cycles(
+    machine_id: int,
+    to: datetime = Query(...),
+    limit: int = Query(20, ge=1, le=100),
+    identity: Identity | None = Depends(get_identity_optional),
+):
+    value = _machine_or_404(machine_id)
+    if identity is not None:
+        require_site(identity, int(value["site_id"]))
+    if to.tzinfo is None or to.utcoffset() is None:
+        raise HTTPException(status_code=422, detail="to_timezone_required")
+    return {"items": raw_cycles(machine_id, to, limit), "next_cursor": None}
 
 
 @router.get("/{machine_id}/timeline", response_model=TimelineResponse)

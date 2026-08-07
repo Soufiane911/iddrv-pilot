@@ -8,7 +8,7 @@ from datetime import datetime
 from typing import Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class ApiError(BaseModel):
@@ -66,6 +66,91 @@ class MachineStatus(BaseModel):
     status: Literal["running", "warning", "stopped", "offline"]
     as_of: datetime
     freshness_s: float | None = None
+
+
+class ScrapRiskRequest(BaseModel):
+    site_id: int = Field(ge=1)
+    machine_erp_ref: str = Field(min_length=1, max_length=50)
+    cycle_time_s: float | None = None
+    dosing_time_s: float | None = None
+    injection_time_s: float | None = None
+    cooling_time_s: float | None = None
+    cushion_mm: float | None = None
+    switchover_position_mm: float | None = None
+    switchover_pressure_bar: float | None = None
+    peak_pressure_bar: float | None = None
+    clamp_force_kn: float | None = None
+    mold_temperature_c: float | None = None
+    barrel_temp_zone1_c: float | None = None
+    barrel_temp_zone2_c: float | None = None
+    barrel_temp_zone3_c: float | None = None
+    oil_temperature_c: float | None = None
+    energy_kwh: float | None = None
+    previous_scrap_flag: int | None = Field(default=None, ge=0, le=1)
+    rolling_scrap_rate_20: float | None = Field(default=None, ge=0, le=1)
+
+
+class ScrapRiskResponse(BaseModel):
+    model_version: str
+    risk_probability: float = Field(ge=0, le=1)
+    predicted_scrap: bool
+    threshold: float = Field(gt=0, lt=1)
+
+
+class ProcessDriftCycle(BaseModel):
+    timestamp: datetime
+    machine_erp_ref: str = Field(min_length=1, max_length=50)
+    cycle_time_s: float | None = None
+    dosing_time_s: float | None = None
+    injection_time_s: float | None = None
+    cooling_time_s: float | None = None
+    cushion_mm: float | None = None
+    switchover_position_mm: float | None = None
+    switchover_pressure_bar: float | None = None
+    peak_pressure_bar: float | None = None
+    clamp_force_kn: float | None = None
+    mold_temperature_c: float | None = None
+    barrel_temp_zone1_c: float | None = None
+    barrel_temp_zone2_c: float | None = None
+    barrel_temp_zone3_c: float | None = None
+    oil_temperature_c: float | None = None
+    energy_kwh: float | None = None
+
+
+class RawMachineCycle(ProcessDriftCycle):
+    """One unaggregated machine cycle suitable for causal HDT history."""
+
+
+class RawMachineCyclePage(BaseModel):
+    items: list[RawMachineCycle]
+    next_cursor: str | None = None
+
+
+class ProcessDriftRequest(BaseModel):
+    site_id: int = Field(ge=1)
+    cycles: list[ProcessDriftCycle] = Field(min_length=3, max_length=1000)
+
+    @model_validator(mode="after")
+    def validate_single_machine(self) -> "ProcessDriftRequest":
+        machine_refs = {cycle.machine_erp_ref for cycle in self.cycles}
+        if len(machine_refs) > 1:
+            raise ValueError("cycles must belong to a single machine")
+        return self
+
+
+class ProcessDriftSignal(BaseModel):
+    feature: str = Field(min_length=1)
+    volatility: float = Field(ge=0)
+
+
+class ProcessDriftResponse(BaseModel):
+    model_version: str
+    machine_erp_ref: str
+    anomaly_score: float
+    predicted_instability_next_20_cycles: bool
+    threshold: float
+    horizon_cycles: int = Field(gt=0)
+    signals: list[ProcessDriftSignal] = Field(default_factory=list, max_length=3)
 
 
 class CursorPage[T](BaseModel):
@@ -172,6 +257,7 @@ class AuthUser(BaseModel):
     display_name: str
     role: Literal["viewer", "analyst", "supervisor", "admin"]
     site_ids: list[int]
+    site_roles: dict[int, Literal["viewer", "analyst", "supervisor", "admin"]] = Field(default_factory=dict)
 
 
 class LoginRequest(BaseModel):
@@ -241,6 +327,40 @@ class ImportJob(BaseModel):
 class ImportPage(BaseModel):
     items: list[ImportJob]
     next_cursor: str | None = None
+
+
+class ImportSessionRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=180)
+
+
+class ImportFileRequest(BaseModel):
+    file_name: str = Field(min_length=1, max_length=255)
+    source_kind: Literal["erp", "machines", "quality", "maintenance", "layout", "unknown"] = "unknown"
+    mime_type: str | None = Field(default=None, max_length=160)
+    size_bytes: int = Field(default=0, ge=0)
+    file_hash: str | None = Field(default=None, min_length=8, max_length=64)
+
+
+class ImportSessionFile(BaseModel):
+    id: UUID
+    file_name: str
+    source_kind: str
+    mime_type: str | None = None
+    size_bytes: int
+    file_hash: str | None = None
+    status: str
+    profile: dict[str, Any] = {}
+
+
+class ImportSession(BaseModel):
+    id: UUID
+    site_id: int
+    name: str
+    status: str
+    summary: dict[str, Any] = {}
+    files: list[ImportSessionFile] = []
+    created_at: datetime
+    updated_at: datetime
 
 class Incident(BaseModel):
     model_config = ConfigDict(from_attributes=True)

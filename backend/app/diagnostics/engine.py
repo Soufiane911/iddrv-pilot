@@ -19,7 +19,7 @@ from datetime import datetime, timedelta, timezone
 from math import isfinite
 from statistics import mean, median, pstdev
 from typing import Protocol, runtime_checkable
-from uuid import NAMESPACE_URL, uuid5
+from uuid import NAMESPACE_URL, uuid4, uuid5
 
 from .models import Evidence, Hypothesis, InsufficientDataError, Investigation
 from .repository import DiagnosticRepository, Row
@@ -33,6 +33,20 @@ def _dt(value) -> datetime:
         return value if value.tzinfo else value.replace(tzinfo=UTC)
     parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
     return parsed.replace(tzinfo=UTC) if parsed.tzinfo is None else parsed.astimezone(UTC)
+
+
+def _matches_order(row: Mapping, requested_order) -> bool:
+    """Match one OF or an explicit inclusive ``OF-A to OF-Z`` range."""
+    if requested_order is None or "production_order_id" not in row:
+        return True
+    actual = row.get("production_order_id")
+    if actual is None:
+        return False
+    requested = str(requested_order)
+    if " to " in requested:
+        lower, upper = (part.strip() for part in requested.split(" to ", 1))
+        return lower <= str(actual) <= upper
+    return str(actual) == requested
 
 
 def _num(row: Mapping, *keys: str) -> float | None:
@@ -196,18 +210,22 @@ class DeterministicInvestigator:
         *,
         baseline_multiplier: float = 1.0,
         minimum_event_cycles: int = _MIN_EVENT_CYCLES,
+        minimum_baseline_cycles: int | None = None,
         minimum_quality_checks: int = _MIN_QUALITY_CHECKS,
         abstain_on_insufficient: bool = True,
     ):
         self.repository = repository
         self.baseline_multiplier = baseline_multiplier
         self.minimum_event_cycles = max(1, minimum_event_cycles)
+        self.minimum_baseline_cycles = max(1, minimum_baseline_cycles or minimum_event_cycles)
         self.minimum_quality_checks = max(1, minimum_quality_checks)
         self.abstain_on_insufficient = abstain_on_insufficient
 
     @staticmethod
     def _evidence_id(source_ref: str, metric: str) -> str:
-        return str(uuid5(NAMESPACE_URL, f"iddrv:evidence:{source_ref}:{metric}"))
+        # Evidence ownership is per run. Random UUIDs prevent a later run from
+        # colliding with an earlier run that used the same source and metric.
+        return str(uuid4())
 
     def _evidence(
         self,
@@ -224,6 +242,13 @@ class DeterministicInvestigator:
         supports: bool = True,
         excerpt: str | None = None,
     ) -> Evidence:
+        for existing in evidence:
+            if (
+                existing.source_kind == source_kind
+                and existing.source_ref == source_ref
+                and existing.metric == metric
+            ):
+                return existing
         item = Evidence(
             self._evidence_id(source_ref, metric),
             source_kind,
@@ -237,10 +262,9 @@ class DeterministicInvestigator:
             excerpt,
         )
         # Evidence can be shared by two candidate hypotheses (for example a
-        # scrap-rate aggregate).  Keep one stable object per id for persistence.
-        if not any(existing.id == item.id for existing in evidence):
-            evidence.append(item)
-        return next(existing for existing in evidence if existing.id == item.id)
+        # scrap-rate aggregate). Keep one object per semantic key for persistence.
+        evidence.append(item)
+        return item
 
     @staticmethod
     def _supports_defect(defect_counts: Counter[str], expected: set[str]) -> bool:
@@ -265,17 +289,33 @@ class DeterministicInvestigator:
         ended_at,
         defect_type="short_shot",
         incident_id=None,
+        as_of=None,
     ) -> Investigation:
-        start, end = _dt(started_at), _dt(ended_at)
+        start, requested_end = _dt(started_at), _dt(ended_at)
+        cutoff = _dt(as_of) if as_of is not None else requested_end
+        if cutoff < start:
+            raise InsufficientDataError("Investigation cutoff precedes incident start")
+        end = min(requested_end, cutoff)
         if end < start:
             raise InsufficientDataError("Incident end precedes its start")
         duration = max(end - start, timedelta(minutes=1))
         baseline_start, baseline_end = start - duration * self.baseline_multiplier, start
 
         event_cycles = list(self.repository.cycles(machine_id, start, end))
-        baseline_cycles = list(self.repository.cycles(machine_id, baseline_start, baseline_end))
+        if production_order_id is not None:
+            event_cycles = [row for row in event_cycles if _matches_order(row, production_order_id)]
+        comparable = getattr(self.repository, "comparable_baseline_cycles", None)
+        if callable(comparable):
+            baseline_cycles = list(comparable(
+                machine_id, production_order_id, start, self.minimum_baseline_cycles
+            ))
+        else:
+            baseline_cycles = list(self.repository.cycles(machine_id, baseline_start, baseline_end))
         quality = list(self.repository.quality_checks(machine_id, start, end))
-        context_start, context_end = start - timedelta(hours=6), end + timedelta(hours=6)
+        if production_order_id is not None:
+            quality = [row for row in quality if _matches_order(row, production_order_id)]
+        context_start = start - timedelta(hours=6)
+        context_end = min(end + timedelta(hours=6), cutoff)
         notes = _related(self.repository.operator_notes(machine_id, context_start, context_end), production_order_id)
         maintenance = _related(
             self.repository.maintenance_events(machine_id, context_start, context_end), production_order_id
@@ -289,18 +329,23 @@ class DeterministicInvestigator:
             missing.append("event_cycles")
         if len(quality) < self.minimum_quality_checks:
             missing.append("quality_checks")
-        if not baseline_cycles:
+        if len(baseline_cycles) < self.minimum_baseline_cycles:
             missing.append("baseline_cycles")
-        # The legacy S001 tests intentionally exercise one-cycle windows and
-        # expect a low-confidence result.  Conservative callers use the new
-        # DeterministicInvestigator default and receive a hard abstention.
-        if self.abstain_on_insufficient and len(event_cycles) < self.minimum_event_cycles and len(quality) < self.minimum_quality_checks:
+        # Runtime callers require enough incident and comparable baseline
+        # cycles. Sparse quality samples can enrich, but never replace, them.
+        if self.abstain_on_insufficient and (
+            len(event_cycles) < self.minimum_event_cycles
+            or len(baseline_cycles) < self.minimum_baseline_cycles
+        ):
             raise InsufficientDataError(
-                f"Insufficient samples: {len(event_cycles)} cycles and {len(quality)} quality checks"
+                "Insufficient samples: "
+                f"{len(event_cycles)} incident cycles, {len(baseline_cycles)} baseline cycles "
+                f"and {len(quality)} quality checks"
             )
 
         evidence: list[Evidence] = []
         defect_counts = _defects([*event_cycles, *quality])
+        quality_defect_counts = _defects(quality)
         expected_requested = set(_split_defects(defect_type))
         if not expected_requested and defect_type:
             expected_requested = {str(defect_type).lower()}
@@ -333,12 +378,12 @@ class DeterministicInvestigator:
             end=end,
             observation={
                 "stat": "count",
-                "value": sum(defect_counts.values()),
+                "value": sum(quality_defect_counts.values()),
                 "unit": "defects",
                 "n": len(quality),
-                "by_type": dict(defect_counts),
+                "by_type": dict(quality_defect_counts),
             },
-            supports=bool(defect_counts),
+            supports=bool(quality_defect_counts),
         )
 
         related_note_evidence: list[Evidence] = []

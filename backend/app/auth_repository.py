@@ -13,12 +13,14 @@ from .security import Identity, hash_password, token_hash, verify_password
 
 
 def _identity(row, site_rows=()):
+    site_roles = tuple(sorted((int(item[0]), str(item[1])) for item in site_rows))
     return Identity(
         user_id=str(row[0]),
         email=str(row[1]),
         display_name=str(row[2]),
         role=str(row[3]),
-        site_ids=tuple(int(item[0]) for item in site_rows),
+        site_ids=tuple(site_id for site_id, _ in site_roles),
+        site_roles=site_roles,
     )
 
 
@@ -52,7 +54,7 @@ def authenticate(email: str, password: str) -> Identity | None:
                 )
                 row = cur.fetchone()
                 if row is not None:
-                    cur.execute("SELECT site_id FROM user_site_roles WHERE user_id=%s", (row[0],))
+                    cur.execute("SELECT site_id,role FROM user_site_roles WHERE user_id=%s ORDER BY site_id", (row[0],))
                     sites = cur.fetchall()
                     cur.execute("SELECT password_hash FROM users WHERE id=%s", (row[0],))
                     password_row = cur.fetchone()
@@ -62,6 +64,10 @@ def authenticate(email: str, password: str) -> Identity | None:
         # A fresh checkout can be used for read-only demo exploration before
         # migration 004 is applied.  Do not turn this into a bypass for writes.
         pass
+
+    from .config import settings
+    if settings.app_environment not in {"development", "test"}:
+        return None
 
     for value in _dev_users():
         if str(value.get("email", "")).lower() == email.lower() and verify_password(password, str(value.get("password_hash", ""))):
@@ -74,6 +80,7 @@ def authenticate(email: str, password: str) -> Identity | None:
                 display_name=str(value.get("display_name", email)),
                 role=role,
                 site_ids=tuple(int(site) for site in value.get("site_ids", [])),
+                site_roles=tuple((int(site), role) for site in value.get("site_ids", [])),
             )
     return None
 
@@ -96,7 +103,11 @@ def create_user(email: str, password: str, display_name: str, role: str, site_id
             for site_id in sorted(set(site_ids)):
                 cur.execute("INSERT INTO user_site_roles(user_id,site_id,role) VALUES (%s,%s,%s)", (row[0], site_id, role))
             conn.commit()
-    return Identity(str(row[0]), str(row[1]), str(row[2]), role, tuple(sorted(set(site_ids))))
+    scoped_sites = tuple(sorted(set(site_ids)))
+    return Identity(
+        str(row[0]), str(row[1]), str(row[2]), role, scoped_sites,
+        site_roles=tuple((site_id, role) for site_id in scoped_sites),
+    )
 
 
 def save_session(identity: Identity, token: str, expires_at: datetime) -> str | None:
@@ -114,38 +125,54 @@ def save_session(identity: Identity, token: str, expires_at: datetime) -> str | 
         return None
 
 
-def replace_session_token(session_id: str, token: str, expires_at: datetime) -> None:
+def replace_session_token(session_id: str, token: str, expires_at: datetime) -> bool:
     try:
         with get_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute("UPDATE sessions SET token_hash=%s,expires_at=%s,last_seen_at=NOW() WHERE id=%s", (token_hash(token), expires_at, session_id))
                 conn.commit()
+                return cur.rowcount == 1
     except psycopg2.Error:
-        return
+        return False
 
 
-def revoke_session(token: str) -> None:
+def revoke_session(token: str) -> bool:
     try:
         with get_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute("UPDATE sessions SET revoked_at=NOW() WHERE token_hash=%s", (token_hash(token),))
                 conn.commit()
+                return cur.rowcount == 1
     except psycopg2.Error:
-        return
+        return False
 
 
 def session_is_active(identity: Identity, token: str) -> bool:
-    if identity.anonymous or not identity.session_id:
+    if identity.anonymous:
         return True
+    if not identity.session_id:
+        return False
     try:
         with get_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    "SELECT 1 FROM sessions WHERE id=%s AND token_hash=%s AND revoked_at IS NULL AND expires_at>NOW()",
-                    (identity.session_id, token_hash(token)),
+                    """SELECT u.id
+                       FROM sessions s
+                       JOIN users u ON u.id=s.user_id
+                       WHERE s.id=%s AND s.token_hash=%s AND s.revoked_at IS NULL
+                         AND s.expires_at>NOW() AND u.is_active=true AND u.id=%s""",
+                    (identity.session_id, token_hash(token), identity.user_id),
                 )
-                return cur.fetchone() is not None
+                if cur.fetchone() is None:
+                    return False
+                cur.execute(
+                    "SELECT site_id,role FROM user_site_roles WHERE user_id=%s ORDER BY site_id",
+                    (identity.user_id,),
+                )
+                current_roles = tuple((int(row[0]), str(row[1])) for row in cur.fetchall())
+                return current_roles == identity.site_roles
     except psycopg2.Error:
-        # Signed token remains valid when the optional control-plane table is
-        # temporarily unavailable; revocation is best effort in a local demo.
-        return True
+        from .config import settings
+        if settings.session_fail_open:
+            return True
+        return False

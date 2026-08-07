@@ -20,6 +20,10 @@ CREATE TABLE IF NOT EXISTS sites (
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+INSERT INTO sites (id, name, timezone)
+VALUES (1, 'Usine Principale', 'Europe/Paris')
+ON CONFLICT (id) DO NOTHING;
+
 -- Machines (presses à injecter)
 CREATE TABLE IF NOT EXISTS machines (
     id SERIAL PRIMARY KEY,
@@ -41,9 +45,11 @@ CREATE TABLE IF NOT EXISTS machines (
 CREATE TABLE IF NOT EXISTS machine_aliases (
     id SERIAL PRIMARY KEY,
     machine_id INT NOT NULL REFERENCES machines(id) ON DELETE CASCADE,
+    site_id INT NOT NULL REFERENCES sites(id),
     alias_context VARCHAR(50) NOT NULL,   -- 'erp', 'file', 'opcua', 'network'
     alias_value VARCHAR(100) NOT NULL,
-    UNIQUE(alias_context, alias_value)
+    CONSTRAINT machine_aliases_site_context_value_key
+        UNIQUE(site_id, alias_context, alias_value)
 );
 
 -- Ordres de Fabrication (OF)
@@ -86,6 +92,7 @@ CREATE TABLE IF NOT EXISTS shifts (
 -- Passeports d'import (traçabilité des fichiers importés)
 CREATE TABLE IF NOT EXISTS import_passports (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    site_id INT NOT NULL REFERENCES sites(id) DEFAULT 1,
     file_name VARCHAR(255),
     file_hash VARCHAR(64),
     file_path_raw TEXT,
@@ -101,8 +108,7 @@ CREATE TABLE IF NOT EXISTS import_passports (
     imported_at TIMESTAMPTZ DEFAULT NOW(),
     error_log TEXT,
     metadata JSONB,
-    status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'completed', 'failed')),
-    UNIQUE(file_hash)
+    status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'completed', 'failed'))
 );
 
 -- Staging brut : 1 ligne source = 1 trace rejouable

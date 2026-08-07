@@ -15,12 +15,14 @@ import os
 import sys
 import time
 import argparse
+import hashlib
 import re
 from pathlib import Path
 
 try:
     import psycopg2
     import psycopg2.extras
+    import psycopg2.sql
 except ImportError:
     print("[ERREUR] psycopg2 n'est pas installé. Exécutez : pip install psycopg2-binary")
     sys.exit(1)
@@ -31,7 +33,7 @@ except ImportError:
 
 DB_URL = os.getenv(
     "DATABASE_URL",
-    "postgresql://iddrv_user:iddrv_secret_2024@localhost:5432/iddrv"
+    "postgresql://iddrv_user@localhost:5432/iddrv"
 )
 
 # Chemins relatifs au répertoire du script
@@ -84,11 +86,40 @@ def execute_sql_file(cursor, sql_path: Path):
 
     sql_content = sql_path.read_text(encoding="utf-8")
     print(f"  → Exécution de {sql_path.name} ({len(sql_content)} octets) …")
-
-    # psycopg2 n'exécute pas les fichiers multi-statements directement ;
-    # on utilise execute() qui accepte le SQL brut via mogrify via executescript-like.
-    # Pour la compatibilité, on utilise psycopg2 avec autocommit=True sur DDL.
     cursor.execute(sql_content)
+
+
+def apply_migration(conn, migration_path: Path) -> bool:
+    """Apply one migration transactionally and record its immutable checksum."""
+    content = migration_path.read_bytes()
+    checksum = hashlib.sha256(content).hexdigest()
+    with conn.cursor() as cursor:
+        cursor.execute(
+            "SELECT checksum FROM schema_migrations WHERE name=%s",
+            (migration_path.name,),
+        )
+        row = cursor.fetchone()
+    if row:
+        existing = row[0] if not isinstance(row, dict) else row["checksum"]
+        if existing != checksum:
+            raise RuntimeError(f"Migration checksum mismatch: {migration_path.name}")
+        return False
+
+    conn.autocommit = False
+    try:
+        with conn.cursor() as cursor:
+            execute_sql_file(cursor, migration_path)
+            cursor.execute(
+                "INSERT INTO schema_migrations(name,checksum) VALUES (%s,%s)",
+                (migration_path.name, checksum),
+            )
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.autocommit = True
+    return True
 
 
 def _version_tuple(value: str) -> tuple[int, ...]:
@@ -207,9 +238,14 @@ def print_validation_report(conn):
     print("\n  🗂️   Tables créées :")
     tables = check_tables(cursor)
     expected_tables = [
-        "data_quality_issues", "evidence_vault", "import_passports",
-        "machine_aliases", "machine_cycles", "machines",
-        "production_orders", "shifts"
+        "action_proposal_decisions", "action_proposals", "data_quality_issues",
+        "diagnostic_evidence", "diagnostic_hypotheses", "diagnostic_runs",
+        "evidence_vault", "feedback", "import_job_events", "import_jobs",
+        "import_passports", "import_sessions", "incidents", "machine_aliases",
+        "machine_cycles", "machines", "maintenance_events", "operator_notes",
+        "production_lines", "production_orders", "quality_checks",
+        "schema_migrations", "sessions", "shifts", "sites", "staging_import_rows",
+        "user_site_roles", "users",
     ]
     for t in tables:
         marker = "✅" if t in expected_tables else "ℹ️"
@@ -251,12 +287,21 @@ def print_validation_report(conn):
     if seed["aliases"] > 0:
         _ok(f"{seed['aliases']} alias machines insérés")
 
+    cursor.execute("SELECT COUNT(*) AS cnt FROM schema_migrations")
+    migration_count = cursor.fetchone()["cnt"]
+    expected_migration_count = len(list((SCRIPT_DIR / "migrations").glob("*.sql")))
+    if migration_count == expected_migration_count:
+        _ok(f"{migration_count} migrations enregistrées")
+    else:
+        _err(f"Migrations incomplètes : {migration_count}/{expected_migration_count}")
+
     # Score global
     issues = (
         len([r for r in ["timescaledb", "uuid-ossp"] if r not in exts])
         + len([t for t in expected_tables if t not in tables])
         + (0 if ht else 1)
         + (0 if seed["machines"] > 0 else 1)
+        + (0 if migration_count == expected_migration_count else 1)
     )
 
     print()
@@ -285,15 +330,17 @@ def main():
     DB_URL = args.db_url
 
     _banner("IDDRV — Setup de la base de données")
-    print(f"\n  🔗  URL : {DB_URL.split('@')[-1]}")  # masque le mot de passe
+    import urllib.parse
+    parsed_target = urllib.parse.urlparse(DB_URL)
+    target_label = f"{parsed_target.hostname or 'localhost'}:{parsed_target.port or 5432}/{parsed_target.path.lstrip('/')}"
+    print(f"\n  🔗  Cible : {target_label}")
 
     if args.simulate_no_timescale:
         _err("timescaledb indisponible (simulation demandée)")
         sys.exit(2)
 
     # 1. Attendre PostgreSQL (connexion sur 'postgres' pour s'assurer de l'existence du DB de secours)
-    import urllib.parse
-    parsed = urllib.parse.urlparse(DB_URL)
+    parsed = parsed_target
     target_db = parsed.path.lstrip("/")
     
     # URL de connexion par défaut vers postgres
@@ -317,7 +364,10 @@ def main():
                 conn_default = psycopg2.connect(default_url)
                 conn_default.autocommit = True
                 with conn_default.cursor() as cur:
-                    cur.execute(f"CREATE DATABASE {target_db};")
+                    cur.execute(
+                        psycopg2.sql.SQL("CREATE DATABASE {}")
+                        .format(psycopg2.sql.Identifier(target_db))
+                    )
                 conn_default.close()
                 _ok(f"Database '{target_db}' created successfully.")
             except Exception as create_err:
@@ -339,16 +389,27 @@ def main():
         execute_sql_file(cursor, INIT_SQL)
         _ok("init.sql exécuté avec succès")
 
-        # 3.5 Exécuter les migrations
-        for migration_sql in sorted((SCRIPT_DIR / "migrations").glob("*.sql")):
-            print(f"\n  ⚙️   Exécution de la migration {migration_sql.name} …")
-            execute_sql_file(cursor, migration_sql)
-            _ok(f"Migration {migration_sql.name} exécutée avec succès")
-
-        # 4. Exécuter seed_data.sql
+        # 3.5 Seed first so topology migrations can attach layouts/lines to
+        # machines on both standalone and Docker bootstrap paths.
         print("\n  🌱  Insertion des données de référence (seed_data.sql) …")
         execute_sql_file(cursor, SEED_SQL)
         _ok("seed_data.sql exécuté avec succès")
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS schema_migrations (
+                name TEXT PRIMARY KEY,
+                checksum CHAR(64) NOT NULL,
+                applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )
+        """)
+
+        # 4. Each migration is transactional, immutable and applied once.
+        for migration_sql in sorted((SCRIPT_DIR / "migrations").glob("*.sql")):
+            print(f"\n  ⚙️   Migration {migration_sql.name} …")
+            if apply_migration(conn, migration_sql):
+                _ok(f"Migration {migration_sql.name} exécutée avec succès")
+            else:
+                _ok(f"Migration {migration_sql.name} déjà appliquée")
 
     except FileNotFoundError as exc:
         _err(str(exc))
@@ -357,10 +418,8 @@ def main():
         _err(str(exc))
         sys.exit(1)
     except psycopg2.Error as exc:
-        # Si les tables existent déjà, ce n'est pas critique (IF NOT EXISTS gère ça)
-        # mais on affiche l'erreur pour information
-        print(f"\n  [INFO] Message PostgreSQL : {exc}")
-        print("  (Normal si la base était déjà initialisée — continuons…)")
+        _err(f"Échec PostgreSQL pendant l'initialisation : {exc}")
+        sys.exit(1)
     finally:
         cursor.close()
 

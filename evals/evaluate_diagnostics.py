@@ -114,7 +114,7 @@ def evaluate_healthy(db_url: str) -> dict[str, Any]:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--db-url", default="postgresql://iddrv_user:iddrv_secret_2024@localhost:5432/iddrv")
+    parser.add_argument("--db-url", default="postgresql://iddrv_user@localhost:5432/iddrv")
     parser.add_argument("--truth", type=Path, default=GROUND_TRUTH)
     args = parser.parse_args()
     results = evaluate(args.db_url, args.truth)

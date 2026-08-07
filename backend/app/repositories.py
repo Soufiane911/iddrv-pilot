@@ -3,6 +3,77 @@ from datetime import datetime
 from uuid import UUID
 from .db import get_connection
 
+
+def _import_session(row, files):
+    return {"id": row[0], "site_id": row[1], "name": row[2], "status": row[3], "summary": row[4] or {},
+            "files": files, "created_at": row[5], "updated_at": row[6]}
+
+
+def create_import_session(site_id: int, name: str, user_id: str):
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""INSERT INTO import_sessions(site_id,name,created_by)
+                           VALUES (%s,%s,%s) RETURNING id,site_id,name,status,summary,created_at,updated_at""", (site_id, name, user_id))
+            row = cur.fetchone(); conn.commit()
+    return _import_session(row, [])
+
+
+def get_import_session(session_id: UUID):
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""SELECT id,site_id,name,status,summary,created_at,updated_at
+                           FROM import_sessions WHERE id=%s""", (str(session_id),))
+            row = cur.fetchone()
+            if row is None:
+                return None
+            cur.execute("""SELECT id,file_name,source_kind,mime_type,size_bytes,file_hash,status,profile
+                           FROM import_session_files WHERE session_id=%s ORDER BY created_at""", (str(session_id),))
+            files = [{"id": r[0], "file_name": r[1], "source_kind": r[2], "mime_type": r[3], "size_bytes": r[4],
+                      "file_hash": r[5], "status": r[6], "profile": r[7] or {}} for r in cur.fetchall()]
+    return _import_session(row, files)
+
+
+def add_import_file(session_id: UUID, payload: dict):
+    profile = {"columns": [], "recognized": [], "unknown": [], "confidence": 0.0,
+               "message": "Profilage en attente du worker d’ingestion."}
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""INSERT INTO import_session_files(session_id,file_name,source_kind,mime_type,size_bytes,file_hash,profile)
+                           VALUES (%s,%s,%s,%s,%s,%s,%s)
+                           ON CONFLICT (session_id,file_name,file_hash) DO NOTHING""",
+                        (str(session_id), payload["file_name"], payload["source_kind"], payload.get("mime_type"),
+                         payload.get("size_bytes", 0), payload.get("file_hash"), __import__("json").dumps(profile)))
+            cur.execute("UPDATE import_sessions SET status='profiling', updated_at=NOW() WHERE id=%s", (str(session_id),))
+            conn.commit()
+
+
+def validate_import_session(session_id: UUID, user_id: str):
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """SELECT COUNT(*)::int,
+                          COUNT(*) FILTER (
+                            WHERE file_hash IS NOT NULL
+                              AND jsonb_array_length(COALESCE(profile->'columns', '[]'::jsonb)) > 0
+                              AND status IN ('needs_review','validated')
+                          )::int
+                   FROM import_session_files WHERE session_id=%s""",
+                (str(session_id),),
+            )
+            total, profiled = cur.fetchone()
+            if total == 0 or profiled != total:
+                raise ValueError("import_session_not_profiled")
+            cur.execute(
+                "UPDATE import_session_files SET status='validated' WHERE session_id=%s",
+                (str(session_id),),
+            )
+            cur.execute(
+                "UPDATE import_sessions SET status='validated', updated_at=NOW() WHERE id=%s",
+                (str(session_id),),
+            )
+            conn.commit()
+    return get_import_session(session_id)
+
 def _incident(row):
     keys = ("id","site_id","machine_id","machine_erp_ref","production_order_id","status","severity","symptom","defect_type","started_at","ended_at","created_at","data_cutoff","confidence")
     return dict(zip(keys, row))
@@ -32,7 +103,17 @@ def get_incident(incident_id: UUID, allowed_site_ids=None):
     return next((r for r in rows if str(r["id"]) == str(incident_id)), None)
 
 def get_evidence(incident_id: UUID):
-    sql = """SELECT e.id,e.source_kind,e.source_ref,e.metric,e.window_start,e.window_end,e.observation,e.baseline,e.delta,e.supports,e.excerpt FROM diagnostic_evidence e JOIN diagnostic_runs r ON r.id=e.run_id WHERE r.incident_id=%s ORDER BY e.window_start"""
+    sql = """SELECT e.id,e.source_kind,e.source_ref,e.metric,e.window_start,e.window_end,
+                    e.observation,e.baseline,e.delta,e.supports,e.excerpt
+             FROM diagnostic_evidence e
+             JOIN diagnostic_runs r ON r.id=e.run_id
+             WHERE r.id=(
+                 SELECT latest.id FROM diagnostic_runs latest
+                 WHERE latest.incident_id=%s AND latest.status='completed'
+                 ORDER BY latest.completed_at DESC NULLS LAST,latest.started_at DESC
+                 LIMIT 1
+             )
+             ORDER BY e.window_start"""
     with get_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(sql, (str(incident_id),)); rows=[]
@@ -86,26 +167,33 @@ def get_proposal(proposal_id: UUID, allowed_site_ids=None):
 def create_proposal(incident_id: UUID, action_code: str, label: str, run_id: UUID | None = None):
     sql = """INSERT INTO action_proposals(incident_id,run_id,action_code,label)
              VALUES (%s,%s,%s,%s)
-             ON CONFLICT (incident_id,action_code) DO UPDATE SET label=EXCLUDED.label
+             ON CONFLICT (incident_id,action_code) DO UPDATE SET
+               label=EXCLUDED.label,run_id=EXCLUDED.run_id
+             WHERE action_proposals.status='proposed'
              RETURNING id,incident_id,run_id,action_code,label,status,created_at"""
     with get_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(sql, (str(incident_id), str(run_id) if run_id else None, action_code, label))
             row = cur.fetchone(); conn.commit()
+    if row is None:
+        return None
     return dict(id=row[0], incident_id=row[1], run_id=row[2], action_code=row[3], label=row[4], status=row[5], created_at=row[6])
 
 
 def decide_proposal(proposal_id: UUID, user_id: str, status: str, reason: str | None):
     sql = """WITH decision AS (
                INSERT INTO action_proposal_decisions(proposal_id,decided_by,status,reason)
-               VALUES (%s,%s,%s,%s) RETURNING id,proposal_id,status,reason,decided_at
+               SELECT p.id,%s,%s,%s FROM action_proposals p
+               WHERE p.id=%s AND p.status='proposed'
+               ON CONFLICT (proposal_id) DO NOTHING
+               RETURNING id,proposal_id,status,reason,decided_at
              )
              UPDATE action_proposals p SET status=CASE WHEN %s='approved' THEN 'accepted' ELSE 'rejected' END
              FROM decision d WHERE p.id=d.proposal_id
              RETURNING d.id,d.proposal_id,d.status,d.reason,d.decided_at"""
     with get_connection() as conn:
         with conn.cursor() as cur:
-            cur.execute(sql, (str(proposal_id), str(user_id), status, reason, status))
+            cur.execute(sql, (str(user_id), status, reason, str(proposal_id), status))
             row = cur.fetchone(); conn.commit()
     if row is None:
         return None
@@ -135,7 +223,7 @@ def persist_investigation(incident_id, result, as_of):
             cur.execute("INSERT INTO diagnostic_runs (incident_id,engine,status,completed_at,data_cutoff,result) VALUES (%s,'deterministic_local','completed',NOW(),%s,%s) RETURNING id", (str(incident_id), as_of, json.dumps(result.to_dict())))
             run_id = cur.fetchone()[0]
             for ev in result.evidence:
-                cur.execute("INSERT INTO diagnostic_evidence (id,run_id,source_kind,source_ref,metric,window_start,window_end,observation,baseline,delta,supports,excerpt) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING", (ev.id,run_id,ev.source_kind,ev.source_ref,ev.metric,ev.window.get('start'),ev.window.get('end'),json.dumps(ev.observation),json.dumps(ev.baseline) if ev.baseline is not None else None,ev.delta,ev.supports,ev.excerpt))
+                cur.execute("INSERT INTO diagnostic_evidence (id,run_id,source_kind,source_ref,metric,window_start,window_end,observation,baseline,delta,supports,excerpt) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)", (ev.id,run_id,ev.source_kind,ev.source_ref,ev.metric,ev.window.get('start'),ev.window.get('end'),json.dumps(ev.observation),json.dumps(ev.baseline) if ev.baseline is not None else None,ev.delta,ev.supports,ev.excerpt))
             for h in result.hypotheses:
-                cur.execute("INSERT INTO diagnostic_hypotheses (run_id,cause_code,label,confidence,supporting_evidence_ids,contradicting_evidence_ids,missing_data,next_check) VALUES (%s,%s,%s,%s,%s::uuid[],%s::uuid[],%s,%s) ON CONFLICT DO NOTHING", (run_id,h.cause_code,h.label,h.confidence,h.supporting_evidence_ids,h.contradicting_evidence_ids,json.dumps(h.missing_data),h.next_check))
+                cur.execute("INSERT INTO diagnostic_hypotheses (run_id,cause_code,label,confidence,supporting_evidence_ids,contradicting_evidence_ids,missing_data,next_check) VALUES (%s,%s,%s,%s,%s::uuid[],%s::uuid[],%s,%s)", (run_id,h.cause_code,h.label,h.confidence,h.supporting_evidence_ids,h.contradicting_evidence_ids,json.dumps(h.missing_data),h.next_check))
             conn.commit(); return run_id

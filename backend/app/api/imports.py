@@ -19,7 +19,7 @@ def imports(
 ):
     if identity is not None and site_id is not None:
         require_site(identity, site_id)
-    allowed = None if identity is None or identity.anonymous or identity.is_admin else identity.site_ids
+    allowed = None if identity is None or identity.anonymous else identity.site_ids
     items, next_value = list_imports(site_ids=allowed, site_id=site_id, limit=limit, cursor=cursor)
     return {"items": items, "next_cursor": next_value}
 

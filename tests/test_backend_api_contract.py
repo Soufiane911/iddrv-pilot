@@ -59,3 +59,27 @@ def test_timeline_contract_is_bounded_and_uses_aggregates(monkeypatch):
 def test_timeline_requires_historical_window():
     response = client.get("/api/v1/machines/7/timeline?bucket=hour")
     assert response.status_code == 422
+
+
+def test_investigation_rejects_naive_as_of_before_engine(monkeypatch):
+    incident_id = "00000000-0000-0000-0000-000000000001"
+    monkeypatch.setattr(
+        "backend.app.api.incidents.get_incident",
+        lambda *args, **kwargs: {
+            "id": incident_id,
+            "site_id": 1,
+            "machine_id": 7,
+            "production_order_id": "OF-1",
+            "started_at": datetime(2025, 2, 1, tzinfo=timezone.utc),
+            "ended_at": datetime(2025, 2, 2, tzinfo=timezone.utc),
+            "data_cutoff": datetime(2025, 2, 2, tzinfo=timezone.utc),
+            "defect_type": "short_shot",
+        },
+    )
+    identity = Identity("u-4", "analyst@example.test", "Analyst", "analyst", (1,))
+    response = client.post(
+        f"/api/v1/incidents/{incident_id}/investigations?as_of=2025-02-01T12:00:00",
+        headers=bearer(identity),
+    )
+    assert response.status_code == 422
+    assert response.json()["error"]["message"] == "as_of_timezone_required"

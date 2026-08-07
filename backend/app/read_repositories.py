@@ -46,7 +46,7 @@ def list_sites(*, site_ids: tuple[int, ...] | None = None, limit: int = 100, cur
               FROM sites s
               LEFT JOIN machines m ON m.site_id=s.id
               LEFT JOIN incidents i ON i.site_id=s.id
-              LEFT JOIN import_passports p ON p.status='completed'
+              LEFT JOIN import_passports p ON p.site_id=s.id AND p.status='completed'
               LEFT JOIN import_jobs j ON j.site_id=s.id AND j.status='completed'
               {where}
               GROUP BY s.id,s.name,s.timezone ORDER BY s.id LIMIT %s OFFSET %s"""
@@ -93,16 +93,20 @@ def _machine_query(site_id: int | None = None, machine_id: int | None = None):
 def list_machines(site_id: int, *, limit: int = 100, cursor: str | None = None):
     offset = _cursor_offset(cursor)
     where, args = _machine_query(site_id=site_id)
-    sql = f"""WITH data_cutoff AS (SELECT MAX(time) AS time FROM machine_cycles)
-              SELECT m.id,m.site_id,m.line_id,m.erp_ref,m.name,m.brand,m.model,
+    sql = f"""SELECT m.id,m.site_id,m.line_id,m.erp_ref,m.name,m.brand,m.model,
                      ml.x,ml.y,ml.z,ml.rotation_deg,ml.display_order,
                      CASE WHEN latest.time IS NULL THEN 'offline'
-                          WHEN data_cutoff.time-latest.time > INTERVAL '1 hour' THEN 'stopped'
+                          WHEN site_cutoff.time-latest.time > INTERVAL '1 hour' THEN 'stopped'
                           WHEN latest.scrap_flag THEN 'warning' ELSE 'running' END AS status
               FROM machines m LEFT JOIN machine_layouts ml ON ml.machine_id=m.id
               LEFT JOIN LATERAL (SELECT c.time,c.scrap_flag FROM machine_cycles c
                                  WHERE c.machine_id=m.id ORDER BY c.time DESC LIMIT 1) latest ON TRUE
-              CROSS JOIN data_cutoff
+              LEFT JOIN LATERAL (
+                  SELECT MAX(c.time) AS time
+                  FROM machine_cycles c
+                  JOIN machines site_machine ON site_machine.id=c.machine_id
+                  WHERE site_machine.site_id=m.site_id
+              ) site_cutoff ON TRUE
               {where} ORDER BY m.id LIMIT %s OFFSET %s"""
     args.extend([limit + 1, offset])
     with get_connection() as conn:
@@ -180,6 +184,80 @@ def machine_status(machine_id: int, as_of: datetime):
     return {"machine_id": machine_id, "status": status, "as_of": as_of, "freshness_s": freshness,
             "last_cycle_at": last_at, "current_order_id": order_id, "cycle_count_24h": count or 0,
             "scrap_rate_24h": _numeric(scrap_rate), "data_quality_status": quality_status}
+
+
+def raw_cycles(machine_id: int, as_of: datetime, limit: int = 20):
+    """Return the latest raw process cycles at or before ``as_of``.
+
+    The inner descending query keeps the bounded window causal and recent; the
+    outer ordering is chronological for the HDT feature builder.
+    """
+    if not 1 <= limit <= 100:
+        raise ValueError("limit must be between 1 and 100")
+    if as_of.tzinfo is None:
+        as_of = as_of.replace(tzinfo=timezone.utc)
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """WITH bounded_cycles AS (
+                     SELECT c.time,
+                            c.cycle_counter,
+                            c.source_row_hash,
+                            m.erp_ref AS machine_erp_ref,
+                            c.cycle_time_s,
+                            c.dosing_time_s,
+                            c.injection_time_s,
+                            c.cooling_time_s,
+                            c.cushion_mm,
+                            c.switchover_position AS switchover_position_mm,
+                            c.switchover_pressure_bar,
+                            c.peak_pressure_bar,
+                            c.clamp_force_kn,
+                            c.mold_temperature_c,
+                            c.barrel_temp_zone1_c,
+                            c.barrel_temp_zone2_c,
+                            c.barrel_temp_zone3_c,
+                            c.oil_temperature_c,
+                            c.energy_kwh
+                     FROM machine_cycles c
+                     JOIN machines m ON m.id=c.machine_id
+                     WHERE c.machine_id=%s AND c.time<=%s
+                     ORDER BY c.time DESC, c.cycle_counter DESC NULLS LAST, c.source_row_hash DESC NULLS LAST
+                     LIMIT %s
+                   )
+                   SELECT time,machine_erp_ref,cycle_time_s,dosing_time_s,
+                          injection_time_s,cooling_time_s,cushion_mm,
+                          switchover_position_mm,switchover_pressure_bar,
+                          peak_pressure_bar,clamp_force_kn,mold_temperature_c,
+                          barrel_temp_zone1_c,barrel_temp_zone2_c,
+                          barrel_temp_zone3_c,oil_temperature_c,energy_kwh
+                   FROM bounded_cycles
+                   ORDER BY time ASC, cycle_counter ASC NULLS LAST, source_row_hash ASC NULLS LAST""",
+                (machine_id, as_of, limit),
+            )
+            rows = cur.fetchall()
+    return [
+        {
+            "timestamp": row[0],
+            "machine_erp_ref": row[1],
+            "cycle_time_s": _numeric(row[2]),
+            "dosing_time_s": _numeric(row[3]),
+            "injection_time_s": _numeric(row[4]),
+            "cooling_time_s": _numeric(row[5]),
+            "cushion_mm": _numeric(row[6]),
+            "switchover_position_mm": _numeric(row[7]),
+            "switchover_pressure_bar": _numeric(row[8]),
+            "peak_pressure_bar": _numeric(row[9]),
+            "clamp_force_kn": _numeric(row[10]),
+            "mold_temperature_c": _numeric(row[11]),
+            "barrel_temp_zone1_c": _numeric(row[12]),
+            "barrel_temp_zone2_c": _numeric(row[13]),
+            "barrel_temp_zone3_c": _numeric(row[14]),
+            "oil_temperature_c": _numeric(row[15]),
+            "energy_kwh": _numeric(row[16]),
+        }
+        for row in rows
+    ]
 
 
 def timeline(machine_id: int, start: datetime, end: datetime, bucket: str):

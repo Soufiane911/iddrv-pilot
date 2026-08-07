@@ -5,6 +5,8 @@ import json
 import time
 import subprocess
 import urllib.parse
+import re
+import atexit
 from pathlib import Path
 import pytest
 
@@ -13,6 +15,26 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from env_manager import check_postgres_connection, check_redis_connection, check_docker_containers
+from conftest import (
+    _default_db_url,
+    _validate_test_database,
+    _validate_test_redis,
+    database_subprocess_environment,
+    initialize_e2e_guard,
+    initialize_e2e_redis_guard,
+)
+
+
+_USERINFO = re.compile(r"([a-z][a-z0-9+.-]*://)[^/@\s]*@", re.IGNORECASE)
+_SENSITIVE_QUERY = re.compile(
+    r"([?&](?:password|sslpassword|passwd|pwd|token|secret|api[_-]?key)=)[^&\s#]+",
+    re.IGNORECASE,
+)
+
+
+def redact_credentials(value: str) -> str:
+    redacted = _USERINFO.sub(r"\1***@", value)
+    return _SENSITIVE_QUERY.sub(r"\1***", redacted)
 
 class JsonReportPlugin:
     def __init__(self, output_path):
@@ -24,7 +46,10 @@ class JsonReportPlugin:
     def pytest_sessionstart(self, session):
         self.start_time = time.time()
 
+    @pytest.hookimpl(tryfirst=True)
     def pytest_runtest_logreport(self, report):
+        if report.failed:
+            report.longrepr = redact_credentials(str(report.longrepr))
         # We only record the 'call' phase (the actual test execution)
         # or a failed/skipped 'setup' phase or a failed 'teardown' phase
         if report.when == "call" or (report.when == "setup" and (report.failed or report.skipped)) or (report.when == "teardown" and report.failed):
@@ -38,7 +63,7 @@ class JsonReportPlugin:
                 "nodeid": report.nodeid,
                 "outcome": outcome,
                 "duration": report.duration,
-                "error": str(report.longrepr) if report.failed else None
+                "error": redact_credentials(str(report.longrepr)) if report.failed else None
             })
 
     def pytest_sessionfinish(self, session, exitstatus):
@@ -80,21 +105,37 @@ def main():
     parser = argparse.ArgumentParser(description="IDDRV E2E Test Suite Runner")
     parser.add_argument("-t", "--tier", type=str, default="1,2", help="Tiers of tests to run (comma-separated, e.g. '1' or '1,2')")
     parser.add_argument("-f", "--feature", type=str, default="all", help="Features to run (comma-separated or 'all')")
-    parser.add_argument("--db-url", type=str, default="postgresql://iddrv_user:iddrv_secret_2024@localhost:5432/iddrv_test", help="TimescaleDB connection URL")
-    parser.add_argument("--redis-url", type=str, default="redis://localhost:6379/1", help="Redis connection URL")
     parser.add_argument("-v", "--verbose", action="store_true", help="Enable detailed verbose output")
     parser.add_argument("--fail-fast", action="store_true", help="Stop execution immediately on first test failure")
     
     args = parser.parse_args()
+    # Connection secrets are accepted from protected environment files only,
+    # never from process arguments visible to other local users.
+    args.db_url = _default_db_url()
+    args.redis_url = os.getenv("E2E_REDIS_URL", "redis://localhost:6379/1")
 
     target_db = urllib.parse.urlparse(args.db_url).path.lstrip("/")
-    if not target_db.endswith("_test"):
-        parser.error("La suite E2E refuse une base qui ne se termine pas par '_test'.")
+    try:
+        _validate_test_database(args.db_url)
+        _validate_test_redis(args.redis_url)
+    except pytest.UsageError as error:
+        parser.error(str(error))
+
+    initialize_e2e_guard(args.db_url)
+    initialize_e2e_redis_guard(args.redis_url)
+    db_environment_context = database_subprocess_environment(args.db_url)
+    db_environment = db_environment_context.__enter__()
+    atexit.register(db_environment_context.__exit__, None, None, None)
+    os.environ["E2E_DATABASE_URL"] = db_environment["DATABASE_URL"]
+    if "PGPASSFILE" in db_environment:
+        os.environ["PGPASSFILE"] = db_environment["PGPASSFILE"]
+    os.environ["E2E_REDIS_URL"] = args.redis_url
 
     setup_script = Path(__file__).resolve().parents[2] / "db" / "setup_db.py"
     print(f"Preparing isolated test database: {target_db}")
     setup_result = subprocess.run(
-        [sys.executable, str(setup_script), "--db-url", args.db_url],
+        [sys.executable, str(setup_script)],
+        env=db_environment,
         text=True,
     )
     if setup_result.returncode != 0:
@@ -115,13 +156,13 @@ def main():
     db_ok = check_postgres_connection(args.db_url)
     print(f"PostgreSQL/TimescaleDB: {'CONNECTED' if db_ok else 'UNREACHABLE'}")
     if not db_ok:
-        print(f"  Warning: Cannot connect to DB at {args.db_url}")
+        print(f"  Warning: Cannot connect to DB at {redact_credentials(args.db_url)}")
         
     # Check Redis
     redis_ok = check_redis_connection(args.redis_url)
     print(f"Redis:                  {'CONNECTED' if redis_ok else 'UNREACHABLE'}")
     if not redis_ok:
-        print(f"  Warning: Cannot connect to Redis at {args.redis_url}")
+        print(f"  Warning: Cannot connect to Redis at {redact_credentials(args.redis_url)}")
         
     print("====================================================\n")
     
@@ -149,14 +190,12 @@ def main():
     # Custom args for conftest
     pytest_args.append(f"--tier={args.tier}")
     pytest_args.append(f"--feature={args.feature}")
-    pytest_args.append(f"--db-url={args.db_url}")
-    pytest_args.append(f"--redis-url={args.redis_url}")
     
     # Run tests and generate reports
     report_json_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "report.json")
     report_plugin = JsonReportPlugin(report_json_path)
     
-    print(f"Starting pytest execution with args: {pytest_args}")
+    print(f"Starting pytest execution with args: {[redact_credentials(value) for value in pytest_args]}")
     exit_code = pytest.main(pytest_args, plugins=[report_plugin])
     
     print("\n====================================================")

@@ -161,8 +161,8 @@ CREATE TABLE IF NOT EXISTS import_job_events (
 -- A copied file with the same bytes is one logical job even when it is
 -- deposited under another path.  NULL hashes are allowed until stability is
 -- confirmed; the worker always fills the hash before claiming the job.
-CREATE UNIQUE INDEX IF NOT EXISTS uq_import_jobs_file_hash
-    ON import_jobs(file_hash)
+CREATE UNIQUE INDEX IF NOT EXISTS uq_import_jobs_site_file_hash
+    ON import_jobs(site_id, file_hash)
     WHERE file_hash IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_import_jobs_status_schedule
     ON import_jobs(status, next_attempt_at, discovered_at);

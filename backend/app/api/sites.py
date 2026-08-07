@@ -14,7 +14,7 @@ def sites(
     limit: int = Query(100, ge=1, le=500),
     identity: Identity | None = Depends(get_identity_optional),
 ):
-    site_ids = None if identity is None or identity.anonymous or identity.is_admin else identity.site_ids
+    site_ids = None if identity is None or identity.anonymous else identity.site_ids
     items, next_value = list_sites(site_ids=site_ids, limit=limit, cursor=cursor)
     return {"items": items, "next_cursor": next_value}
 
