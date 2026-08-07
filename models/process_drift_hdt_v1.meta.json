@@ -1,0 +1,60 @@
+{
+  "model_version": "hdt-process-drift-iforest-v1",
+  "feature_columns": [
+    "cycle_time_s_volatility_20",
+    "injection_time_s_volatility_20",
+    "cooling_time_s_volatility_20",
+    "peak_pressure_bar_volatility_20",
+    "clamp_force_kn_volatility_20",
+    "mold_temperature_c_volatility_20",
+    "barrel_temp_zone2_c_volatility_20",
+    "energy_kwh_volatility_20",
+    "machine_erp_ref"
+  ],
+  "anomaly_features": [
+    "cycle_time_s_volatility_20",
+    "injection_time_s_volatility_20",
+    "cooling_time_s_volatility_20",
+    "peak_pressure_bar_volatility_20",
+    "clamp_force_kn_volatility_20",
+    "mold_temperature_c_volatility_20",
+    "barrel_temp_zone2_c_volatility_20",
+    "energy_kwh_volatility_20"
+  ],
+  "target_column": "instability_next_20_cycles",
+  "source_outcome_column": "scrap_flag",
+  "horizon_cycles": 20,
+  "minimum_future_scraps": 3,
+  "baseline_window": 20,
+  "metrics": {
+    "average_precision": 0.14067634969950768,
+    "baseline_prevalence": 0.012252591894439209,
+    "lift_over_prevalence": 11.481354387013665,
+    "roc_auc": 0.8778513815489006,
+    "precision_instability": 0.12292358803986711,
+    "recall_instability": 0.23717948717948717,
+    "normal_score_quantile": 0.98,
+    "alert_rate": 0.023641218975808984,
+    "positive_predictions": 301.0,
+    "horizon_cycles": 20.0,
+    "minimum_future_scraps": 3.0
+  },
+  "rows": {
+    "train": 25461,
+    "test": 12732,
+    "train_instability_events": 601,
+    "test_instability_events": 156
+  },
+  "time_boundary": {
+    "train_end": "2025-02-14T19:11:20.058654+00:00",
+    "test_start": "2025-02-14T09:27:48.488593+00:00"
+  },
+  "contract": {
+    "target": "at_least_3_future_scraps_in_next_20_cycles_as_instability_proxy",
+    "features": "causal_rolling_volatility_only",
+    "normal_training_population": "historical_cycles_with_scrap_flag_0",
+    "split": "chronological_2_3_train_1_3_test_per_machine",
+    "algorithm": "machine_contextualized_isolation_forest",
+    "ground_truth_used": false
+  }
+}

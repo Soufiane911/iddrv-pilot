@@ -1,0 +1,49 @@
+{
+  "model_version": "rebut-risk-logistic-v1",
+  "feature_columns": [
+    "cycle_time_s",
+    "dosing_time_s",
+    "injection_time_s",
+    "cooling_time_s",
+    "cushion_mm",
+    "switchover_position_mm",
+    "switchover_pressure_bar",
+    "peak_pressure_bar",
+    "clamp_force_kn",
+    "mold_temperature_c",
+    "barrel_temp_zone1_c",
+    "barrel_temp_zone2_c",
+    "barrel_temp_zone3_c",
+    "oil_temperature_c",
+    "energy_kwh",
+    "previous_scrap_flag",
+    "rolling_scrap_rate_20",
+    "machine_erp_ref"
+  ],
+  "target_column": "scrap_flag",
+  "metrics": {
+    "average_precision": 0.08039934828549897,
+    "baseline_prevalence": 0.01620859760394644,
+    "lift_over_prevalence": 4.960290226831437,
+    "roc_auc": 0.5926710315647652,
+    "precision_scrap": 0.03173029251363411,
+    "recall_scrap": 0.30917874396135264,
+    "threshold": 0.5,
+    "positive_predictions": 2017.0
+  },
+  "rows": {
+    "train": 25542,
+    "test": 12771,
+    "train_scraps": 590,
+    "test_scraps": 207
+  },
+  "time_boundary": {
+    "train_end": "2025-02-14T15:21:43.596283+00:00",
+    "test_start": "2025-02-14T15:21:49.651461+00:00"
+  },
+  "contract": {
+    "split": "chronological_2_3_train_1_3_test",
+    "class_weight": "balanced",
+    "random_state": 42
+  }
+}
