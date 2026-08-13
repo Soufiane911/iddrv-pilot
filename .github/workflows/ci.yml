@@ -109,7 +109,7 @@ jobs:
       timescaledb:
         image: timescale/timescaledb:2.28.2-pg16
         env:
-          POSTGRES_DB: iddrv
+          POSTGRES_DB: iddrv_test
           POSTGRES_USER: iddrv_user
           POSTGRES_PASSWORD: iddrv_ci_password
           TIMESCALEDB_TELEMETRY: "off"
@@ -128,8 +128,9 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     env:
-      E2E_DATABASE_URL: postgresql://iddrv_user:iddrv_ci_password@localhost:5432/iddrv
+      E2E_DATABASE_URL: postgresql://iddrv_user:iddrv_ci_password@localhost:5432/iddrv_test
       E2E_REDIS_URL: redis://localhost:6379/1
+      E2E_DESTRUCTIVE_CLEANUP_CONFIRMATION: iddrv_test:truncate-and-redis-1:flush
     steps:
       - uses: actions/checkout@v4
 
