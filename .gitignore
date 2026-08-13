@@ -1,42 +1,102 @@
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
-
 .pytest_cache/
 .ruff_cache/
+.mypy_cache/
+.tox/
 .coverage
 htmlcov/
+*.egg-info/
+dist/
+build/
 
+# Environnements virtuels et secrets
+.env
+.env.*
+!.env.example
+.venv/
+venv/
+
+# Node
+node_modules/
+frontend/node_modules/
+frontend/dist/
+frontend/.cache/
+*.tsbuildinfo
+frontend/vite.config.js
+frontend/vite.config.d.ts
+/package-lock.json
+
+# Tests et couverture
+frontend/coverage/
+frontend/test-results/
+frontend/playwright-report/
+test-results/
+tests/e2e/report.json
+tests/e2e/report.txt
+
+# Données locales générées
+data/raw/
+ingest/data/raw/
+data/inbox/
+data/processing/
+data/archive/
+data/quarantine/
+data/watch/
+backups/
+
+# Fichiers locaux de config Docker
+docker-compose.override.yml
+
+# Outils et agents
 .agents/
 .claude/
 .factory/
 .pi/
 .vite/
 
-.env
-.venv/
-venv/
-node_modules/
-frontend/node_modules/
-frontend/dist/
-*.tsbuildinfo
-frontend/vite.config.js
-frontend/vite.config.d.ts
-
-data/raw/
-ingest/data/raw/
-
-tests/e2e/report.json
-tests/e2e/report.txt
-backups/
-data/inbox/
-data/processing/
-data/archive/
-data/quarantine/
-data/watch/
-
+# Fichiers système
 .DS_Store
 
-# Veille documents (PDF/archives) are evidence on disk, not versioned
-source-plasturgie/**/*.pdf
-source-plasturgie/**/*.zip
+# Archives de debug / sessions
+kimi-debug-session_*.zip
+
+# Scripts temporaires personnels
+check-test-apostrophe.py
+frontend/check-*.py
+frontend/find-*.py
+frontend/fix-*.py
+
+# Notes et prompts personnels
+note/
+prompt-deepsearch-veille-ia.md
+
+# Sources externes non versionnées
+source-plasturgie/
+
+# Documentation complète (certification, runbook, contrats, specs)
+docs/
+
+# Évaluation offline (ground truth)
+evals/
+
+# Données brutes générées (les samples et le scénario demo sont lus par les tests)
+data/cycles_bruts/
+
+# Configurations d'agents et orchestration
+.agents/
+.claude/
+.codex/
+.factory/
+.pi/
+AGENTS.md
+
+# Scripts d'entraînement non essentiels
+scripts/train_process_drift.py
+scripts/train_rebut_risk.py
+scripts/generate_cycles_bruts.py
+
+# Brouillon README
+README.draft.md

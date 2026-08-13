@@ -6,10 +6,12 @@ import { StatePanel } from './components/Ui';
 import { ApiRequestError, apiClient, type ApiClient } from './lib/api';
 import { broadcastSessionState } from './lib/session';
 import { HealthPage } from './pages/HealthPage';
+import { AdminPage } from './pages/AdminPage';
 import { ImportsPage } from './pages/ImportsPage';
 import { IncidentDetailPage } from './pages/IncidentDetailPage';
 import { IncidentsPage } from './pages/IncidentsPage';
 import { LoginPage } from './pages/LoginPage';
+import { ModelMonitoringPage } from './pages/ModelMonitoringPage';
 import { OpportunitiesPage } from './pages/OpportunitiesPage';
 import { OverviewPage } from './pages/OverviewPage';
 import { ShowroomPage } from './pages/ShowroomPage';
@@ -97,6 +99,8 @@ export function App({ api = apiClient }: { api?: ApiClient }) {
             <Route path="incidents" element={<IncidentsPage />} />
             <Route path="incidents/:incidentId" element={<IncidentDetailPage />} />
             <Route path="imports" element={<ImportsPage />} />
+            <Route path="admin" element={<AdminPage />} />
+            <Route path="monitoring" element={<ModelMonitoringPage />} />
             <Route path="health" element={<HealthPage />} />
             <Route path="*" element={<Navigate to="/overview" replace />} />
           </Route>

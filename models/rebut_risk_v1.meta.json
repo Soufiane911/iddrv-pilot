@@ -22,9 +22,9 @@
   ],
   "target_column": "scrap_flag",
   "metrics": {
-    "average_precision": 0.08039934828549897,
+    "average_precision": 0.08039934828549898,
     "baseline_prevalence": 0.01620859760394644,
-    "lift_over_prevalence": 4.960290226831437,
+    "lift_over_prevalence": 4.960290226831438,
     "roc_auc": 0.5926710315647652,
     "precision_scrap": 0.03173029251363411,
     "recall_scrap": 0.30917874396135264,

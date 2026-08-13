@@ -1,95 +1,66 @@
-name: IDDRV Delivery
+name: Delivery
 
 on:
   workflow_run:
-    workflows: [IDDRV CI]
+    workflows: [CI]
     types: [completed]
     branches: [main]
 
 permissions:
   contents: read
+  packages: write
 
 jobs:
-  # ─────────────────────────────────────────────────────
-  # Livraison — BLOQUÉE en attente d'environnement cible
-  # ─────────────────────────────────────────────────────
-  #
-  # Conditions de déblocage :
-  #   1. Remote GitHub configuré (le dépôt n'a actuellement aucun remote)
-  #   2. Secrets requis dans l'environnement GitHub :
-  #      - DOCKER_REGISTRY         (ex: ghcr.io/<org>)
-  #      - DOCKER_REGISTRY_USER    (ex: <org>)
-  #      - DOCKER_REGISTRY_TOKEN   (GitHub PAT avec write:packages)
-  #   3. Serveur cible accessible pour le déploiement
-  #      - DEPLOY_HOST, DEPLOY_USER, DEPLOY_SSH_KEY
-  #   4. Validation de sécurité approuvée
-  #
-  # En attendant la livraison vers un registre distant,
-  # le déploiement on-premise est manuel et documenté
-  # dans docs/on-prem-runbook.md.
-  #
-  # ─────────────────────────────────────────────────────
-
-  delivery-blocked:
-    name: Delivery (BLOCKED — no remote/registry)
+  build-and-push:
+    name: Build & push Docker images
     if: github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-24.04
-    timeout-minutes: 1
     steps:
-      - name: Delivery status
-        run: |
-          echo "::notice::La livraison automatisée est bloquée."
-          echo ""
-          echo "Prérequis manquants :"
-          echo "  - Remote GitHub (git remote -v → vide)"
-          echo "  - Secrets DOCKER_REGISTRY, DOCKER_REGISTRY_TOKEN"
-          echo "  - Environnement cible (DEPLOY_HOST, etc.)"
-          echo ""
-          echo "Procédure manuelle actuelle :"
-          echo "  docker compose up -d --build"
-          echo "  docs/on-prem-runbook.md"
-          exit 0
+      - uses: actions/checkout@v4
 
-  # ─────────────────────────────────────────────────────
-  # Template CI/CD complet (activé quand débloqué)
-  # ─────────────────────────────────────────────────────
-  #
-  # build-and-push:
-  #   name: Build & push Docker images
-  #   runs-on: ubuntu-24.04
-  #   needs: [wait-for-ci]
-  #   if: github.event.workflow_run.conclusion == 'success'
-  #   permissions:
-  #     contents: read
-  #     packages: write
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - uses: docker/login-action@v3
-  #       with:
-  #         registry: ${{ secrets.DOCKER_REGISTRY }}
-  #         username: ${{ secrets.DOCKER_REGISTRY_USER }}
-  #         password: ${{ secrets.DOCKER_REGISTRY_TOKEN }}
-  #     - uses: docker/build-push-action@v6
-  #       with:
-  #         context: .
-  #         file: backend/Dockerfile
-  #         push: true
-  #         tags: ${{ secrets.DOCKER_REGISTRY }}/iddrv-api:${{ github.sha }}
-  #     - uses: docker/build-push-action@v6
-  #       with:
-  #         context: .
-  #         file: frontend/Dockerfile
-  #         push: true
-  #         tags: ${{ secrets.DOCKER_REGISTRY }}/iddrv-web:${{ github.sha }}
-  #
-  # deploy:
-  #   name: Deploy to target
-  #   runs-on: ubuntu-24.04
-  #   needs: [build-and-push]
-  #   environment: pilot
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - run: |
-  #         scp docker-compose.yml ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:/opt/iddrv/
-  #         ssh ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
-  #           "cd /opt/iddrv && docker compose pull && docker compose up -d"
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push API image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./backend/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/iddrv-api:${{ github.sha }}
+            ghcr.io/${{ github.repository_owner }}/iddrv-api:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push Web image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./frontend/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/iddrv-web:${{ github.sha }}
+            ghcr.io/${{ github.repository_owner }}/iddrv-web:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    name: Deploy to pilot
+    needs: build-and-push
+    runs-on: ubuntu-24.04
+    environment: pilot
+    if: github.event.workflow_run.conclusion == 'success' && vars.DEPLOY_HOST != ''
+    steps:
+      - name: Deploy on-premise
+        run: |
+          echo "Déploiement on-premise conditionné par les variables DEPLOY_HOST / DEPLOY_USER"
+          echo "et le secret DEPLOY_SSH_KEY."
+          echo ""
+          echo "Commande type :"
+          echo "  ssh ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }} \"cd /opt/iddrv && docker compose pull && docker compose up -d\""

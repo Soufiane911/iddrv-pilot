@@ -10,24 +10,97 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  backend:
-    name: Backend (pytest)
+  lint:
+    name: Lint & syntax check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
           cache: pip
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Check Python syntax
+        run: python -m compileall backend/ ingest/ ml/ scripts/ tests/
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Lint frontend
+        working-directory: frontend
+        run: npm run lint
+
+  backend:
+    name: Backend unit tests
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt pytest
-      - name: Run unit tests (E2E excluded — needs Docker)
+          pip install -r requirements.txt -r backend/requirements.txt pytest
+
+      - name: Run unit tests
         run: python -m pytest -q --ignore=tests/e2e
 
+  frontend:
+    name: Frontend tests & build
+    needs: backend
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm run test
+
+      - name: Build
+        run: npm run build
+
+  compose:
+    name: Compose validation
+    needs: frontend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate docker-compose.yml
+        run: docker compose config --quiet
+
   e2e:
-    name: E2E (TimescaleDB + Redis)
+    name: E2E tests
+    needs: compose
     runs-on: ubuntu-latest
     services:
       timescaledb:
@@ -56,43 +129,16 @@ jobs:
       E2E_REDIS_URL: redis://localhost:6379/1
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
           cache: pip
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt pytest
+          pip install -r requirements.txt -r backend/requirements.txt pytest
+
       - name: Run E2E harness
         run: python tests/e2e/run_tests.py -t 1,2
-
-  frontend:
-    name: Frontend (lint, tests, build)
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: frontend
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-      - name: Install dependencies
-        run: npm ci
-      - name: Lint
-        run: npm run lint
-      - name: Tests
-        run: npm run test
-      - name: Build
-        run: npm run build
-
-  compose:
-    name: Compose configuration
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Validate docker-compose.yml
-        run: docker compose config --quiet
