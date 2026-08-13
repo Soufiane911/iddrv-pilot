@@ -96,7 +96,6 @@ AGENTS.md
 # Scripts d'entraînement non essentiels
 scripts/train_process_drift.py
 scripts/train_rebut_risk.py
-scripts/generate_cycles_bruts.py
 
 # Brouillon README
 README.draft.md
