@@ -12,17 +12,34 @@ from .db import get_connection
 BUCKETS = {"minute": "1 minute", "hour": "1 hour"}
 
 
+class InvalidCursor(ValueError):
+    """Raised when a pagination cursor is not a valid legacy offset."""
+
+
 def _cursor_offset(cursor: str | None) -> int:
-    if not cursor:
+    """Decode the v1 cursor without silently restarting at the first page.
+
+    Cursors already emitted by v1 are base64 encoded offsets.  Keep accepting
+    that format for compatibility, but reject malformed values so a typo cannot
+    make a user unknowingly see page one again.
+    """
+    if cursor is None:
         return 0
     try:
-        return max(0, int(base64.urlsafe_b64decode(cursor + "=" * (-len(cursor) % 4)).decode()))
-    except (ValueError, TypeError):
-        return 0
+        encoded = cursor + "=" * (-len(cursor) % 4)
+        decoded = base64.b64decode(encoded, altchars=b"-_", validate=True).decode("ascii")
+        if not decoded.isdecimal():
+            raise ValueError
+        return int(decoded)
+    except (ValueError, TypeError, UnicodeDecodeError):
+        raise InvalidCursor("invalid pagination cursor") from None
 
 
 def next_cursor(offset: int, page_size: int, count: int) -> str | None:
-    if count < page_size:
+    # Callers fetch one look-ahead row.  A page exactly full is final when no
+    # look-ahead row was returned; emitting a cursor there creates a phantom
+    # request that repeats the last page.
+    if count <= page_size:
         return None
     return base64.urlsafe_b64encode(str(offset + page_size).encode()).decode().rstrip("=")
 
@@ -49,7 +66,7 @@ def list_sites(*, site_ids: tuple[int, ...] | None = None, limit: int = 100, cur
               LEFT JOIN import_passports p ON p.site_id=s.id AND p.status='completed'
               LEFT JOIN import_jobs j ON j.site_id=s.id AND j.status='completed'
               {where}
-              GROUP BY s.id,s.name,s.timezone ORDER BY s.id LIMIT %s OFFSET %s"""
+              GROUP BY s.id,s.name,s.timezone ORDER BY s.id ASC LIMIT %s OFFSET %s"""
     args.extend([limit + 1, offset])
     with get_connection() as conn:
         with conn.cursor() as cur:
@@ -73,7 +90,7 @@ def list_lines(site_id: int, *, limit: int = 100, cursor: str | None = None):
                 """SELECT l.id,l.site_id,l.code,l.name,COUNT(m.id)
                    FROM production_lines l LEFT JOIN machines m ON m.line_id=l.id
                    WHERE l.site_id=%s GROUP BY l.id,l.site_id,l.code,l.name
-                   ORDER BY l.id LIMIT %s OFFSET %s""",
+                   ORDER BY l.id ASC LIMIT %s OFFSET %s""",
                 (site_id, limit + 1, offset),
             )
             rows = cur.fetchall()
@@ -90,25 +107,45 @@ def _machine_query(site_id: int | None = None, machine_id: int | None = None):
     return (" WHERE " + " AND ".join(clauses)) if clauses else "", args
 
 
-def list_machines(site_id: int, *, limit: int = 100, cursor: str | None = None):
+def _as_of(value: datetime | None) -> datetime:
+    value = value or datetime.now(timezone.utc)
+    return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value
+
+
+def _machine_status_sql() -> str:
+    """One causal status policy shared by catalogue, detail and status reads."""
+    return """CASE
+        WHEN latest.time IS NULL OR params.as_of - latest.time > INTERVAL '1 hour' THEN 'offline'
+        WHEN params.as_of - latest.time > INTERVAL '15 minutes' THEN 'stopped'
+        WHEN recent.scrap_rate >= 0.10 THEN 'warning'
+        ELSE 'running'
+    END"""
+
+
+def list_machines(site_id: int, *, limit: int = 100, cursor: str | None = None,
+                  as_of: datetime | None = None):
     offset = _cursor_offset(cursor)
-    where, args = _machine_query(site_id=site_id)
-    sql = f"""SELECT m.id,m.site_id,m.line_id,m.erp_ref,m.name,m.brand,m.model,
+    effective_as_of = _as_of(as_of)
+    where, filter_args = _machine_query(site_id=site_id)
+    sql = f"""WITH params AS (SELECT %s::timestamptz AS as_of)
+              SELECT m.id,m.site_id,m.line_id,m.erp_ref,m.name,m.brand,m.model,
                      ml.x,ml.y,ml.z,ml.rotation_deg,ml.display_order,
-                     CASE WHEN latest.time IS NULL THEN 'offline'
-                          WHEN site_cutoff.time-latest.time > INTERVAL '1 hour' THEN 'stopped'
-                          WHEN latest.scrap_flag THEN 'warning' ELSE 'running' END AS status
-              FROM machines m LEFT JOIN machine_layouts ml ON ml.machine_id=m.id
-              LEFT JOIN LATERAL (SELECT c.time,c.scrap_flag FROM machine_cycles c
-                                 WHERE c.machine_id=m.id ORDER BY c.time DESC LIMIT 1) latest ON TRUE
+                     {_machine_status_sql()} AS status
+              FROM machines m CROSS JOIN params
+              LEFT JOIN machine_layouts ml ON ml.machine_id=m.id
+              LEFT JOIN LATERAL (SELECT c.time FROM machine_cycles c
+                                 WHERE c.machine_id=m.id AND c.time <= params.as_of
+                                 ORDER BY c.time DESC, c.cycle_counter DESC NULLS LAST,
+                                          c.source_row_hash DESC NULLS LAST LIMIT 1) latest ON TRUE
               LEFT JOIN LATERAL (
-                  SELECT MAX(c.time) AS time
+                  SELECT AVG(c.scrap_flag::int)::float AS scrap_rate
                   FROM machine_cycles c
-                  JOIN machines site_machine ON site_machine.id=c.machine_id
-                  WHERE site_machine.site_id=m.site_id
-              ) site_cutoff ON TRUE
-              {where} ORDER BY m.id LIMIT %s OFFSET %s"""
-    args.extend([limit + 1, offset])
+                  WHERE c.machine_id=m.id
+                    AND c.time > params.as_of - INTERVAL '24 hours'
+                    AND c.time <= params.as_of
+              ) recent ON TRUE
+              {where} ORDER BY m.id ASC LIMIT %s OFFSET %s"""
+    args = [effective_as_of, *filter_args, limit + 1, offset]
     with get_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(sql, args); rows = cur.fetchall()
@@ -116,71 +153,83 @@ def list_machines(site_id: int, *, limit: int = 100, cursor: str | None = None):
     for row in rows[:limit]:
         items.append({
             "id": row[0], "site_id": row[1], "line_id": row[2], "erp_ref": row[3], "name": row[4],
-            "brand": row[5], "model": row[6], "status": row[12],
+            "brand": row[5], "model": row[6], "status": row[12], "as_of": effective_as_of,
             "layout": {"x": _numeric(row[7]) or 0, "y": _numeric(row[8]) or 0, "z": _numeric(row[9]) or 0,
                        "rotation_deg": _numeric(row[10]) or 0, "display_order": row[11]} if row[7] is not None else None,
         })
     return items, next_cursor(offset, limit, len(rows))
 
 
-def get_machine(machine_id: int):
-    where, args = _machine_query(machine_id=machine_id)
+def get_machine(machine_id: int, as_of: datetime | None = None):
+    effective_as_of = _as_of(as_of)
+    where, filter_args = _machine_query(machine_id=machine_id)
+    sql = f"""WITH params AS (SELECT %s::timestamptz AS as_of)
+                   SELECT m.id,m.site_id,m.line_id,m.erp_ref,m.name,m.brand,m.model,
+                          ml.x,ml.y,ml.z,ml.rotation_deg,ml.display_order,
+                          {_machine_status_sql()} AS status
+                   FROM machines m CROSS JOIN params
+                   LEFT JOIN machine_layouts ml ON ml.machine_id=m.id
+                   LEFT JOIN LATERAL (SELECT c.time FROM machine_cycles c
+                                      WHERE c.machine_id=m.id AND c.time <= params.as_of
+                                      ORDER BY c.time DESC, c.cycle_counter DESC NULLS LAST,
+                                               c.source_row_hash DESC NULLS LAST LIMIT 1) latest ON TRUE
+                   LEFT JOIN LATERAL (
+                       SELECT AVG(c.scrap_flag::int)::float AS scrap_rate
+                       FROM machine_cycles c
+                       WHERE c.machine_id=m.id
+                         AND c.time > params.as_of - INTERVAL '24 hours'
+                         AND c.time <= params.as_of
+                   ) recent ON TRUE""" + where
+    args = [effective_as_of, *filter_args]
     with get_connection() as conn:
         with conn.cursor() as cur:
-            cur.execute(
-                """SELECT m.id,m.site_id,m.line_id,m.erp_ref,m.name,m.brand,m.model,
-                          ml.x,ml.y,ml.z,ml.rotation_deg,ml.display_order,
-                          CASE WHEN latest.time IS NULL OR NOW()-latest.time > INTERVAL '1 hour' THEN 'offline'
-                               WHEN NOW()-latest.time > INTERVAL '15 minutes' THEN 'stopped'
-                               WHEN latest.scrap_flag THEN 'warning' ELSE 'running' END AS status
-                   FROM machines m LEFT JOIN machine_layouts ml ON ml.machine_id=m.id
-                   LEFT JOIN LATERAL (SELECT c.time,c.scrap_flag FROM machine_cycles c
-                                      WHERE c.machine_id=m.id ORDER BY c.time DESC LIMIT 1) latest ON TRUE""" + where,
-                args,
-            )
+            cur.execute(sql, args)
             row = cur.fetchone()
     if row is None:
         return None
     return {
         "id": row[0], "site_id": row[1], "line_id": row[2], "erp_ref": row[3], "name": row[4],
-        "brand": row[5], "model": row[6], "status": row[12],
+        "brand": row[5], "model": row[6], "status": row[12], "as_of": effective_as_of,
         "layout": {"x": _numeric(row[7]) or 0, "y": _numeric(row[8]) or 0, "z": _numeric(row[9]) or 0,
                     "rotation_deg": _numeric(row[10]) or 0, "display_order": row[11]} if row[7] is not None else None,
     }
 
 
 def machine_status(machine_id: int, as_of: datetime):
-    if as_of.tzinfo is None:
-        as_of = as_of.replace(tzinfo=timezone.utc)
+    as_of = _as_of(as_of)
     with get_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
-                """WITH latest AS (
+                f"""WITH params AS (SELECT %s::timestamptz AS as_of),
+                   latest AS (
                      SELECT c.time,c.production_order_id,c.data_quality_status
-                     FROM machine_cycles c WHERE c.machine_id=%s AND c.time<=%s ORDER BY c.time DESC LIMIT 1
+                     FROM machine_cycles c CROSS JOIN params
+                     WHERE c.machine_id=%s AND c.time<=params.as_of
+                     ORDER BY c.time DESC, c.cycle_counter DESC NULLS LAST,
+                              c.source_row_hash DESC NULLS LAST LIMIT 1
                    ), recent AS (
                      SELECT COUNT(*)::int AS n,
                             AVG(c.scrap_flag::int)::float AS scrap_rate
-                     FROM machine_cycles c WHERE c.machine_id=%s AND c.time>%s-INTERVAL '24 hours' AND c.time<=%s
-                   ) SELECT latest.time,latest.production_order_id,latest.data_quality_status,recent.n,recent.scrap_rate
-                   FROM latest CROSS JOIN recent""",
-                (machine_id, as_of, machine_id, as_of, as_of),
+                     FROM machine_cycles c CROSS JOIN params
+                     WHERE c.machine_id=%s
+                       AND c.time>params.as_of-INTERVAL '24 hours'
+                       AND c.time<=params.as_of
+                   )
+                   SELECT latest.time,latest.production_order_id,latest.data_quality_status,
+                          recent.n,recent.scrap_rate,
+                          {_machine_status_sql()} AS status
+                   FROM params LEFT JOIN latest ON TRUE CROSS JOIN recent""",
+                (as_of, machine_id, machine_id),
             )
             row = cur.fetchone()
+    # The aggregate CTE always yields a row, including for a machine without
+    # cycles.  Keep this guard for database adapters returning no row.
     if row is None:
         return {"machine_id": machine_id, "status": "offline", "as_of": as_of, "freshness_s": None,
                 "last_cycle_at": None, "current_order_id": None, "cycle_count_24h": 0, "scrap_rate_24h": None,
                 "data_quality_status": None}
-    last_at, order_id, quality_status, count, scrap_rate = row
+    last_at, order_id, quality_status, count, scrap_rate, status = row
     freshness = max(0.0, (as_of - last_at).total_seconds()) if last_at else None
-    if freshness is None or freshness > 3600:
-        status = "offline"
-    elif freshness > 900:
-        status = "stopped"
-    elif scrap_rate is not None and scrap_rate >= 0.10:
-        status = "warning"
-    else:
-        status = "running"
     return {"machine_id": machine_id, "status": status, "as_of": as_of, "freshness_s": freshness,
             "last_cycle_at": last_at, "current_order_id": order_id, "cycle_count_24h": count or 0,
             "scrap_rate_24h": _numeric(scrap_rate), "data_quality_status": quality_status}
@@ -368,7 +417,7 @@ def list_imports(*, site_ids: tuple[int, ...] | None = None, site_id: int | None
     where = " WHERE " + " AND ".join(clauses) if clauses else ""
     sql = f"""SELECT j.id,j.site_id,j.source_kind,j.file_name,j.status,j.attempt_count,j.max_attempts,
                      j.file_hash,j.passport_id,j.last_error_code,j.last_error,j.discovered_at,j.started_at,j.completed_at
-              FROM import_jobs j{where} ORDER BY j.discovered_at DESC LIMIT %s OFFSET %s"""
+              FROM import_jobs j{where} ORDER BY j.discovered_at DESC, j.id DESC LIMIT %s OFFSET %s"""
     args.extend([limit + 1, offset])
     with get_connection() as conn:
         with conn.cursor() as cur:

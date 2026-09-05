@@ -93,9 +93,7 @@ data/cycles_bruts/
 .pi/
 AGENTS.md
 
-# Scripts d'entraînement non essentiels
-scripts/train_process_drift.py
-scripts/train_rebut_risk.py
+# Les scripts d'entraînement versionnés sont des points d'entrée reproductibles.
 
 # Brouillon README
 README.draft.md

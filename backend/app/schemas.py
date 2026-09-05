@@ -29,6 +29,15 @@ class HealthResponse(BaseModel):
     database: Literal["ok", "unavailable"]
 
 
+class ReadinessResponse(BaseModel):
+    status: Literal["ready", "not_ready"]
+    service: str
+    version: str
+    database: Literal["ok", "unavailable"]
+    redis: Literal["ok", "unavailable"]
+    model: Literal["ok", "unavailable"]
+
+
 class Site(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
@@ -58,6 +67,7 @@ class Machine(BaseModel):
     brand: str | None = None
     model: str | None = None
     status: Literal["running", "warning", "stopped", "offline"] | None = None
+    as_of: datetime | None = None
     layout: dict[str, Any] | None = None
 
 
@@ -188,6 +198,7 @@ class MachineListItem(BaseModel):
     brand: str | None = None
     model: str | None = None
     status: Literal["running", "warning", "stopped", "offline"] | None = None
+    as_of: datetime | None = None
     layout: dict[str, Any] | None = None
 
 
@@ -371,6 +382,8 @@ class Incident(BaseModel):
     symptom: str; defect_type: str | None = None
     started_at: datetime; ended_at: datetime | None = None; created_at: datetime
     data_cutoff: datetime; confidence: Literal["low", "medium", "high"] | None = None
+    # Additive read-only projection of the latest persisted human feedback.
+    feedback_verdict: str | None = None
 
 class Evidence(BaseModel):
     id: UUID; source_kind: str; source_ref: str; metric: str

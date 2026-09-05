@@ -6,57 +6,27 @@ test.describe('Administration et Monitoring', () => {
     await page.waitForLoadState('networkidle');
   });
 
-  test('accède à la page admin et affiche le profil (si auth disponible)', async ({ page }) => {
+  test('accède à la page admin et affiche le profil de démonstration', async ({ page }) => {
     await page.goto('/admin');
     await page.waitForLoadState('networkidle');
     await expect(page.getByRole('heading', { name: /Administration/i })).toBeVisible();
-
-    // En mode SKIP_AUTH, le profil peut ne pas charger (401 sur /auth/me)
-    // On vérifie soit le profil, soit le message d'erreur, soit l'état de chargement
-    const profileHeading = page.getByRole('heading', { name: /Votre profil/i });
-    const errorPanel = page.getByRole('alert');
-    const loadingPanel = page.getByText(/Chargement du profil/i);
-
-    const hasProfile = await profileHeading.count() > 0 && await profileHeading.isVisible().catch(() => false);
-    const hasError = await errorPanel.count() > 0 && await errorPanel.first().isVisible().catch(() => false);
-    const hasLoading = await loadingPanel.count() > 0 && await loadingPanel.isVisible().catch(() => false);
-
-    if (hasProfile) {
-      // Le profil est chargé — vérifie les sections attendues
-      await expect(page.getByRole('heading', { name: /Permissions par site/i })).toBeVisible();
-    } else if (hasError || hasLoading) {
-      // Mode SKIP_AUTH : le profil est indisponible ou en cours de chargement, c'est acceptable
-      expect(true).toBe(true);
-    } else {
-      // Ni profil ni erreur — attend au moins la présence du titre Administration
-      await expect(page.getByRole('heading', { name: /Administration/i })).toBeVisible();
-    }
+    await expect(page.getByRole('heading', { name: /Votre profil/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Permissions par site/i })).toBeVisible();
   });
 
-  test('affiche la matrice des rôles (si auth disponible)', async ({ page }) => {
+  test('affiche la matrice des rôles', async ({ page }) => {
     await page.goto('/admin');
     await page.waitForLoadState('networkidle');
-
-    const matriceHeading = page.getByRole('heading', { name: /Matrice des rôles/i });
-    if (await matriceHeading.count() > 0 && await matriceHeading.isVisible().catch(() => false)) {
-      await expect(matriceHeading).toBeVisible();
-      await expect(page.getByText(/Bonnes pratiques/i)).toBeVisible();
-    } else {
-      test.skip(true, 'Matrice des rôles non affichée en mode SKIP_AUTH');
-    }
+    await expect(page.getByRole('heading', { name: /Matrice des rôles/i })).toBeVisible();
+    await expect(page.getByText(/Bonnes pratiques/i)).toBeVisible();
   });
 
-  test('affiche les informations de sécurité (si auth disponible)', async ({ page }) => {
+  test('affiche les informations de sécurité documentées', async ({ page }) => {
     await page.goto('/admin');
     await page.waitForLoadState('networkidle');
-
-    const httpOnlyText = page.getByText(/HttpOnly/i);
-    if (await httpOnlyText.count() > 0 && await httpOnlyText.first().isVisible().catch(() => false)) {
-      await expect(page.getByText(/Secure/i).first()).toBeVisible();
-      await expect(page.getByText(/Argon2id/i).first()).toBeVisible();
-    } else {
-      test.skip(true, 'Informations de sécurité non affichées en mode SKIP_AUTH');
-    }
+    await expect(page.getByText(/HttpOnly/i).first()).toBeVisible();
+    await expect(page.getByText(/Secure/i).first()).toBeVisible();
+    await expect(page.getByText(/Argon2id/i).first()).toBeVisible();
   });
 
   test('accède à la page monitoring avec les métriques HDT', async ({ page }) => {
@@ -106,19 +76,24 @@ test.describe('Administration et Monitoring', () => {
     await expect(page.getByText(/validation offline sur données synthétiques/i).first()).toBeVisible();
   });
 
-  test('navigue entre admin et monitoring via la sidebar', async ({ page }) => {
+  test('atteint les écrans administration et monitoring par leurs routes publiques', async ({ page }) => {
+    // These screens are intentionally not presented as sidebar links: the
+    // sidebar exposes service health, while monitoring/admin are dedicated
+    // routes.  Assert the routes that actually exist instead of a stale link.
     await page.goto('/admin');
     await page.waitForLoadState('networkidle');
     await expect(page.getByRole('heading', { name: /Administration/i })).toBeVisible();
 
-    await page.getByRole('link', { name: /Monitoring HDT/i }).click();
+    await page.goto('/monitoring');
     await page.waitForLoadState('networkidle');
     await expect(page).toHaveURL(/\/monitoring/);
     await expect(page.getByRole('heading', { name: /Monitoring du modèle HDT/i })).toBeVisible();
 
-    await page.getByRole('link', { name: /Utilisateurs/i }).click();
+    await page.goto('/health');
     await page.waitForLoadState('networkidle');
-    await expect(page).toHaveURL(/\/admin/);
-    await expect(page.getByRole('heading', { name: /Administration/i })).toBeVisible();
+    await expect(page).toHaveURL(/\/health/);
+    await expect(page.getByRole('heading', { name: /Santé des services/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Dépendances sondées/i })).toBeVisible();
+    await expect(page.getByText('Chargeable', { exact: true })).toBeVisible();
   });
 });

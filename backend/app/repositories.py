@@ -75,22 +75,43 @@ def validate_import_session(session_id: UUID, user_id: str):
     return get_import_session(session_id)
 
 def _incident(row):
-    keys = ("id","site_id","machine_id","machine_erp_ref","production_order_id","status","severity","symptom","defect_type","started_at","ended_at","created_at","data_cutoff","confidence")
+    keys = ("id","site_id","machine_id","machine_erp_ref","production_order_id","status","severity","symptom","defect_type","started_at","ended_at","created_at","data_cutoff","confidence","feedback_verdict")
     return dict(zip(keys, row))
 
-def list_incidents(site_id=None, start=None, end=None, status=None, machine_id=None, allowed_site_ids=None, limit=None, offset=0):
+_INCIDENT_SELECT = """SELECT i.id,i.site_id,i.machine_id,m.erp_ref,i.production_order_id,i.status,
+       i.severity,i.symptom,i.defect_type,i.started_at,i.ended_at,i.created_at,
+       i.data_cutoff,i.confidence,latest_feedback.verdict
+       FROM incidents i
+       LEFT JOIN machines m ON m.id=i.machine_id
+       LEFT JOIN LATERAL (
+           SELECT f.verdict
+           FROM feedback f
+           WHERE f.incident_id=i.id
+           ORDER BY f.created_at DESC, f.id DESC
+           LIMIT 1
+       ) latest_feedback ON TRUE"""
+
+
+def _incident_filters(site_id=None, start=None, end=None, status=None, machine_id=None, allowed_site_ids=None):
     clauses, args = [], []
     if site_id is not None: clauses.append("i.site_id=%s"); args.append(site_id)
     if machine_id is not None: clauses.append("i.machine_id=%s"); args.append(machine_id)
     if allowed_site_ids is not None:
         if not allowed_site_ids:
-            return []
+            return None, []
         clauses.append("i.site_id = ANY(%s)"); args.append(list(allowed_site_ids))
     if start is not None: clauses.append("i.started_at >= %s"); args.append(start)
     if end is not None: clauses.append("i.started_at <= %s"); args.append(end)
     if status is not None: clauses.append("i.status=%s"); args.append(status)
-    where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
-    sql = """SELECT i.id,i.site_id,i.machine_id,m.erp_ref,i.production_order_id,i.status,i.severity,i.symptom,i.defect_type,i.started_at,i.ended_at,i.created_at,i.data_cutoff,i.confidence FROM incidents i LEFT JOIN machines m ON m.id=i.machine_id""" + where + " ORDER BY i.started_at DESC"
+    return clauses, args
+
+
+def list_incidents(site_id=None, start=None, end=None, status=None, machine_id=None, allowed_site_ids=None, limit=None, offset=0):
+    filters, args = _incident_filters(site_id, start, end, status, machine_id, allowed_site_ids)
+    if filters is None:
+        return []
+    where = (" WHERE " + " AND ".join(filters)) if filters else ""
+    sql = _INCIDENT_SELECT + where + " ORDER BY i.started_at DESC, i.id DESC"
     if limit is not None:
         sql += " LIMIT %s OFFSET %s"
         args.extend([limit, max(0, offset)])
@@ -98,9 +119,19 @@ def list_incidents(site_id=None, start=None, end=None, status=None, machine_id=N
         with conn.cursor() as cur:
             cur.execute(sql, args); return [_incident(r) for r in cur.fetchall()]
 
+
 def get_incident(incident_id: UUID, allowed_site_ids=None):
-    rows = list_incidents(allowed_site_ids=allowed_site_ids)
-    return next((r for r in rows if str(r["id"]) == str(incident_id)), None)
+    filters, args = _incident_filters(allowed_site_ids=allowed_site_ids)
+    if filters is None:
+        return None
+    filters.insert(0, "i.id=%s")
+    args.insert(0, str(incident_id))
+    where = " WHERE " + " AND ".join(filters)
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(_INCIDENT_SELECT + where, args)
+            row = cur.fetchone()
+    return _incident(row) if row is not None else None
 
 def get_evidence(incident_id: UUID):
     sql = """SELECT e.id,e.source_kind,e.source_ref,e.metric,e.window_start,e.window_end,

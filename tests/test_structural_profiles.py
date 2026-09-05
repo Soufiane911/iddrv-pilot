@@ -490,6 +490,15 @@ def test_explicit_unit_conversions_are_applied_once():
     assert mapping["Cycle_Time_ms"]["conversion_applied"] is True
 
 
+def test_brand_specific_mapping_wins_over_generic_fallback():
+    mapping = build_column_map(["CycleTime", "GoodParts"], brand="haitian")
+
+    assert mapping["CycleTime"]["brand"] == "haitian"
+    assert mapping["CycleTime"]["confidence"] == 1.0
+    assert mapping["GoodParts"]["brand"] == "haitian"
+    assert mapping["GoodParts"]["confidence"] == 1.0
+
+
 def test_generic_canonical_dictionary_covers_process_fields():
     mapping = build_column_map([
         "switchover_position_mm", "cooling_time_s", "barrel_temp_zone2_c",

@@ -26,7 +26,14 @@ async def http_exception_handler(request: Request, exc: HTTPException) -> JSONRe
     request_id = getattr(request.state, "request_id", None) if hasattr(request, "state") else None
     detail = exc.detail if isinstance(exc.detail, str) else "Request failed"
     code = detail if detail.endswith("_not_found") or detail.endswith("_unavailable") else "http_error"
-    return _response(exc.status_code, code, detail, request_id=request_id)
+    response = _response(exc.status_code, code, detail, request_id=request_id)
+    # Preserve endpoint-specific headers such as Retry-After while ensuring
+    # every error keeps the correlation header managed by the middleware.
+    if exc.headers:
+        for name, value in exc.headers.items():
+            if name.lower() != "x-request-id":
+                response.headers[name] = value
+    return response
 
 
 async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:

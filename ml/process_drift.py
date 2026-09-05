@@ -13,6 +13,7 @@ a production label should be replaced by a validated SPC/quality event.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import json
 from pathlib import Path
 from typing import Any
 
@@ -24,6 +25,12 @@ from sklearn.impute import SimpleImputer
 from sklearn.metrics import average_precision_score, precision_score, recall_score, roc_auc_score
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
+
+from .artifact_contract import (
+    ArtifactContractError,
+    load_serialized_artifact,
+    runtime_environment,
+)
 
 MODEL_VERSION = "hdt-process-drift-iforest-v1"
 TARGET_COLUMN = "instability_next_20_cycles"
@@ -78,14 +85,16 @@ class TrainingResult:
     test_events: int
     train_end: str
     test_start: str
+    per_machine_boundaries: dict[str, dict[str, str]]
 
 
 def load_cycle_files(data_dir: Path) -> pd.DataFrame:
     """Load machine cycles only; ground_truth.json is never read."""
+    data_dir = Path(data_dir).expanduser()
     paths = sorted(data_dir.glob("machine_cycles_*.csv"))
     if not paths:
         raise FileNotFoundError(f"No machine_cycles_*.csv files found in {data_dir}")
-    return prepare_frame(pd.concat([pd.read_csv(path) for path in paths], ignore_index=True))
+    return pd.concat([pd.read_csv(path) for path in paths], ignore_index=True)
 
 
 def _future_event(series: pd.Series, horizon: int) -> pd.Series:
@@ -111,6 +120,8 @@ def _add_causal_features(group: pd.DataFrame) -> pd.DataFrame:
 
 def prepare_frame(frame: pd.DataFrame) -> pd.DataFrame:
     """Prepare timestamped cycles and causal volatility features."""
+    if TARGET_COLUMN in frame.columns or set(ANOMALY_FEATURES).intersection(frame.columns):
+        raise ValueError("frame is already prepared")
     required = set(RAW_NUMERIC_FEATURES) | {"timestamp", "machine_erp_ref", SOURCE_OUTCOME_COLUMN}
     missing = sorted(required.difference(frame.columns))
     if missing:
@@ -150,6 +161,8 @@ def temporal_split(frame: pd.DataFrame, train_fraction: float = 2 / 3) -> tuple[
     test_parts: list[pd.DataFrame] = []
     for _, group in frame.groupby("machine_erp_ref", sort=False):
         ordered = group.sort_values("timestamp").reset_index(drop=True)
+        if len(ordered) < 2:
+            raise ValueError("Every machine group must contain at least one test row")
         cut = max(1, min(len(ordered) - 1, int(len(ordered) * train_fraction)))
         train_parts.append(ordered.iloc[:cut].copy())
         test_parts.append(ordered.iloc[cut:].copy())
@@ -217,6 +230,15 @@ def evaluate(artifact: dict[str, Any], test: pd.DataFrame) -> dict[str, float]:
 def train(frame: pd.DataFrame) -> TrainingResult:
     prepared = prepare_frame(frame)
     train_frame, test_frame = temporal_split(prepared)
+    per_machine_boundaries: dict[str, dict[str, str]] = {}
+    for machine, train_group in train_frame.groupby("machine_erp_ref", sort=False):
+        test_group = test_frame[test_frame["machine_erp_ref"] == machine]
+        if test_group.empty:
+            raise ValueError(f"Machine {machine} has no test rows")
+        per_machine_boundaries[str(machine)] = {
+            "train_end": train_group["timestamp"].max().isoformat(),
+            "test_start": test_group["timestamp"].min().isoformat(),
+        }
     normal_train = train_frame[train_frame[SOURCE_OUTCOME_COLUMN] == 0]
     global_model = build_pipeline().fit(normal_train[list(ANOMALY_FEATURES)])
     global_scores = -global_model.score_samples(normal_train[list(ANOMALY_FEATURES)])
@@ -244,6 +266,7 @@ def train(frame: pd.DataFrame) -> TrainingResult:
         "baseline_window": BASELINE_WINDOW,
         "thresholds": thresholds,
         "global_threshold": global_threshold,
+        "environment": runtime_environment(),
         "training_contract": {
             "target": "at_least_3_future_scraps_in_next_20_cycles_as_instability_proxy",
             "features": "causal_rolling_volatility_only",
@@ -263,6 +286,7 @@ def train(frame: pd.DataFrame) -> TrainingResult:
         test_events=int(test_frame[TARGET_COLUMN].sum()),
         train_end=train_frame["timestamp"].max().isoformat(),
         test_start=test_frame["timestamp"].min().isoformat(),
+        per_machine_boundaries=per_machine_boundaries,
     )
 
 
@@ -286,18 +310,42 @@ def save_artifact(result: TrainingResult, artifact_path: Path, metadata_path: Pa
             "train_instability_events": result.train_events,
             "test_instability_events": result.test_events,
         },
-        "time_boundary": {"train_end": result.train_end, "test_start": result.test_start},
+        "time_boundary": {
+            "train_end": result.train_end,
+            "test_start": result.test_start,
+            "per_machine": result.per_machine_boundaries,
+        },
+        "environment": runtime_environment(),
         "contract": result.artifact["training_contract"],
     }
-    metadata_path.write_text(__import__("json").dumps(metadata, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    metadata_path.write_text(json.dumps(metadata, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
 
 def load_artifact(path: Path) -> dict[str, Any]:
-    artifact = joblib.load(path)
-    if not isinstance(artifact, dict) or artifact.get("model_version") != MODEL_VERSION:
-        raise ValueError(f"Unsupported or invalid HDT artifact: {path}")
+    artifact = load_serialized_artifact(path)
+    if artifact.get("model_version") != MODEL_VERSION:
+        raise ArtifactContractError(f"Unsupported or invalid HDT artifact: {path}")
     if artifact.get("feature_columns") != list(FEATURE_COLUMNS):
-        raise ValueError("HDT model feature contract does not match runtime features")
+        raise ArtifactContractError("HDT model feature contract does not match runtime features")
+    if artifact.get("anomaly_features") != list(ANOMALY_FEATURES):
+        raise ArtifactContractError("HDT anomaly feature contract does not match runtime features")
+    if artifact.get("horizon_cycles") != HORIZON_CYCLES:
+        raise ArtifactContractError("HDT artifact horizon does not match runtime contract")
+    if not isinstance(artifact.get("models"), dict) or not isinstance(artifact.get("thresholds"), dict):
+        raise ArtifactContractError("HDT artifact model registry is invalid")
+    global_model = artifact.get("global_model")
+    if global_model is None or not hasattr(global_model, "score_samples"):
+        raise ArtifactContractError("HDT artifact global model is invalid")
+    if any(not hasattr(model, "score_samples") for model in artifact["models"].values()):
+        raise ArtifactContractError("HDT artifact machine model registry is invalid")
+    if "global_threshold" not in artifact:
+        raise ArtifactContractError("HDT artifact is missing its global fallback")
+    thresholds = [artifact["global_threshold"], *artifact["thresholds"].values()]
+    try:
+        if any(not np.isfinite(float(value)) for value in thresholds):
+            raise ArtifactContractError("HDT artifact thresholds are invalid")
+    except (TypeError, ValueError) as exc:
+        raise ArtifactContractError("HDT artifact thresholds are invalid") from exc
     return artifact
 
 

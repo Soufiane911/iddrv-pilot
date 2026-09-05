@@ -43,11 +43,7 @@ test.describe("Parcours incident complet : liste → détail → investigation",
 
   test("ouvre le détail d’un incident et vérifie l'affichage", async ({ page }) => {
     const tableRows = page.locator('table tbody tr');
-    const rowCount = await tableRows.count();
-    if (rowCount === 0) {
-      test.skip(true, 'Aucun incident disponible pour tester le détail');
-      return;
-    }
+    await expect(tableRows).toHaveCount(1);
 
     // Clique sur le premier lien d'incident
     await tableRows.first().getByRole('link').first().click();
@@ -61,11 +57,7 @@ test.describe("Parcours incident complet : liste → détail → investigation",
 
   test('vérifie la présence des métriques sur la fiche incident', async ({ page }) => {
     const tableRows = page.locator('table tbody tr');
-    if (await tableRows.count() === 0) {
-      test.skip(true, 'Aucun incident disponible');
-      return;
-    }
-
+    await expect(tableRows).toHaveCount(1);
     await tableRows.first().getByRole('link').first().click();
     await page.waitForLoadState('networkidle');
     await expect(page).toHaveURL(/\/incidents\//);
@@ -79,41 +71,29 @@ test.describe("Parcours incident complet : liste → détail → investigation",
 
   test("lance l’investigation et vérifie les hypothèses et preuves", async ({ page }) => {
     const tableRows = page.locator('table tbody tr');
-    if (await tableRows.count() === 0) {
-      test.skip(true, 'Aucun incident disponible');
-      return;
-    }
-
+    await expect(tableRows).toHaveCount(1);
     await tableRows.first().getByRole('link').first().click();
     await page.waitForLoadState('networkidle');
     await expect(page).toHaveURL(/\/incidents\//);
 
     const investigateButton = page.getByRole('button', { name: /Lancer l’investigation/i });
-    if (await investigateButton.count() === 0 || !(await investigateButton.isVisible())) {
-      test.skip(true, 'Bouton investigation non disponible (lecture seule ou absent)');
-      return;
-    }
-
+    await expect(investigateButton).toBeVisible();
     await investigateButton.click();
-    await expect(page.getByText(/Investigation/i)).toBeVisible();
+    await expect(page.getByText(/Investigation terminée/i)).toBeVisible({ timeout: 15000 });
 
     // Attend que l’investigation se termine (succès ou erreur)
-    await expect(page.getByRole('status').or(page.getByText(/Investigation terminée/i)).or(page.getByText(/preuves/i))).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole('status').first()).toBeVisible({ timeout: 15000 });
 
     // Vérifie la section hypothèses
     await expect(page.getByText(/Raisonnement structuré/i).or(page.getByText(/Aucun run disponible/i))).toBeVisible();
 
     // Vérifie la section preuves (timeline ou liste)
-    await expect(page.getByText(/Reconstitution temporelle/i).or(page.getByText(/Avant/i))).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Avant · pendant · après/i })).toBeVisible();
   });
 
   test('vérifie la timeline de reconstitution temporelle', async ({ page }) => {
     const tableRows = page.locator('table tbody tr');
-    if (await tableRows.count() === 0) {
-      test.skip(true, 'Aucun incident disponible');
-      return;
-    }
-
+    await expect(tableRows).toHaveCount(1);
     await tableRows.first().getByRole('link').first().click();
     await page.waitForLoadState('networkidle');
     await expect(page).toHaveURL(/\/incidents\//);

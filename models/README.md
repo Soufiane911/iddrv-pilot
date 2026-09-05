@@ -6,11 +6,19 @@ Baseline de régression logistique scikit-learn pour estimer le risque de rebut
 à partir des paramètres de cycle et de l'historique causal des 20 cycles
 précédents.
 
-Entraînement reproductible :
+Entraînement reproductible (Python 3.13.x, scikit-learn 1.7.2 et joblib
+1.5.2) :
 
 ```bash
-python scripts/train_rebut_risk.py
+.venv/bin/python scripts/train_rebut_risk.py \
+  --data-dir data/scenarios/industrial_demo \
+  --artifact /tmp/rebut_risk_v1.joblib \
+  --metadata /tmp/rebut_risk_v1.meta.json
 ```
+
+Le script échoue si les données sont absentes et refuse d'écraser un fichier
+existant sans `--force`. `ground_truth.json` est réservé à l'évaluation et
+n'est jamais lu.
 
 Contrat :
 
@@ -20,6 +28,8 @@ Contrat :
 - aucune utilisation du fichier d'évaluation réservé au runtime ;
 - `quality_flag`, `defect_type`, `part_quality_status` et le label courant sont
   exclus des features pour éviter la fuite de cible ;
+- les metadata publiées conservent l'environnement Python/scikit-learn/joblib,
+  le contrat de features, les bornes temporelles et les métriques ;
 - les features `previous_scrap_flag` et `rolling_scrap_rate_20` ne regardent que
   les cycles déjà terminés.
 

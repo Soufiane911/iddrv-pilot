@@ -5,11 +5,6 @@ import { formatDate, formatNumber, MetricCard, SectionTitle, StatePanel } from '
 import { HdtScoreHistory } from '../components/monitoring/HdtScoreHistory';
 import { HdtSimulator } from '../components/monitoring/HdtSimulator';
 import { ModelMetricsCard } from '../components/monitoring/ModelMetricsCard';
-import type { Incident } from '../lib/api';
-
-interface IncidentWithFeedback extends Incident {
-  feedback_verdict?: 'confirmed' | 'rejected' | 'uncertain' | string;
-}
 
 interface HdtHistoryEntry {
   id: string;
@@ -47,7 +42,7 @@ export function ModelMonitoringPage() {
   const history = useMemo(() => loadHistory(), [historyKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const incidentsWithFeedback = useMemo(() => {
-    const incidents = (incidentsQuery.data ?? []) as IncidentWithFeedback[];
+    const incidents = incidentsQuery.data ?? [];
     return incidents.filter((i) => !!i.feedback_verdict);
   }, [incidentsQuery.data]);
 
@@ -106,6 +101,7 @@ export function ModelMonitoringPage() {
       {/* History */}
       <section className="surface-card" style={{ padding: '24px', marginBottom: '24px' }} aria-labelledby="history-heading">
         <SectionTitle eyebrow="HISTORIQUE" title="Historique des prédictions" />
+        <p className="muted small" style={{ marginTop: '8px' }}>Les scores du simulateur sont conservés localement dans ce navigateur uniquement ; ils ne constituent pas un historique serveur.</p>
 
         {history.length === 0 ? (
           <div style={{ marginTop: '16px' }}>
@@ -174,7 +170,7 @@ export function ModelMonitoringPage() {
 
       {/* Human feedbacks */}
       <section className="surface-card" style={{ padding: '24px', marginBottom: '24px' }} aria-labelledby="feedback-heading">
-        <SectionTitle eyebrow="VALIDATION TERRAIN" title="Feedbacks humains" />
+        <SectionTitle eyebrow="VALIDATION TERRAIN" title="Feedbacks humains"><button className="button-secondary" type="button" onClick={() => { void incidentsQuery.refetch(); }} disabled={incidentsQuery.isFetching}>{incidentsQuery.isFetching ? 'Actualisation…' : 'Actualiser'}</button></SectionTitle>
 
         {isLoading && (
           <div style={{ marginTop: '16px' }}>

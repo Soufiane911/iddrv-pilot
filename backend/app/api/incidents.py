@@ -2,7 +2,7 @@ from datetime import datetime
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query
 from ..repositories import list_incidents, get_incident, get_evidence, save_feedback, persist_investigation
-from ..read_repositories import _cursor_offset, next_cursor
+from ..read_repositories import InvalidCursor, _cursor_offset, next_cursor
 from ..schemas import Incident, IncidentPage, Evidence, FeedbackRequest, FeedbackResponse, InvestigationResponse
 from ..security import Identity, get_identity_optional, require_roles, require_site, require_site_roles
 
@@ -17,9 +17,12 @@ def incidents(site_id: int | None = None, from_: datetime | None = Query(None, a
     if identity is not None and site_id is not None:
         require_site(identity, site_id)
     allowed = None if identity is None or identity.anonymous else identity.site_ids
+    try:
+        offset = _cursor_offset(cursor)
+    except InvalidCursor as exc:
+        raise HTTPException(status_code=422, detail="invalid pagination cursor") from exc
     rows = list_incidents(site_id, from_, to, status, machine_id=machine_id, allowed_site_ids=allowed,
-                          limit=limit + 1, offset=_cursor_offset(cursor))
-    offset = _cursor_offset(cursor)
+                          limit=limit + 1, offset=offset)
     return {"items": rows[:limit], "next_cursor": next_cursor(offset, limit, len(rows))}
 
 @router.get("/{incident_id}", response_model=Incident)

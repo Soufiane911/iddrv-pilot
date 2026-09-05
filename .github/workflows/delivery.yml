@@ -10,17 +10,23 @@ permissions:
   contents: read
   packages: write
 
+env:
+  # A workflow_run checks out the commit that CI actually validated, not the
+  # default branch head at the time this workflow is scheduled.
+  IMAGE_TAG: ${{ github.event.workflow_run.head_sha }}
+
 jobs:
   build-and-push:
-    name: Build & push Docker images
+    name: Build & push immutable Docker images
     if: github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
 
       - uses: docker/setup-buildx-action@v3
 
-      # GHCR exige des noms de dépôt en minuscules (le pseudo GitHub peut contenir des majuscules)
       - name: Lowercase repository owner
         run: echo "REPO_OWNER=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_ENV"
 
@@ -36,9 +42,7 @@ jobs:
           context: .
           file: ./backend/Dockerfile
           push: true
-          tags: |
-            ghcr.io/${{ env.REPO_OWNER }}/iddrv-api:${{ github.sha }}
-            ghcr.io/${{ env.REPO_OWNER }}/iddrv-api:latest
+          tags: ghcr.io/${{ env.REPO_OWNER }}/iddrv-api:${{ env.IMAGE_TAG }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -48,23 +52,82 @@ jobs:
           context: .
           file: ./frontend/Dockerfile
           push: true
-          tags: |
-            ghcr.io/${{ env.REPO_OWNER }}/iddrv-web:${{ github.sha }}
-            ghcr.io/${{ env.REPO_OWNER }}/iddrv-web:latest
+          tags: ghcr.io/${{ env.REPO_OWNER }}/iddrv-web:${{ env.IMAGE_TAG }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
   deploy:
-    name: Deploy to pilot
+    name: Deploy immutable SHA to pilot
     needs: build-and-push
     runs-on: ubuntu-24.04
     environment: pilot
-    if: github.event.workflow_run.conclusion == 'success' && vars.DEPLOY_HOST != ''
+    # DEPLOY_ENABLED is an explicit promotion switch. Without it this job is
+    # skipped and deployment-status reports "not deployed" below.
+    if: github.event.workflow_run.conclusion == 'success' && vars.DEPLOY_ENABLED == 'true'
+    env:
+      DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+      DEPLOY_USER: ${{ vars.DEPLOY_USER }}
+      DEPLOY_PATH: ${{ vars.DEPLOY_PATH || '/opt/iddrv' }}
+      DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+      DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
     steps:
-      - name: Deploy on-premise
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Lowercase repository owner for the pilot manifest
+        run: echo "GHCR_OWNER=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_ENV"
+
+      - name: Validate pilot SSH prerequisites
+        shell: bash
         run: |
-          echo "Déploiement on-premise conditionné par les variables DEPLOY_HOST / DEPLOY_USER"
-          echo "et le secret DEPLOY_SSH_KEY."
-          echo ""
-          echo "Commande type :"
-          echo "  ssh ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }} \"cd /opt/iddrv && docker compose pull && docker compose up -d\""
+          set -euo pipefail
+          test -n "$DEPLOY_HOST" || { echo 'DEPLOY_HOST is required' >&2; exit 1; }
+          test -n "$DEPLOY_USER" || { echo 'DEPLOY_USER is required' >&2; exit 1; }
+          test -n "$DEPLOY_SSH_KEY" || { echo 'DEPLOY_SSH_KEY is required' >&2; exit 1; }
+          test -n "$DEPLOY_KNOWN_HOSTS" || { echo 'DEPLOY_KNOWN_HOSTS is required' >&2; exit 1; }
+          [[ "$DEPLOY_PATH" =~ ^/[A-Za-z0-9._/-]+$ ]] || { echo 'DEPLOY_PATH contains unsupported characters' >&2; exit 1; }
+          [[ "$IMAGE_TAG" =~ ^[0-9a-f]{40}$ ]] || { echo 'workflow_run head SHA is invalid' >&2; exit 1; }
+
+      - name: Copy deployment manifest and execute verified SSH deployment
+        shell: bash
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$RUNNER_TEMP/iddrv-ssh"
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$RUNNER_TEMP/iddrv-ssh/known_hosts"
+          chmod 600 "$RUNNER_TEMP/iddrv-ssh/known_hosts"
+          printf '%s' "$DEPLOY_SSH_KEY" > "$RUNNER_TEMP/iddrv-ssh/id_ed25519"
+          chmod 600 "$RUNNER_TEMP/iddrv-ssh/id_ed25519"
+          export GIT_SSH_COMMAND="ssh -i $RUNNER_TEMP/iddrv-ssh/id_ed25519 -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$RUNNER_TEMP/iddrv-ssh/known_hosts"
+          ssh -i "$RUNNER_TEMP/iddrv-ssh/id_ed25519" -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$RUNNER_TEMP/iddrv-ssh/known_hosts" \
+            "$DEPLOY_USER@$DEPLOY_HOST" "install -d -m 750 '$DEPLOY_PATH'"
+          scp -r -i "$RUNNER_TEMP/iddrv-ssh/id_ed25519" -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$RUNNER_TEMP/iddrv-ssh/known_hosts" \
+            deploy/compose.pilot.yml deploy/deploy-pilot.sh db \
+            "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/"
+          ssh -i "$RUNNER_TEMP/iddrv-ssh/id_ed25519" -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$RUNNER_TEMP/iddrv-ssh/known_hosts" \
+            "$DEPLOY_USER@$DEPLOY_HOST" \
+            "chmod 700 '$DEPLOY_PATH/deploy-pilot.sh' && IMAGE_TAG='$IMAGE_TAG' GHCR_OWNER='$GHCR_OWNER' DEPLOY_PATH='$DEPLOY_PATH' '$DEPLOY_PATH/deploy-pilot.sh'"
+
+  deployment-status:
+    name: Report deployment status
+    needs: [build-and-push, deploy]
+    if: always()
+    runs-on: ubuntu-24.04
+    steps:
+      - name: State whether pilot was deployed
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ needs.build-and-push.result }}" != "success" ]]; then
+            echo "Images were not published; pilot was not deployed." >&2
+            exit 1
+          elif [[ "${{ needs.deploy.result }}" == "success" ]]; then
+            echo "Pilot deployed at immutable SHA ${{ github.event.workflow_run.head_sha }}."
+          elif [[ "${{ vars.DEPLOY_ENABLED }}" != "true" ]]; then
+            echo "Pilot not deployed: DEPLOY_ENABLED is not true (dry-run/no promotion)."
+          else
+            echo "Pilot deployment failed; no successful deployment is claimed." >&2
+            exit 1
+          fi

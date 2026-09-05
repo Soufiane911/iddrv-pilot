@@ -1,8 +1,10 @@
 from datetime import datetime, timezone
 
+import pytest
 from fastapi.testclient import TestClient
 
 from backend.app.main import app
+from backend.app.read_repositories import InvalidCursor, _cursor_offset, _machine_status_sql, next_cursor
 from backend.app.security import Identity, create_session_token, hash_password, verify_password
 
 
@@ -59,6 +61,31 @@ def test_timeline_contract_is_bounded_and_uses_aggregates(monkeypatch):
 def test_timeline_requires_historical_window():
     response = client.get("/api/v1/machines/7/timeline?bucket=hour")
     assert response.status_code == 422
+
+
+def test_invalid_incident_cursor_returns_422_without_query(monkeypatch):
+    monkeypatch.setattr(
+        "backend.app.api.incidents.list_incidents",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("query should not run")),
+    )
+    response = client.get("/api/v1/incidents?cursor=not-a-cursor")
+    assert response.status_code == 422
+    assert response.json()["error"]["message"] == "invalid pagination cursor"
+
+
+def test_legacy_pagination_cursor_is_strict_and_final_page_has_no_phantom():
+    assert _cursor_offset("MA") == 0
+    with pytest.raises(InvalidCursor):
+        _cursor_offset("not-a-cursor")
+    assert next_cursor(0, 2, 2) is None
+    assert next_cursor(0, 2, 3)
+
+
+def test_machine_catalogue_uses_the_same_causal_status_policy():
+    policy = _machine_status_sql()
+    assert "INTERVAL '15 minutes'" in policy
+    assert "INTERVAL '1 hour'" in policy
+    assert "recent.scrap_rate >= 0.10" in policy
 
 
 def test_investigation_rejects_naive_as_of_before_engine(monkeypatch):

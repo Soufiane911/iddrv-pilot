@@ -1,6 +1,8 @@
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from ..read_repositories import list_lines, list_machines, list_sites
+from ..read_repositories import InvalidCursor, _cursor_offset, list_lines, list_machines, list_sites
 from ..schemas import MachinePage, ProductionLinePage, Site, SitePage
 from ..security import Identity, get_identity_optional, require_site
 
@@ -15,6 +17,10 @@ def sites(
     identity: Identity | None = Depends(get_identity_optional),
 ):
     site_ids = None if identity is None or identity.anonymous else identity.site_ids
+    try:
+        _cursor_offset(cursor)
+    except InvalidCursor as exc:
+        raise HTTPException(status_code=422, detail="invalid pagination cursor") from exc
     items, next_value = list_sites(site_ids=site_ids, limit=limit, cursor=cursor)
     return {"items": items, "next_cursor": next_value}
 
@@ -38,6 +44,10 @@ def lines(
 ):
     if identity is not None:
         require_site(identity, site_id)
+    try:
+        _cursor_offset(cursor)
+    except InvalidCursor as exc:
+        raise HTTPException(status_code=422, detail="invalid pagination cursor") from exc
     items, next_value = list_lines(site_id, limit=limit, cursor=cursor)
     return {"items": items, "next_cursor": next_value}
 
@@ -46,10 +56,18 @@ def lines(
 def machines(
     site_id: int,
     cursor: str | None = None,
+    as_of: datetime | None = None,
     limit: int = Query(100, ge=1, le=500),
     identity: Identity | None = Depends(get_identity_optional),
 ):
     if identity is not None:
         require_site(identity, site_id)
-    items, next_value = list_machines(site_id, limit=limit, cursor=cursor)
+    try:
+        _cursor_offset(cursor)
+    except InvalidCursor as exc:
+        raise HTTPException(status_code=422, detail="invalid pagination cursor") from exc
+    machine_query = {"limit": limit, "cursor": cursor}
+    if as_of is not None:
+        machine_query["as_of"] = as_of
+    items, next_value = list_machines(site_id, **machine_query)
     return {"items": items, "next_cursor": next_value}

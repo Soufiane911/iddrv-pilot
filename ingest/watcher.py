@@ -28,10 +28,12 @@ from threading import Event
 from typing import Any, Callable, Iterable, Mapping
 
 
-DEFAULT_DB_URL = os.getenv(
-    "DATABASE_URL",
-    "postgresql://iddrv_user@localhost:5432/iddrv",
-)
+try:
+    from .runtime_config import worker_database_url
+except ImportError:  # direct module execution compatibility
+    from runtime_config import worker_database_url
+
+DEFAULT_DB_URL = worker_database_url()
 RETRYABLE_STATUSES = {"discovered", "retry_wait", "failed"}
 TERMINAL_STATUSES = {"completed", "quarantined"}
 IGNORED_SUFFIXES = {".part", ".partial", ".tmp", ".lock", ".crdownload"}
@@ -765,11 +767,12 @@ class WatchedFolderWorker:
             return ingest_pipeline.ingest_machine_file(str(path), machine_ref, site_id=site_id)
         raise ValueError(f"unsupported_source_kind:{job.source_kind}")
 
-    @staticmethod
-    def _default_detector(job: ImportJob, result: Any) -> Any:
+    def _default_detector(self, job: ImportJob, result: Any) -> Any:
+        # The worker owns its least-privilege URL. Passing it explicitly keeps
+        # the detector independent from API settings and SESSION_SECRET.
         from backend.app.diagnostics.runtime import trigger_after_import
 
-        return trigger_after_import(job, result)
+        return trigger_after_import(job, result, db_url=self.config.db_url)
 
     def _event(self, job: ImportJob, event_type: str, **kwargs: Any) -> None:
         try:

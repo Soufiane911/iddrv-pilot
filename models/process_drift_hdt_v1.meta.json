@@ -27,27 +27,46 @@
   "minimum_future_scraps": 3,
   "baseline_window": 20,
   "metrics": {
-    "average_precision": 0.14067634969950768,
-    "baseline_prevalence": 0.012252591894439209,
-    "lift_over_prevalence": 11.481354387013665,
-    "roc_auc": 0.8778513815489006,
-    "precision_instability": 0.12292358803986711,
-    "recall_instability": 0.23717948717948717,
+    "average_precision": 0.10976143908919278,
+    "baseline_prevalence": 0.012232415902140673,
+    "lift_over_prevalence": 8.97299764554151,
+    "roc_auc": 0.8680857062019244,
+    "precision_instability": 0.09652509652509653,
+    "recall_instability": 0.16025641025641027,
     "normal_score_quantile": 0.98,
-    "alert_rate": 0.023641218975808984,
-    "positive_predictions": 301.0,
+    "alert_rate": 0.020308946914451502,
+    "positive_predictions": 259.0,
     "horizon_cycles": 20.0,
     "minimum_future_scraps": 3.0
   },
   "rows": {
-    "train": 25461,
-    "test": 12732,
+    "train": 25500,
+    "test": 12753,
     "train_instability_events": 601,
     "test_instability_events": 156
   },
   "time_boundary": {
-    "train_end": "2025-02-14T19:11:20.058654+00:00",
-    "test_start": "2025-02-14T09:27:48.488593+00:00"
+    "train_end": "2025-02-14T19:19:00.609541+00:00",
+    "test_start": "2025-02-14T09:32:36.204490+00:00",
+    "per_machine": {
+      "606": {
+        "train_end": "2025-02-14T16:08:21.166212+00:00",
+        "test_start": "2025-02-14T16:09:00.577912+00:00"
+      },
+      "1003": {
+        "train_end": "2025-02-14T19:19:00.609541+00:00",
+        "test_start": "2025-02-14T19:19:36.160402+00:00"
+      },
+      "152": {
+        "train_end": "2025-02-14T09:32:14.215768+00:00",
+        "test_start": "2025-02-14T09:32:36.204490+00:00"
+      }
+    }
+  },
+  "environment": {
+    "python": "3.13.9",
+    "scikit_learn": "1.7.2",
+    "joblib": "1.5.2"
   },
   "contract": {
     "target": "at_least_3_future_scraps_in_next_20_cycles_as_instability_proxy",

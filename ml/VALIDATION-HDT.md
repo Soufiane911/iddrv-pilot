@@ -1,20 +1,25 @@
 # Validation HDT — résultat de référence
 
-Date de l'exécution : 2026-08-03.
+Date de l'exécution : 2026-08-19.
 
 ## Commandes
 
 ```bash
-python scripts/train_process_drift.py
-python -m pytest -q tests/test_process_drift.py tests/test_rebut_risk.py
+.venv-report/bin/python scripts/train_process_drift.py \
+  --artifact /tmp/process_drift_hdt_v1.joblib \
+  --metadata /tmp/process_drift_hdt_v1.meta.json
+.venv-report/bin/python -m pytest -q tests/test_process_drift.py tests/test_rebut_risk.py
 ```
 
 ## Jeu et protocole
 
 | Élément | Valeur |
 |---|---:|
-| Lignes d'entraînement | 25 461 |
-| Lignes de test | 12 732 |
+| Lignes brutes chargées | 38 313 |
+| Lignes exploitables après préparation | 38 253 |
+| Lignes terminales exclues | 60 (20 par machine) |
+| Lignes d'entraînement | 25 500 |
+| Lignes de test | 12 753 |
 | Événements d'instabilité train | 601 |
 | Événements d'instabilité test | 156 |
 | Horizon | 20 cycles |
@@ -26,31 +31,37 @@ python -m pytest -q tests/test_process_drift.py tests/test_rebut_risk.py
 Les nombres de rebuts futurs servent ici de proxy de séquence instable. Ce
 n'est pas une mesure de performance terrain.
 
+Les bornes `train_end` et `test_start` au niveau global sont des agrégats
+inter-machines (respectivement le maximum des fins d'entraînement et le minimum
+des débuts de test) ; elles peuvent donc se chevaucher. L'absence de fuite
+temporelle se juge sur les bornes `time_boundary.per_machine`, qui sont
+strictement ordonnées pour chaque machine.
+
 ## Résultats holdout
 
 | Métrique | Résultat |
 |---|---:|
-| Average precision | **14,07 %** |
-| Prévalence de référence | **1,23 %** |
-| Lift vs prévalence | **11,48×** |
-| ROC-AUC | **0,878** |
-| Precision au seuil machine | **12,29 %** |
-| Recall au seuil machine | **23,72 %** |
-| Taux d'alerte | **2,36 %** |
-| Alertes | **301 / 12 732** |
+| Average precision | **10,98 %** |
+| Prévalence de référence | **1,22 %** |
+| Lift vs prévalence | **8,97×** |
+| ROC-AUC | **0,868** |
+| Precision au seuil machine | **9,65 %** |
+| Recall au seuil machine | **16,03 %** |
+| Taux d'alerte | **2,03 %** |
+| Alertes | **259 / 12 753** |
 
 ## Lecture correcte
 
 Le score classe mieux les trajectoires associées à une séquence future instable
-que le classement aléatoire, avec environ 11,5 fois la prévalence en average
-precision. Au seuil choisi, environ 2,4 % des cycles sont signalés et 23,7 %
+que le classement aléatoire, avec environ 9 fois la prévalence en average
+precision. Au seuil choisi, environ 2 % des cycles sont signalés et 16 %
 des séquences labellisées sont retrouvées.
 
 Cela ne signifie pas :
 
-- qu'une alerte est une probabilité de 14 % ;
+- qu'une alerte est une probabilité calibrée ;
 - qu'une alerte est une cause de rebut ;
-- que 12,3 % de précision seront obtenus sur une usine réelle ;
+- qu'une précision mesurée sur ce jeu sera obtenue sur une usine réelle ;
 - que le modèle est prêt à commander une machine.
 
 `anomaly_score` est un score de classement non calibré. L'action attendue est

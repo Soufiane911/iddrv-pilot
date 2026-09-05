@@ -26,6 +26,8 @@ from sklearn.metrics import (
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
+from .artifact_contract import ArtifactContractError, load_serialized_artifact, runtime_environment
+
 MODEL_VERSION = "rebut-risk-logistic-v1"
 TARGET_COLUMN = "scrap_flag"
 DEFAULT_THRESHOLD = 0.5
@@ -171,6 +173,7 @@ def train(frame: pd.DataFrame, threshold: float = DEFAULT_THRESHOLD) -> Training
     metrics = evaluate(model, test_frame, threshold)
     artifact: dict[str, Any] = {
         "model_version": MODEL_VERSION,
+        "environment": runtime_environment(),
         "model": model,
         "feature_columns": list(FEATURE_COLUMNS),
         "target_column": TARGET_COLUMN,
@@ -212,6 +215,7 @@ def save_artifact(result: TrainingResult, artifact_path: Path, metadata_path: Pa
             "train_end": result.train_end,
             "test_start": result.test_start,
         },
+        "environment": runtime_environment(),
         "contract": result.artifact["training_contract"],
     }
     metadata_path.write_text(
@@ -221,11 +225,20 @@ def save_artifact(result: TrainingResult, artifact_path: Path, metadata_path: Pa
 
 
 def load_artifact(path: Path) -> dict[str, Any]:
-    artifact = joblib.load(path)
-    if not isinstance(artifact, dict) or artifact.get("model_version") != MODEL_VERSION:
-        raise ValueError(f"Unsupported or invalid model artifact: {path}")
+    artifact = load_serialized_artifact(path)
+    if artifact.get("model_version") != MODEL_VERSION:
+        raise ArtifactContractError(f"Unsupported or invalid model artifact: {path}")
     if artifact.get("feature_columns") != list(FEATURE_COLUMNS):
-        raise ValueError("Model feature contract does not match runtime features")
+        raise ArtifactContractError("Model feature contract does not match runtime features")
+    model = artifact.get("model")
+    if not hasattr(model, "predict_proba"):
+        raise ArtifactContractError("Model artifact classifier is invalid")
+    try:
+        threshold = float(artifact.get("threshold"))
+    except (TypeError, ValueError) as exc:
+        raise ArtifactContractError("Model artifact threshold is invalid") from exc
+    if not np.isfinite(threshold) or not 0.0 < threshold < 1.0:
+        raise ArtifactContractError("Model artifact threshold is invalid")
     return artifact
 
 

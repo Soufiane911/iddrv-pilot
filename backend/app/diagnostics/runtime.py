@@ -7,12 +7,35 @@ reads scenario files or evaluation ground truth.
 from __future__ import annotations
 
 import hashlib
+import os
 from collections import Counter, defaultdict
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Iterable, Mapping
+from typing import Iterable, Iterator, Mapping
 
-from ..db import get_connection
+import psycopg2
+
+
+@contextmanager
+def _worker_connection(db_url: str) -> Iterator:
+    """Open a detector connection without loading the API configuration."""
+    try:
+        timeout = max(1, int(os.getenv("DB_CONNECT_TIMEOUT_S", "3")))
+    except ValueError:
+        timeout = 3
+    conn = psycopg2.connect(db_url, connect_timeout=timeout)
+    try:
+        yield conn
+    finally:
+        conn.close()
+
+
+def get_connection():
+    """Preserve the API default while importing its configuration lazily."""
+    from ..db import get_connection as api_get_connection
+
+    return api_get_connection()
 
 
 DETECTOR_VERSION = "scrap-window-v1"
@@ -89,8 +112,13 @@ def _detection_key(site_id: int, window: ScrapWindow) -> str:
     return hashlib.sha256(payload.encode()).hexdigest()
 
 
-def trigger_after_import(job, result) -> dict[str, int]:
-    """Persist idempotent incidents after a committed machine-cycle import."""
+def trigger_after_import(job, result, *, db_url: str | None = None) -> dict[str, int]:
+    """Persist idempotent incidents after a committed machine-cycle import.
+
+    ``db_url`` is supplied by the ingestion worker so this detector does not
+    load API settings (which require API credentials in pilot/production).
+    The API-facing default remains available for existing callers.
+    """
     if not isinstance(result, Mapping) or result.get("transaction_committed") is not True:
         raise ValueError("detector_requires_committed_import")
     passport_id = result.get("passport_id") or getattr(job, "passport_id", None)
@@ -98,7 +126,8 @@ def trigger_after_import(job, result) -> dict[str, int]:
     if not passport_id or site_id is None:
         raise ValueError("detector_requires_passport_and_site")
 
-    with get_connection() as conn:
+    connection_context = _worker_connection(db_url) if db_url else get_connection()
+    with connection_context as conn:
         with conn.cursor() as cur:
             cur.execute(
                 """WITH affected AS (

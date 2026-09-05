@@ -1,8 +1,8 @@
 """Drift and calibration monitoring for the HDT process-drift model.
 
 The HDT anomaly score is an *uncalibrated ranking score* (see
-ml/VALIDATION-HDT.md: average precision 0.14, ROC AUC 0.878, "an alert is not a
-probability"). This module therefore monitors three separate concerns:
+ml/VALIDATION-HDT.md; an alert is not a probability). This module therefore
+monitors three separate concerns:
 
 1. Distribution shift of the raw score against a reference distribution, using
    the Population Stability Index (PSI) and, as a complement, the two-sample
@@ -347,14 +347,14 @@ def build_reference_scores(
         os.getenv("PROCESS_DRIFT_REFERENCE_DATA", "data/scenarios/industrial_demo")
     )
     frame = load_cycle_files(directory)
-    normal = frame[frame["scrap_flag"] == 0]
+    prepared = prepare_inference_frame(frame)
+    normal = prepared[prepared["scrap_flag"] == 0]
     if normal.empty:
         raise ValueError("no normal (scrap_flag == 0) cycles available for the reference")
     if len(normal) > max_samples:
         step = len(normal) // max_samples
         normal = normal.iloc[::step].head(max_samples)
-    prepared = prepare_inference_frame(normal)
-    scores = predict(artifact, prepared)["anomaly_score"].to_numpy(dtype=float)
+    scores = predict(artifact, normal)["anomaly_score"].to_numpy(dtype=float)
     scores = scores[np.isfinite(scores)]
     if len(scores) < MIN_REFERENCE_SAMPLES:
         raise ValueError("reference score distribution is too small")
@@ -391,9 +391,10 @@ def _default_reference() -> np.ndarray:
     """Reference for the deployed artifact: real normal scores, else bootstrap."""
     artifact: dict[str, Any] | None = None
     try:
+        from ml.artifact_contract import model_path_from_env
         from ml.process_drift import load_artifact
 
-        artifact_path = Path(os.getenv("PROCESS_DRIFT_MODEL_PATH", "models/process_drift_hdt_v1.joblib"))
+        artifact_path = model_path_from_env("PROCESS_DRIFT_MODEL_PATH", "process_drift_hdt_v1.joblib")
         if artifact_path.is_file():
             artifact = load_artifact(artifact_path)
             return build_reference_scores(artifact)

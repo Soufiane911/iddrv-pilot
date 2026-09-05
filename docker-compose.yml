@@ -34,16 +34,32 @@ services:
       - "127.0.0.1:6379:6379"
     volumes:
       - redis_data:/data
+    # Security counters must not be silently evicted under memory pressure.
     command: >
       redis-server
       --appendonly yes
       --maxmemory 256mb
-      --maxmemory-policy allkeys-lru
+      --maxmemory-policy noeviction
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 3s
       retries: 5
+
+  migrate:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    restart: "no"
+    environment:
+      OWNER_DATABASE_URL: ${OWNER_DATABASE_URL:-${DOCKER_DATABASE_URL:?DOCKER_DATABASE_URL must be set with URL-encoded credentials}}
+      API_DATABASE_URL: ${API_DATABASE_URL:-}
+      WORKER_DATABASE_URL: ${WORKER_DATABASE_URL:-}
+      APP_ENV: ${APP_ENV:-pilot}
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+    command: ["sh", "-c", "if [ \"$$APP_ENV\" = pilot ] || [ \"$$APP_ENV\" = prod ] || [ \"$$APP_ENV\" = production ]; then if [ -z \"$$API_DATABASE_URL\" ] || [ -z \"$$WORKER_DATABASE_URL\" ]; then echo 'API_DATABASE_URL and WORKER_DATABASE_URL are required in pilot/production' >&2; exit 1; fi; fi; export DATABASE_URL=\"$$OWNER_DATABASE_URL\"; python db/setup_db.py && if [ -n \"$$API_DATABASE_URL\" ] && [ -n \"$$WORKER_DATABASE_URL\" ]; then python db/runtime_roles.py; fi"]
 
   api:
     build:
@@ -51,7 +67,9 @@ services:
       dockerfile: backend/Dockerfile
     restart: unless-stopped
     environment:
-      DATABASE_URL: ${DOCKER_DATABASE_URL:?DOCKER_DATABASE_URL must be set with URL-encoded credentials}
+      # Development may use the owner URL; pilot/production use the dedicated API role.
+      DATABASE_URL: ${API_DATABASE_URL:-${DOCKER_DATABASE_URL:?DOCKER_DATABASE_URL must be set with URL-encoded credentials}}
+      API_DATABASE_URL: ${API_DATABASE_URL:-}
       REDIS_URL: redis://redis:6379/0
       APP_ENV: ${APP_ENV:-pilot}
       ALLOW_ANONYMOUS_READS: ${ALLOW_ANONYMOUS_READS:-false}
@@ -63,12 +81,16 @@ services:
       # Without it in pilot mode, only an admin session can read metrics.
       METRICS_TOKEN: ${METRICS_TOKEN:-}
       METRICS_PUBLIC: ${METRICS_PUBLIC:-false}
+      # web has a fixed address on the private network; only it may forward client IP headers.
+      TRUSTED_PROXY_IPS: ${TRUSTED_PROXY_IPS:-172.30.0.10/32}
     depends_on:
-      timescaledb:
+      migrate:
+        condition: service_completed_successfully
+      redis:
         condition: service_healthy
-    command: ["sh", "-c", "python db/setup_db.py --db-url \"$$DATABASE_URL\" && uvicorn backend.app.main:app --host 0.0.0.0 --port 8000"]
+    command: ["sh", "-c", "if [ \"$$APP_ENV\" = pilot ] || [ \"$$APP_ENV\" = prod ] || [ \"$$APP_ENV\" = production ]; then if [ -z \"$$API_DATABASE_URL\" ]; then echo 'API_DATABASE_URL is required in pilot/production' >&2; exit 1; fi; fi; export DATABASE_URL=\"$${API_DATABASE_URL:-$$DATABASE_URL}\"; exec uvicorn backend.app.main:app --host 0.0.0.0 --port 8000"]
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=3)"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/ready', timeout=3)"]
       interval: 10s
       timeout: 5s
       retries: 6
@@ -79,8 +101,11 @@ services:
       dockerfile: backend/Dockerfile
     restart: unless-stopped
     environment:
-      DATABASE_URL: ${DOCKER_DATABASE_URL:?DOCKER_DATABASE_URL must be set with URL-encoded credentials}
+      # Development may use the owner URL; pilot/production use the dedicated worker role.
+      DATABASE_URL: ${WORKER_DATABASE_URL:-${DOCKER_DATABASE_URL:?DOCKER_DATABASE_URL must be set with URL-encoded credentials}}
+      WORKER_DATABASE_URL: ${WORKER_DATABASE_URL:-}
       REDIS_URL: redis://redis:6379/0
+      APP_ENV: ${APP_ENV:-pilot}
       INBOX_ROOT: /var/lib/iddrv/inbox
       ARCHIVE_ROOT: /var/lib/iddrv/archive
       QUARANTINE_ROOT: /var/lib/iddrv/quarantine
@@ -95,7 +120,7 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    command: ["python", "-m", "ingest.watcher", "--root", "/var/lib/iddrv", "--poll-seconds", "${WATCH_INTERVAL_S:-5}", "--stable-seconds", "${STABLE_SECONDS:-10}"]
+    command: ["sh", "-c", "if [ \"$$APP_ENV\" = pilot ] || [ \"$$APP_ENV\" = prod ] || [ \"$$APP_ENV\" = production ]; then if [ -z \"$$WORKER_DATABASE_URL\" ]; then echo 'WORKER_DATABASE_URL is required in pilot/production' >&2; exit 1; fi; fi; export DATABASE_URL=\"$${WORKER_DATABASE_URL:-$$DATABASE_URL}\"; exec python -m ingest.watcher --root /var/lib/iddrv --poll-seconds \"${WATCH_INTERVAL_S:-5}\" --stable-seconds \"${STABLE_SECONDS:-10}\""]
     volumes:
       - ./data/inbox:/var/lib/iddrv/inbox
       - ./data/processing:/var/lib/iddrv/processing
@@ -130,19 +155,22 @@ services:
     depends_on:
       api:
         condition: service_healthy
+    networks:
+      default:
+        ipv4_address: 172.30.0.10
 
   # ─────────────────────────────────────────────────────
   # Redis Commander — Interface Web de monitoring Redis
   # (Optionnel — désactiver en prod)
   # ─────────────────────────────────────────────────────
   redis-commander:
-    image: ghcr.io/joeferner/redis-commander:latest
+    image: ghcr.io/joeferner/redis-commander:0.8.0
     container_name: iddrv_redis_commander
     restart: unless-stopped
     environment:
       REDIS_HOSTS: local:redis:6379
     ports:
-      - "8081:8081"
+      - "127.0.0.1:8081:8081"
     depends_on:
       redis:
         condition: service_healthy
@@ -158,3 +186,6 @@ volumes:
 networks:
   default:
     name: iddrv_network
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24

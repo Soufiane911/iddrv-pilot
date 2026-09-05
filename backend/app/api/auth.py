@@ -1,6 +1,14 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 
-from ..auth_repository import authenticate, create_user, replace_session_token, revoke_session, save_session
+from ..auth_repository import (
+    AuthenticationUnavailable,
+    authenticate,
+    create_user,
+    replace_session_token,
+    revoke_session,
+    save_session,
+)
+from .. import login_throttle
 from ..config import settings
 from ..schemas import AuthUser, CreateUserRequest, LoginRequest, LoginResponse
 from ..security import (
@@ -29,14 +37,43 @@ def _user(identity: Identity):
 
 
 @router.post("/login", response_model=LoginResponse)
-def login(payload: LoginRequest, response: Response):
-    identity = authenticate(payload.email, payload.password)
+def login(payload: LoginRequest, request: Request, response: Response):
+    origin = login_throttle.client_ip(request)
+    try:
+        allowed, retry_after = login_throttle.allowed(payload.email, origin)
+    except login_throttle.ThrottleUnavailable:
+        raise HTTPException(status_code=503, detail="login_throttle_unavailable") from None
+    if not allowed:
+        raise HTTPException(
+            status_code=429,
+            detail="login_rate_limited",
+            headers={"Retry-After": str(retry_after)},
+        )
+
+    try:
+        identity = authenticate(payload.email, payload.password)
+    except AuthenticationUnavailable:
+        # Do not count a storage outage as a bad password or retain a slot
+        # until its TTL when authentication never reached a result.
+        try:
+            login_throttle.release_reservation(payload.email, origin)
+        except login_throttle.ThrottleUnavailable:
+            pass
+        raise HTTPException(status_code=503, detail="authentication_unavailable") from None
     if identity is None:
+        try:
+            login_throttle.record_failure(payload.email, origin)
+        except login_throttle.ThrottleUnavailable:
+            raise HTTPException(status_code=503, detail="login_throttle_unavailable") from None
         raise HTTPException(status_code=401, detail="invalid_credentials")
     token, expires_at = create_session_token(identity)
     provisional_token = token
     session_id = save_session(identity, token, expires_at)
     if not session_id:
+        try:
+            login_throttle.release_reservation(payload.email, origin)
+        except login_throttle.ThrottleUnavailable:
+            pass
         raise HTTPException(status_code=503, detail="session_persistence_unavailable")
     identity = Identity(
         identity.user_id, identity.email, identity.display_name, identity.role,
@@ -46,7 +83,17 @@ def login(payload: LoginRequest, response: Response):
     # Persist the hash of the token that is actually sent to the client.
     if not replace_session_token(session_id, token, expires_at):
         revoke_session(provisional_token)
+        try:
+            login_throttle.release_reservation(payload.email, origin)
+        except login_throttle.ThrottleUnavailable:
+            pass
         raise HTTPException(status_code=503, detail="session_persistence_unavailable")
+    try:
+        # Only this identity quota is cleared. The shared origin quota is never
+        # reset by a valid account (important for password spraying/NATs).
+        login_throttle.clear_failure(payload.email, origin)
+    except login_throttle.ThrottleUnavailable:
+        raise HTTPException(status_code=503, detail="login_throttle_unavailable") from None
     set_session_cookie(response, token)
     return {"user": _user(identity), "expires_at": expires_at}
 

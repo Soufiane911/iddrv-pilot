@@ -38,9 +38,9 @@ Le système doit rester local, explicable, on-premise et réversible. Une alerte
 
 ### Veille mobilisable
 
-La veille plasturgie disponible dans `source-plasturgie/veille-index/` justifie une lecture prudente des signaux : température, pression, refroidissement, temps de cycle, énergie et force de fermeture dépendent de la matière, de la géométrie, du moule, des capteurs et de la machine. Les sources EUROMAP 77/83 servent surtout à l'interopérabilité et au vocabulaire des données, pas à fournir des seuils universels. Les revues et articles locaux confirment l'intérêt du monitoring et des profils process, mais leurs résultats ne sont pas des performances IDDRV transférables.
+La veille plasturgie externe référencée dans `ml/EXTERNAL-SOURCES.md` justifie une lecture prudente des signaux : température, pression, refroidissement, temps de cycle, énergie et force de fermeture dépendent de la matière, de la géométrie, du moule, des capteurs et de la machine. Les sources EUROMAP 77/83 servent surtout à l'interopérabilité et au vocabulaire des données, pas à fournir des seuils universels. Les revues et articles locaux confirment l'intérêt du monitoring et des profils process, mais leurs résultats ne sont pas des performances IDDRV transférables.
 
-La décision de veille est donc de versionner le contrat de données, les tolérances par contexte, le split temporel, les métriques, le seuil d'alerte et la validation humaine. Les références effectivement vérifiées et leurs limites sont consignées dans `source-plasturgie/veille-index/journal-veille.md` et `feature-to-defect-matrix.md`.
+Ces sources sont des artefacts externes et ne sont pas disponibles dans ce checkout. Leur emplacement distant et leur version immuable (commit `feadef7268cb87a16228be254e0e786aa0f55d63`) sont consignés dans `ml/EXTERNAL-SOURCES.md`. La décision de veille est donc aussi de versionner le contrat de données, les tolérances par contexte, le split temporel, les métriques, le seuil d'alerte et la validation humaine ; aucune source externe n'est présentée ici comme une preuve locale.
 
 ### Benchmark : règles, SPC et ML
 
@@ -86,21 +86,21 @@ La volatilité est calculée avec les valeurs disponibles jusqu'au cycle observ�
 
 ### Split et métriques actuelles
 
-Le split est temporel, deux tiers pour l'entraînement et un tiers pour le test, **à l'intérieur de chaque machine**. La référence exécutée contient 25 461 lignes d'entraînement, 12 732 lignes de test, 601 événements proxy train et 156 événements proxy test.
+Le split est temporel, deux tiers pour l'entraînement et un tiers pour le test, **à l'intérieur de chaque machine**. La référence exécutée contient 25 500 lignes d'entraînement, 12 753 lignes de test, 601 événements proxy train et 156 événements proxy test.
 
 Résultats du holdout synthétique :
 
 | Métrique | Résultat |
 |---|---:|
-| Average precision | **14,07 %** |
-| Prévalence de référence | **1,23 %** |
-| Lift vs prévalence | **11,48×** |
-| ROC-AUC | **0,878** |
-| Precision au seuil machine | **12,29 %** |
-| Recall au seuil machine | **23,72 %** |
-| Taux d'alerte | **2,36 %** — 301 / 12 732 |
+| Average precision | **10,98 %** |
+| Prévalence de référence | **1,22 %** |
+| Lift vs prévalence | **8,97×** |
+| ROC-AUC | **0,868** |
+| Precision au seuil machine | **9,65 %** |
+| Recall au seuil machine | **16,03 %** |
+| Taux d'alerte | **2,03 %** — 259 / 12 753 |
 
-Lecture correcte : le classement est meilleur que l'aléatoire sur ce holdout et le seuil signale environ 2,4 % des cycles. 14,07 % est une average precision, pas la probabilité d'une alerte ; 12,29 % et 23,72 % ne sont pas des garanties pour une usine réelle.
+Lecture correcte : le classement est meilleur que l'aléatoire sur ce holdout et le seuil signale environ 2 % des cycles. 10,98 % est une average precision, pas la probabilité d'une alerte ; 9,65 % et 16,03 % ne sont pas des garanties pour une usine réelle.
 
 ### Limites à dire explicitement
 
@@ -115,7 +115,7 @@ Lecture correcte : le classement est meilleur que l'aléatoire sur ce holdout et
 
 ### Architecture et responsabilité runtime
 
-Le chemin opérationnel reste déterministe et fondé sur des preuves. Les règles de tolérance contrôlent les excursions connues. Le `DeterministicInvestigator` sélectionne une baseline, calcule les écarts et produit au maximum trois hypothèses avec preuves, contradictions, données manquantes et prochaine vérification. HDT est exposé par `/api/v1/process-drift` et possède un panneau UI, mais l'interface ne fabrique pas de cycles bruts à partir d'une timeline agrégée : elle affiche l'absence de données jusqu'à raccordement d'une source cycle.
+Le chemin opérationnel reste déterministe et fondé sur des preuves. Les règles de tolérance contrôlent les excursions connues. Le `DeterministicInvestigator` sélectionne une baseline, calcule les écarts et produit au maximum trois hypothèses avec preuves, contradictions, données manquantes et prochaine vérification. HDT est exposé par `/api/v1/process-drift` et possède un panneau UI ; depuis l'hôte, les appels passent par nginx sur `http://localhost:8080` (`/api/health` et `/api/v1/*`), tandis que le port interne de l'API n'est pas publié.
 
 Une sortie HDT contient notamment `anomaly_score`, l'alerte booléenne, le seuil, l'horizon et `model_version`. Le score est ensuite confronté aux preuves machine par l'investigateur déterministe. Une alerte HDT ne constitue donc pas une explication et ne remplace pas les règles ni les preuves persistées.
 
@@ -137,7 +137,7 @@ Les lignes suivantes remplacent le cadrage « modèle de risque de rebut » pour
 
 ### C6 — Organiser et réaliser une veille technique et réglementaire
 
-**Preuve fichier :** `source-plasturgie/veille-index/journal-veille.md`, `source-plasturgie/veille-index/feature-to-defect-matrix.md`, `source-plasturgie/euromap/EUROMAP102_reference.md`, `ml/HDT-process-drift.md`, `ml/VALIDATION-HDT.md`.
+**Référence externe :** `ml/EXTERNAL-SOURCES.md` (commit immuable `feadef7268cb87a16228be254e0e786aa0f55d63`) ; les fichiers de veille ne sont pas présents dans ce checkout. **Preuve locale :** `ml/HDT-process-drift.md`, `ml/VALIDATION-HDT.md`.
 
 **Détail :** veille EUROMAP, NIST, scikit-learn et publications injection plastique ; séparation documentée entre tolérance, SPC, anomalie ML et explication déterministe ; limites de transférabilité et besoin de validation terrain explicités.
 
@@ -145,7 +145,7 @@ Les lignes suivantes remplacent le cadrage « modèle de risque de rebut » pour
 
 ### C7 — Identifier des services d'IA préexistants
 
-**Preuve fichier :** `ml/HDT-process-drift.md`, `ml/rebut_risk.py`, `ml/process_drift.py`, `source-plasturgie/veille-index/journal-veille.md`.
+**Preuve fichier :** `ml/HDT-process-drift.md`, `ml/rebut_risk.py`, `ml/process_drift.py`. Référence de veille externe : `ml/EXTERNAL-SOURCES.md` (commit immuable `feadef7268cb87a16228be254e0e786aa0f55d63`).
 
 **Détail :** benchmark règles de tolérance / SPC / ML. Les règles restent le contrôle autoritaire ; SPC est le complément statistique à valider ; la régression de rebut est une baseline historique ; l'Isolation Forest HDT est retenue pour la détection de trajectoire inhabituelle par machine. Aucun LLM cloud ou RAG n'est présenté comme actif.
 
@@ -161,17 +161,17 @@ Les lignes suivantes remplacent le cadrage « modèle de risque de rebut » pour
 
 ### C9 — Développer une API REST exposant un modèle d'IA
 
-**Preuve actuelle :** `backend/app/api/incidents.py`, `backend/app/api/investigations.py`, `backend/app/diagnostics/engine.py` et les contrats/tests API exposent le diagnostic déterministe et ses preuves.
+**Preuve actuelle :** `backend/app/api/process_drift.py`, `backend/app/api/incidents.py`, `backend/app/api/investigations.py`, `backend/app/diagnostics/engine.py`, `tests/test_process_drift_api.py` et les contrats API.
 
-**Détail à ajouter :** ne pas dire que l'API expose déjà HDT. Elle expose le `DeterministicInvestigator` actif ; HDT reste un artefact prototype offline jusqu'à validation du contrat d'inférence, de la persistance du score et de la gestion des erreurs.
+**Détail :** l'API REST sécurisée expose HDT sur `POST /api/v1/process-drift` avec cycles bruts, version, score, seuil, horizon et signaux. Depuis l'hôte, nginx relaie ce chemin via `localhost:8080`; le port interne 8000 n'est pas publié. HDT reste un prototype offline non validé terrain, avec monitoring métier et persistance à compléter.
 
 **Statut honnête :** **Prouvé pour le service déterministe ; API HDT prouvée, monitoring métier encore partiel**.
 
 ### C10 — Intégrer l'API d'un modèle ou service d'IA dans une application
 
-**Preuve actuelle :** `frontend/src/lib/api.ts`, `frontend/src/pages/IncidentDetailPage.tsx` et les tests frontend montrent le parcours investigation → hypothèses → preuves → feedback du `DeterministicInvestigator`.
+**Preuve actuelle :** `frontend/src/lib/api.ts`, `frontend/src/components/monitoring/HdtSimulator.tsx`, `frontend/src/pages/ModelMonitoringPage.tsx`, `frontend/src/pages/IncidentDetailPage.tsx` et les tests frontend montrent l'appel HDT et le parcours investigation → hypothèses → preuves → feedback du `DeterministicInvestigator`.
 
-**Détail à ajouter :** le frontend ne doit pas présenter le score HDT comme une prédiction terrain avant intégration qualifiée. Une future intégration devra afficher version, seuil, contexte machine, statut prototype et preuves déterministes associées.
+**Détail :** le panneau HDT appelle l'endpoint avec des cycles bruts saisis dans le simulateur et affiche version, machine, score, seuil, horizon et signaux. Il ne fabrique pas de cycles à partir d'une timeline agrégée et doit conserver le statut de prototype ; le raccordement à une source de cycles ingérés et la validation terrain restent à faire.
 
 **Statut honnête :** **Prouvé pour le diagnostic déterministe ; panneau HDT intégré, raccordement des cycles bruts restant à faire**.
 
@@ -179,7 +179,7 @@ Les lignes suivantes remplacent le cadrage « modèle de risque de rebut » pour
 
 **Preuve fichier :** `ml/VALIDATION-HDT.md`, `backend/app/diagnostics/engine.py`, les endpoints de feedback et les tests d'évaluation du diagnostic.
 
-**Détail à ajouter :** suivre average precision, ROC-AUC, précision, rappel, prévalence, lift et taux d'alerte sur des fenêtres temporelles ; comparer la prévalence et les features par machine ; surveiller les machines inconnues, les valeurs manquantes, le drift et les alertes sans confirmation humaine. Les métriques 14,07 %, 0,878, 12,29 %, 23,72 % et 2,36 % sont une référence offline synthétique, pas un SLO terrain.
+**Détail :** suivre average precision, ROC-AUC, précision, rappel, prévalence, lift et taux d'alerte sur des fenêtres temporelles ; comparer la prévalence et les features par machine ; surveiller les machines inconnues, les valeurs manquantes, le drift et les alertes sans confirmation humaine. Les métriques 10,98 %, 0,868, 9,65 %, 16,03 % et 2,03 % sont une référence offline synthétique, pas un SLO terrain.
 
 **Statut honnête :** **Partiel** — métriques et feedback existent ; monitoring continu, drift et validation terrain HDT restent à construire.
 
@@ -207,15 +207,15 @@ Les lignes suivantes remplacent le cadrage « modèle de risque de rebut » pour
 
 ### Réponse courte (E3)
 
-> « Le service actuellement intégré expose le diagnostic déterministe, ses hypothèses, ses preuves et le feedback. HDT est un artefact offline versionné avec un contrat de features, un split temporel et des métriques ; je ne le présente pas comme déjà branché à l'API ni comme une commande machine. Avant promotion, il faut un vrai événement qualité, le monitoring du drift, l'abstention et une validation humaine. »
+> « Le service actuellement intégré expose le diagnostic déterministe et HDT, avec ses contrats, scores, seuils et preuves associées. Je ne présente pas HDT comme une commande machine ni comme un modèle validé terrain. Avant promotion, il faut un vrai événement qualité, le monitoring du drift, l'abstention et une validation humaine. »
 
 ### Si l'on demande pourquoi pas seulement le rebut
 
 > « Le rebut courant arrive après le cycle et dépend d'un proxy de qualité. Le sujet HDT est en amont : détecter une trajectoire qui devient instable avant la séquence. Le rebut-risk reste une baseline de comparaison, mais il ne porte plus le cadrage principal. »
 
-### Si l'on demande ce que signifie 14,07 %
+### Si l'on demande ce que signifie 10,98 %
 
-> « C'est l'average precision du holdout synthétique, à comparer à une prévalence de 1,23 %, soit un lift de 11,48 fois. Ce n'est pas une probabilité calibrée et cela ne garantit pas 14 % de précision sur le terrain. »
+> « C'est l'average precision du holdout synthétique, à comparer à une prévalence de 1,22 %, soit un lift de 8,97 fois. Ce n'est pas une probabilité calibrée et cela ne garantit pas 9,65 % de précision sur le terrain. »
 
 ### Si l'on demande si le runtime lit la vérité terrain
 
@@ -227,5 +227,5 @@ Les lignes suivantes remplacent le cadrage « modèle de risque de rebut » pour
 - `ml/VALIDATION-HDT.md` : exécution de référence et métriques ;
 - `ml/process_drift.py` : features, split, entraînement et prédiction ;
 - `ml/README.md` : statut prototype et commandes ;
-- `source-plasturgie/veille-index/journal-veille.md` : veille et décisions ;
-- `source-plasturgie/veille-index/feature-to-defect-matrix.md` : hypothèses process prudentes.
+- `ml/EXTERNAL-SOURCES.md` : emplacement et commit immuable des sources
+  externes de veille ; elles ne sont pas embarquées dans ce checkout.

@@ -3,13 +3,14 @@
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi import HTTPException
+from fastapi.responses import JSONResponse
 
 from .config import settings
-from .db import check_connection
+from .db import check_connection, check_redis_connection
 from .errors import unhandled_exception_handler, validation_exception_handler, http_exception_handler
 from .middleware import RequestContextMiddleware
 from .metrics import router as metrics_router
-from .schemas import HealthResponse
+from .schemas import HealthResponse, ReadinessResponse
 from .api.incidents import router as incidents_router
 from .api.sites import router as sites_router
 from .api.machines import router as machines_router
@@ -19,7 +20,7 @@ from .api.actions import router as actions_router
 from .api.investigations import router as investigations_router
 from .api.workspace import router as workspace_router
 from .api.scrap_risk import router as scrap_risk_router
-from .api.process_drift import router as process_drift_router
+from .api.process_drift import _model_artifact, router as process_drift_router
 
 
 app = FastAPI(title=settings.app_name, version=settings.app_version)
@@ -42,6 +43,7 @@ app.include_router(process_drift_router)
 
 @app.get("/health", response_model=HealthResponse, tags=["system"])
 def health() -> HealthResponse:
+    """Backward-compatible database health contract."""
     database_ok = check_connection()
     return HealthResponse(
         status="ok" if database_ok else "degraded",
@@ -49,3 +51,38 @@ def health() -> HealthResponse:
         version=settings.app_version,
         database="ok" if database_ok else "unavailable",
     )
+
+
+@app.get("/live", tags=["system"])
+@app.get("/api/live", include_in_schema=False, tags=["system"])
+def live() -> dict[str, str]:
+    """Process liveness only; dependency failures belong to /ready."""
+    return {"status": "alive"}
+
+
+def check_model_artifact() -> bool:
+    try:
+        _model_artifact()
+        return True
+    except Exception:
+        return False
+
+
+@app.get("/ready", response_model=ReadinessResponse, tags=["system"])
+@app.get("/api/ready", response_model=ReadinessResponse, include_in_schema=False, tags=["system"])
+def ready():
+    checks = {
+        "database": check_connection(),
+        "redis": check_redis_connection(),
+        "model": check_model_artifact(),
+    }
+    available = all(checks.values())
+    payload = {
+        "status": "ready" if available else "not_ready",
+        "service": settings.app_name,
+        "version": settings.app_version,
+        **{name: "ok" if value else "unavailable" for name, value in checks.items()},
+    }
+    if not available:
+        return JSONResponse(status_code=503, content=ReadinessResponse(**payload).model_dump(mode="json"))
+    return ReadinessResponse(**payload)

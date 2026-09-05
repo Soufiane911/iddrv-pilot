@@ -40,6 +40,7 @@ def _has_metric(metrics_text: str, metric_name: str) -> bool:
 class TestSessionValidation:
     def test_session_inactive_when_db_unavailable_in_production(self, monkeypatch):
         monkeypatch.setenv("APP_ENV", "production")
+        monkeypatch.setenv("API_DATABASE_URL", "postgresql://api:password@db/iddrv")
         monkeypatch.setenv("SESSION_SECRET", "p" * 40)
         monkeypatch.setenv("SESSION_FAIL_OPEN", "false")
         from backend.app.config import Settings

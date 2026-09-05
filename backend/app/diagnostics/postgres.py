@@ -6,7 +6,7 @@ from ..db import get_connection
 
 class PostgresDiagnosticRepository:
     def __init__(self, db_url: str | None = None):
-        self.db_url = db_url or os.getenv("DATABASE_URL")
+        self.db_url = db_url or os.getenv("API_DATABASE_URL") or os.getenv("DATABASE_URL")
 
     def _connection(self):
         return psycopg2.connect(self.db_url) if self.db_url else get_connection()

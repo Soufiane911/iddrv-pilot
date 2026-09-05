@@ -16,12 +16,16 @@ import psycopg2
 import psycopg2.extras
 from datetime import datetime, timedelta, timezone
 from typing import Optional
-import os
 import hashlib
 import json
 
+try:
+    from .runtime_config import worker_database_url
+except ImportError:  # direct module execution compatibility
+    from runtime_config import worker_database_url
 
-DB_URL = os.getenv("DATABASE_URL", "postgresql://iddrv_user@localhost:5432/iddrv")
+
+DB_URL = worker_database_url()
 OVERLAP_WINDOW = timedelta(minutes=30)
 
 

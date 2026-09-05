@@ -10,6 +10,7 @@ import threading
 from datetime import datetime, timedelta, timezone
 
 import numpy as np
+import pandas as pd
 import pytest
 from fastapi.testclient import TestClient
 
@@ -281,6 +282,39 @@ def test_bootstrap_reference_fallback_when_data_unreachable(monkeypatch):
     monitor = monitoring.get_monitor()
     assert monitor.reference_size == monitoring.REFERENCE_BOOTSTRAP_SAMPLES
     assert monitor.psi() == 0.0  # empty window, no crash
+
+
+def test_reference_prepares_full_history_before_filtering_normal_cycles(monkeypatch):
+    from ml import process_drift as process_drift_model
+
+    history = pd.DataFrame(
+        [
+            {**_cycle(index), "scrap_flag": index % 2}
+            for index in range(220)
+        ]
+    )
+    calls: dict[str, object] = {}
+    real_prepare = process_drift_model.prepare_inference_frame
+
+    def recording_prepare(frame: pd.DataFrame) -> pd.DataFrame:
+        calls["prepared_input_rows"] = len(frame)
+        return real_prepare(frame)
+
+    def fake_predict(_artifact: dict[str, object], frame: pd.DataFrame) -> pd.DataFrame:
+        calls["prediction_rows"] = len(frame)
+        calls["prediction_has_scrap_flag"] = "scrap_flag" in frame.columns
+        return pd.DataFrame({"anomaly_score": np.arange(len(frame), dtype=float)})
+
+    monkeypatch.setattr(process_drift_model, "load_cycle_files", lambda _directory: history)
+    monkeypatch.setattr(process_drift_model, "prepare_inference_frame", recording_prepare)
+    monkeypatch.setattr(process_drift_model, "predict", fake_predict)
+
+    scores = monitoring.build_reference_scores({}, cycles_dir="unused", max_samples=500)
+
+    assert calls["prepared_input_rows"] == len(history)
+    assert calls["prediction_rows"] == int((history["scrap_flag"] == 0).sum())
+    assert calls["prediction_has_scrap_flag"] is True
+    assert len(scores) == 110
 
 
 # -- Prometheus integration through the API ----------------------------------

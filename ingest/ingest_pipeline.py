@@ -34,7 +34,12 @@ except ImportError:  # direct ``python ingest/ingest_pipeline.py`` compatibility
     from mapper import get_mapping_confidence
     from reconciler import insert_cycles, get_db_connection, reconcile_existing_cycles
 
-DB_URL = os.getenv("DATABASE_URL", "postgresql://iddrv_user@localhost:5432/iddrv")
+try:
+    from .runtime_config import worker_database_url
+except ImportError:  # direct ``python ingest/ingest_pipeline.py`` compatibility
+    from runtime_config import worker_database_url
+
+DB_URL = worker_database_url()
 PROJECT_ROOT = Path(__file__).parent.parent.resolve()
 RAW_STORE = Path(os.getenv("RAW_STORE_PATH", str(PROJECT_ROOT / "data" / "raw")))
 

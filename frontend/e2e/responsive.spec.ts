@@ -72,11 +72,7 @@ test.describe('Tests responsive', () => {
     await page.goto('/sites');
     await page.waitForLoadState('networkidle');
     const openButtons = page.locator('button.site-open');
-    if (await openButtons.count() === 0) {
-      test.skip(true, 'Aucun site disponible');
-      return;
-    }
-
+    await expect(openButtons).toHaveCount(1);
     await openButtons.first().click();
     await page.waitForLoadState('networkidle');
     await expect(page).toHaveURL(/\/sites\/\d+\/workshop/);

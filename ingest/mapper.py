@@ -12,6 +12,11 @@ import re
 from pathlib import Path
 from typing import Optional
 
+try:
+    from .runtime_config import worker_database_url
+except ImportError:  # direct module execution compatibility
+    from runtime_config import worker_database_url
+
 # Chemin vers le dictionnaire canonique
 _DICT_PATH = Path(__file__).parent / "mappers" / "canonical_dict.json"
 
@@ -78,7 +83,7 @@ def build_column_map(source_headers: list[str], brand: str = "generic") -> dict[
                     original_header = normalized_headers[normalized_src]
                     confidence = 1.0 if mapping["brand"] == brand else 0.75
                     scale = float(mapping.get("scale", 1.0))
-                    result[original_header] = {
+                    candidate = {
                         "canonical": canonical,
                         "unit": unit,
                         "source_unit": mapping.get("source_unit", unit),
@@ -88,6 +93,12 @@ def build_column_map(source_headers: list[str], brand: str = "generic") -> dict[
                         "matched_by": src_label,
                         "brand": mapping["brand"]
                     }
+                    # A brand-specific mapping must win over the generic
+                    # fallback even when the dictionary lists the fallback
+                    # later (e.g. Haitian ``CycleTime``/``GoodParts``).
+                    previous = result.get(original_header)
+                    if previous is None or candidate["confidence"] > previous["confidence"]:
+                        result[original_header] = candidate
 
     # Colonnes non reconnues
     for header in source_headers:
@@ -188,7 +199,7 @@ if __name__ == "__main__":
     parser.add_argument("--simulate-redis-saturation", action="store_true", help="Mock Redis memory saturation.")
 
     args = parser.parse_args()
-    db_url = args.db_url or (os.getenv("DATABASE_URL") if args.site_id is not None else None)
+    db_url = args.db_url or (worker_database_url() if args.site_id is not None else None)
     redis_url = args.redis_url or (os.getenv("REDIS_URL") if args.buffer == "redis" else None)
 
     # Handle mock options first

@@ -155,7 +155,7 @@ Pour une validation industrielle, il faut ajouter :
 
 | Compétence | Preuve apportée par HDT | Niveau honnête |
 |---|---|---|
-| C6 | Veille EUROMAP, articles, HAL et NIST dans `source-plasturgie/` | Défendable |
+| C6 | Veille externe EUROMAP, articles, HAL et NIST, référencée par commit dans `ml/EXTERNAL-SOURCES.md` | Défendable |
 | C7 | Reformulation du problème : dérive future plutôt que contrôle hors tolérance | Défendable |
 | C8 | Choix argumenté d'un détecteur explicable et comparaison avec le baseline rebut | Partielle à consolider |
 | C9 | Contrat de features, cible future et séparation entraînement/inférence | Défendable sur le périmètre offline |

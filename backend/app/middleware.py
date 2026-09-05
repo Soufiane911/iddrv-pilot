@@ -1,4 +1,5 @@
 import logging
+import re
 import time
 from uuid import uuid4
 
@@ -7,11 +8,19 @@ from starlette.requests import Request
 from starlette.responses import Response
 
 logger = logging.getLogger("iddrv.request")
+_REQUEST_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")
+
+
+def _request_id(request: Request) -> str:
+    candidate = request.headers.get("X-Request-ID", "").strip()
+    # Correlation IDs are observable in logs and error JSON; reject control
+    # characters, oversized values, and ambiguous whitespace from clients.
+    return candidate if _REQUEST_ID_RE.fullmatch(candidate) else str(uuid4())
 
 
 class RequestContextMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
-        request_id = request.headers.get("X-Request-ID") or str(uuid4())
+        request_id = _request_id(request)
         request.state.request_id = request_id
 
         start = time.perf_counter()

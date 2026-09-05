@@ -1,0 +1,107 @@
+# Immutable pilot manifest. IMAGE_TAG is always the CI-validated workflow_run SHA.
+services:
+  timescaledb:
+    image: timescale/timescaledb:2.28.2-pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      TIMESCALEDB_TELEMETRY: "off"
+    volumes:
+      - timescaledb_data:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/01_init.sql:ro
+      - ./db/seed_data.sql:/docker-entrypoint-initdb.d/02_seed.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "256mb", "--maxmemory-policy", "noeviction"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+
+  migrate:
+    image: ghcr.io/${GHCR_OWNER:?GHCR_OWNER is required}/iddrv-api:${IMAGE_TAG:?IMAGE_TAG is required}
+    restart: "no"
+    environment:
+      OWNER_DATABASE_URL: ${OWNER_DATABASE_URL:?OWNER_DATABASE_URL is required}
+      API_DATABASE_URL: ${API_DATABASE_URL:?API_DATABASE_URL is required}
+      WORKER_DATABASE_URL: ${WORKER_DATABASE_URL:?WORKER_DATABASE_URL is required}
+      APP_ENV: pilot
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+    command: ["sh", "-c", "export DATABASE_URL=\"$$OWNER_DATABASE_URL\"; python db/setup_db.py && python db/runtime_roles.py"]
+
+  api:
+    image: ghcr.io/${GHCR_OWNER:?GHCR_OWNER is required}/iddrv-api:${IMAGE_TAG:?IMAGE_TAG is required}
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: ${API_DATABASE_URL:?API_DATABASE_URL is required}
+      API_DATABASE_URL: ${API_DATABASE_URL:?API_DATABASE_URL is required}
+      REDIS_URL: redis://redis:6379/0
+      APP_ENV: pilot
+      SESSION_SECRET: ${SESSION_SECRET:?SESSION_SECRET is required}
+      SESSION_COOKIE_SECURE: "true"
+      METRICS_TOKEN: ${METRICS_TOKEN:-}
+      METRICS_PUBLIC: "false"
+      # web has a fixed address on the private network; only it may forward client IP headers.
+      TRUSTED_PROXY_IPS: ${TRUSTED_PROXY_IPS:-172.31.0.10/32}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    command: ["uvicorn", "backend.app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/ready', timeout=3)"]
+
+  worker:
+    image: ghcr.io/${GHCR_OWNER:?GHCR_OWNER is required}/iddrv-api:${IMAGE_TAG:?IMAGE_TAG is required}
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: ${WORKER_DATABASE_URL:?WORKER_DATABASE_URL is required}
+      WORKER_DATABASE_URL: ${WORKER_DATABASE_URL:?WORKER_DATABASE_URL is required}
+      REDIS_URL: redis://redis:6379/0
+      APP_ENV: pilot
+      INBOX_ROOT: /var/lib/iddrv/inbox
+      ARCHIVE_ROOT: /var/lib/iddrv/archive
+      QUARANTINE_ROOT: /var/lib/iddrv/quarantine
+      RAW_STORE_PATH: /var/lib/iddrv/raw
+      INGEST_WATCH_ROOT: /var/lib/iddrv
+      WORKER_HEARTBEAT_PATH: /var/lib/iddrv/processing/.worker_heartbeat
+    depends_on:
+      api:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: ["python", "-m", "ingest.watcher", "--root", "/var/lib/iddrv", "--poll-seconds", "5", "--stable-seconds", "10"]
+    volumes:
+      - ./data:/var/lib/iddrv
+
+  web:
+    image: ghcr.io/${GHCR_OWNER:?GHCR_OWNER is required}/iddrv-web:${IMAGE_TAG:?IMAGE_TAG is required}
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8080:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      default:
+        ipv4_address: 172.31.0.10
+
+volumes:
+  timescaledb_data:
+  redis_data:
+
+networks:
+  default:
+    name: iddrv_pilot_network
+    ipam:
+      config:
+        - subnet: 172.31.0.0/24

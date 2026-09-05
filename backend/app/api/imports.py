@@ -2,7 +2,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from ..read_repositories import get_import, list_imports
+from ..read_repositories import InvalidCursor, _cursor_offset, get_import, list_imports
 from ..schemas import ImportJob, ImportPage
 from ..security import Identity, get_identity_optional, require_site
 
@@ -20,6 +20,10 @@ def imports(
     if identity is not None and site_id is not None:
         require_site(identity, site_id)
     allowed = None if identity is None or identity.anonymous else identity.site_ids
+    try:
+        _cursor_offset(cursor)
+    except InvalidCursor as exc:
+        raise HTTPException(status_code=422, detail="invalid pagination cursor") from exc
     items, next_value = list_imports(site_ids=allowed, site_id=site_id, limit=limit, cursor=cursor)
     return {"items": items, "next_cursor": next_value}
 

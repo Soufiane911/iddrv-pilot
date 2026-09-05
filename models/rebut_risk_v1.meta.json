@@ -41,6 +41,11 @@
     "train_end": "2025-02-14T15:21:43.596283+00:00",
     "test_start": "2025-02-14T15:21:49.651461+00:00"
   },
+  "environment": {
+    "python": "3.13.9",
+    "scikit_learn": "1.7.2",
+    "joblib": "1.5.2"
+  },
   "contract": {
     "split": "chronological_2_3_train_1_3_test",
     "class_weight": "balanced",

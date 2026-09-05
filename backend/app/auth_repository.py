@@ -12,6 +12,10 @@ from .db import get_connection
 from .security import Identity, hash_password, token_hash, verify_password
 
 
+class AuthenticationUnavailable(RuntimeError):
+    """Authentication storage could not be queried."""
+
+
 def _identity(row, site_rows=()):
     site_roles = tuple(sorted((int(item[0]), str(item[1])) for item in site_rows))
     return Identity(
@@ -60,10 +64,10 @@ def authenticate(email: str, password: str) -> Identity | None:
                     password_row = cur.fetchone()
                     if password_row and verify_password(password, password_row[0]):
                         return _identity(row, sites)
-    except psycopg2.Error:
-        # A fresh checkout can be used for read-only demo exploration before
-        # migration 004 is applied.  Do not turn this into a bypass for writes.
-        pass
+    except (psycopg2.Error, OSError) as exc:
+        # A database outage is not an invalid password.  Returning 401 here
+        # both misleads operators and lets clients retry without backoff.
+        raise AuthenticationUnavailable("authentication_storage_unavailable") from exc
 
     from .config import settings
     if settings.app_environment not in {"development", "test"}:

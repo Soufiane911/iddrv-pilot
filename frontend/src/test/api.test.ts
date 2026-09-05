@@ -278,6 +278,27 @@ describe('contrat du journal d’import', () => {
   });
 });
 
+describe('feedback incident relu depuis le serveur', () => {
+  beforeEach(() => { globalThis.fetch = vi.fn(); });
+  afterEach(() => { vi.restoreAllMocks(); });
+
+  it('mappe le dernier verdict projeté dans la liste des incidents', async () => {
+    (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      text: async () => JSON.stringify({ items: [{
+        id: 'incident-1', site_id: 1, machine_id: 2, status: 'open', severity: 'high',
+        symptom: 'short_shot_increase', started_at: '2025-01-01T00:00:00Z',
+        created_at: '2025-01-01T00:00:00Z', data_cutoff: '2025-01-01T00:00:00Z',
+        feedback_verdict: 'confirmed',
+      }], next_cursor: null }),
+    });
+
+    const incidents = await createApiClient('http://test/api/v1').getIncidents();
+    expect(incidents[0].feedback_verdict).toBe('confirmed');
+  });
+});
+
 describe('santé du service', () => {
   beforeEach(() => { globalThis.fetch = vi.fn(); });
   afterEach(() => { vi.restoreAllMocks(); });
@@ -291,6 +312,17 @@ describe('santé du service', () => {
     const health = await api.getHealth();
     expect((globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0][0]).toBe('/api/health');
     expect(health.database).toBe('ok');
+  });
+
+  it('expose la readiness séparément du healthcheck de vivacité', async () => {
+    (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      ok: true, status: 200,
+      text: async () => JSON.stringify({ status: 'ready', service: 'iddrv', database: 'ok', redis: 'ok', model: 'ok' }),
+    });
+    const api = createApiClient('/api/v1');
+    const readiness = await api.getReadiness();
+    expect((globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0][0]).toBe('/api/ready');
+    expect(readiness).toMatchObject({ status: 'ready', redis: 'ok', model: 'ok' });
   });
 });
 

@@ -10,7 +10,9 @@ class Settings:
     app_name: str = "IDDVR API"
     app_version: str = "0.1.0"
     database_url: str = "postgresql://iddrv_user@localhost:5432/iddrv"
+    redis_url: str = "redis://localhost:6379/0"
     db_connect_timeout_s: int = 3
+    trusted_proxy_ips: tuple[str, ...] = ()
     session_secret: str = ""
     session_ttl_s: int = 28800
     session_cookie_name: str = "iddrv_session"
@@ -34,6 +36,11 @@ class Settings:
             ttl_value = int(ttl)
         except ValueError:
             ttl_value = 28800
+        api_database_url = os.getenv("API_DATABASE_URL", "").strip()
+        if environment in {"pilot", "prod", "production"} and not api_database_url:
+            raise RuntimeError(
+                "API_DATABASE_URL must be explicitly configured in pilot/production"
+            )
         configured_secret = os.getenv("SESSION_SECRET", "").strip()
         insecure_placeholders = {
             "local-development-only-change-me",
@@ -50,6 +57,9 @@ class Settings:
             # Random per-process fallback is limited to local development/tests.
             secret = configured_secret or secrets.token_urlsafe(32)
         fail_open = os.getenv("SESSION_FAIL_OPEN", "false").lower() in {"1", "true", "yes"}
+        trusted_proxy_ips = tuple(
+            value.strip() for value in os.getenv("TRUSTED_PROXY_IPS", "").split(",") if value.strip()
+        )
         allow_anonymous = (
             environment in {"development", "test"}
             and os.getenv("ALLOW_ANONYMOUS_READS", "false").lower() in {"1", "true", "yes"}
@@ -66,8 +76,13 @@ class Settings:
         return cls(
             app_name=os.getenv("APP_NAME", "IDDVR API"),
             app_version=os.getenv("APP_VERSION", "0.1.0"),
-            database_url=os.getenv("DATABASE_URL", cls.database_url),
+            # DATABASE_URL remains a local-development fallback. The API
+            # container is always wired to the dedicated API role in secure
+            # environments.
+            database_url=api_database_url or os.getenv("DATABASE_URL", cls.database_url),
+            redis_url=os.getenv("REDIS_URL", cls.redis_url),
             db_connect_timeout_s=max(1, timeout_value),
+            trusted_proxy_ips=trusted_proxy_ips,
             session_secret=secret,
             session_ttl_s=max(300, ttl_value),
             session_cookie_name=os.getenv("SESSION_COOKIE_NAME", "iddrv_session"),

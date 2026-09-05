@@ -350,7 +350,7 @@ describe('WorkspacePage', () => {
 
     await waitFor(() => expect(getImportSession).toHaveBeenCalledWith('session-url'));
     expect(await screen.findByText(/Session reprise par l’URL/i)).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: /Déposer les sources/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Référencer les exports' })).toBeInTheDocument();
   });
 
   it('permet de référencer un fichier dans la session', async () => {

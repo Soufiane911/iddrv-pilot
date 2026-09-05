@@ -4,15 +4,14 @@ from __future__ import annotations
 
 import logging
 import math
-import os
 import time
 from functools import lru_cache
-from pathlib import Path
 
 import pandas as pd
 from fastapi import APIRouter, Depends, HTTPException
 
 from ml import monitoring
+from ml.artifact_contract import model_path_from_env
 from ml.process_drift import ANOMALY_FEATURES, HORIZON_CYCLES, RAW_NUMERIC_FEATURES, load_artifact, predict, prepare_inference_frame
 
 from .. import metrics
@@ -26,7 +25,7 @@ LOGGER = logging.getLogger("iddrv.monitoring")
 @lru_cache(maxsize=1)
 def _model_artifact():
     """Load the HDT artifact only when the first valid request needs it."""
-    path = Path(os.getenv("PROCESS_DRIFT_MODEL_PATH", "models/process_drift_hdt_v1.joblib"))
+    path = model_path_from_env("PROCESS_DRIFT_MODEL_PATH", "process_drift_hdt_v1.joblib")
     try:
         artifact = load_artifact(path)
         required_keys = {"models", "global_model", "thresholds", "global_threshold", "horizon_cycles"}
@@ -90,6 +89,8 @@ def score_process_drift(
     started = time.perf_counter()
     try:
         result = predict(artifact, prepared.iloc[[-1]]).iloc[0]
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail="process_drift_feature_contract_invalid") from exc
     except Exception as exc:
         # A broken artifact must not become an opaque 500 response.
         raise HTTPException(status_code=503, detail="process_drift_model_unavailable") from exc

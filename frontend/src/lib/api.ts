@@ -19,6 +19,16 @@ export interface Health {
   message?: string;
 }
 
+export interface Readiness {
+  status: 'ready' | 'not_ready';
+  service?: string;
+  version?: string;
+  database: 'ok' | 'unavailable';
+  redis: 'ok' | 'unavailable';
+  model: 'ok' | 'unavailable';
+  checkedAt?: string;
+}
+
 export interface Site {
   id: number;
   name: string;
@@ -196,6 +206,8 @@ export interface Incident {
   created_at: string;
   data_cutoff: string;
   confidence?: 'low' | 'medium' | 'high' | null;
+  /** Latest persisted operator verdict, when one exists. */
+  feedback_verdict?: 'confirmed' | 'rejected' | 'uncertain' | string | null;
 }
 
 export interface Evidence {
@@ -334,10 +346,11 @@ export class ApiRequestError extends Error {
 
 export interface ApiClient {
   getHealth(): Promise<Health>;
+  getReadiness(): Promise<Readiness>;
   getSites(): Promise<Site[]>;
   getSite(siteId: number): Promise<Site>;
-  getMachines(siteId: number): Promise<Machine[]>;
-  getMachine(machineId: number): Promise<Machine>;
+  getMachines(siteId: number, asOf?: string): Promise<Machine[]>;
+  getMachine(machineId: number, asOf?: string): Promise<Machine>;
   getMachineStatus(machineId: number, asOf?: string): Promise<MachineStatus>;
   getMachineTimeline(machineId: number, from?: string, to?: string): Promise<MachineTimeline>;
   getMachineCycles(machineId: number, asOf: string, limit?: number): Promise<MachineCycle[]>;
@@ -465,6 +478,7 @@ function mapIncident(value: unknown): Incident {
     created_at: String(record.created_at ?? record.createdAt ?? record.started_at),
     data_cutoff: String(record.data_cutoff ?? record.dataCutoff ?? record.started_at),
     confidence: (record.confidence as Incident['confidence']) ?? null,
+    feedback_verdict: (record.feedback_verdict ?? record.feedbackVerdict) as Incident['feedback_verdict'] ?? null,
   };
 }
 
@@ -699,17 +713,32 @@ export function createApiClient(baseUrl = import.meta.env.VITE_API_URL ?? '/api/
         message: payload.database === 'ok' ? 'API connectée et base disponible.' : 'API joignable, base à surveiller.',
       } satisfies Health;
     },
+    async getReadiness() {
+      const healthRoot = import.meta.env.VITE_HEALTH_URL ? normaliseBaseUrl(import.meta.env.VITE_HEALTH_URL) : apiBase.replace(/\/api(?:\/v1)?$/, '') || '/api';
+      const payload = await request<Record<string, unknown>>('/ready', {}, healthRoot);
+      return {
+        status: (payload.status ?? 'not_ready') as Readiness['status'],
+        service: payload.service as string | undefined,
+        version: payload.version as string | undefined,
+        database: (payload.database ?? 'unavailable') as Readiness['database'],
+        redis: (payload.redis ?? 'unavailable') as Readiness['redis'],
+        model: (payload.model ?? 'unavailable') as Readiness['model'],
+        checkedAt: new Date().toISOString(),
+      } satisfies Readiness;
+    },
     async getSites() {
       return (await requestAllPages('/sites')).map(mapSite);
     },
     async getSite(siteId) {
       return mapSite(await requestWithLegacyFallback(`/sites/${siteId}`));
     },
-    async getMachines(siteId) {
-      return (await requestAllPages(`/sites/${siteId}/machines`)).map(mapMachine);
+    async getMachines(siteId, asOf) {
+      const query = asOf ? `?as_of=${encodeURIComponent(asOf)}` : '';
+      return (await requestAllPages(`/sites/${siteId}/machines${query}`)).map(mapMachine);
     },
-    async getMachine(machineId) {
-      return mapMachine(await requestWithLegacyFallback(`/machines/${machineId}`));
+    async getMachine(machineId, asOf) {
+      const query = asOf ? `?as_of=${encodeURIComponent(asOf)}` : '';
+      return mapMachine(await requestWithLegacyFallback(`/machines/${machineId}${query}`));
     },
     async getMachineStatus(machineId, asOf) {
       const query = asOf ? `?as_of=${encodeURIComponent(asOf)}` : '';
@@ -895,6 +924,7 @@ function demoMachineCycles(machineId: number, asOf?: string, limit = 20): Machin
 /** A deterministic client used by component tests and an explicit demo mode. */
 export const mockApiClient: ApiClient = {
   getHealth: async () => ({ status: 'ok', service: 'iddrv-demo', database: 'ok', checkedAt: DEMO_DATE, message: 'API de démonstration connectée.' }),
+  getReadiness: async () => ({ status: 'ready', service: 'iddrv-demo', database: 'ok', redis: 'ok', model: 'ok', checkedAt: DEMO_DATE }),
   getSites: async () => DEMO_SITES,
   getSite: async (id) => DEMO_SITES.find((site) => site.id === id) ?? DEMO_SITES[0],
   getMachines: async () => DEMO_MACHINES,
@@ -957,4 +987,6 @@ export const mockApiClient: ApiClient = {
   logout: async () => undefined,
 };
 
-export const apiClient = createApiClient();
+// Playwright's UI smoke suite opts into deterministic demo data explicitly;
+// production and local development continue to use the HTTP client.
+export const apiClient = import.meta.env.VITE_DEMO_MODE === 'true' ? mockApiClient : createApiClient();

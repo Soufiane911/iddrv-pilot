@@ -40,30 +40,13 @@ test.describe('Parcours complet : overview → sites → atelier → incidents',
     await expect(page.getByText(/PRESSES RÉFÉRENCÉES/i).first()).toBeVisible();
 
     const openButtons = page.locator('button.site-open');
-    await expect.poll(async () => await openButtons.count(), { timeout: 10000 }).toBeGreaterThanOrEqual(0);
-    const count = await openButtons.count();
-    if (count === 0) {
-      await expect(page.locator('.empty-panel')).toBeVisible();
-      return;
-    }
-
+    await expect(openButtons).toHaveCount(1);
     await openButtons.first().click();
     await page.waitForLoadState('networkidle');
     await expect(page).toHaveURL(/\/sites\/\d+\/workshop/);
 
-    // Le workshop peut être en état "ready" ou "indisponible" selon les données
-    // On attend que le contenu se stabilise (SVG, message ready, ou message d'erreur)
-    const svg = page.locator('svg[role="radiogroup"]').first();
-    const ready = page.locator('.workshop-page-ready').first();
-    const alert = page.getByRole('alert').first();
-    const status = page.locator('[role="status"]').first();
-    await expect.poll(async () => {
-      if (await svg.count() > 0 && await svg.isVisible().catch(() => false)) return true;
-      if (await ready.count() > 0 && await ready.isVisible().catch(() => false)) return true;
-      if (await alert.count() > 0 && await alert.isVisible().catch(() => false)) return true;
-      if (await status.count() > 0 && await status.isVisible().catch(() => false)) return true;
-      return false;
-    }, { timeout: 30000 }).toBe(true);
+    await expect(page.locator('.workshop-page-ready')).toBeVisible({ timeout: 30000 });
+    await expect(page.locator('svg[role="radiogroup"]').first()).toBeVisible();
   });
 
   test('sélectionne une presse sur le plan et affiche son détail', async ({ page }) => {
@@ -72,31 +55,14 @@ test.describe('Parcours complet : overview → sites → atelier → incidents',
     await page.waitForSelector('.site-card, .empty-panel', { timeout: 15000 });
 
     const openButtons = page.locator('button.site-open');
-    if (await openButtons.count() === 0) {
-      test.skip(true, 'Aucun site disponible pour tester la sélection de presse');
-      return;
-    }
+    await expect(openButtons).toHaveCount(1);
     await openButtons.first().click();
     await page.waitForLoadState('networkidle');
 
-    // Attend que le contenu se stabilise
-    const svg = page.locator('svg[role="radiogroup"]').first();
-    const ready = page.locator('.workshop-page-ready').first();
-    const alert = page.getByRole('alert').first();
-    const status = page.locator('[role="status"]').first();
-    await expect.poll(async () => {
-      if (await svg.count() > 0 && await svg.isVisible().catch(() => false)) return true;
-      if (await ready.count() > 0 && await ready.isVisible().catch(() => false)) return true;
-      if (await alert.count() > 0 && await alert.isVisible().catch(() => false)) return true;
-      if (await status.count() > 0 && await status.isVisible().catch(() => false)) return true;
-      return false;
-    }, { timeout: 30000 }).toBe(true);
-
-    // Si le SVG est présent, teste la sélection de presse
-    if (await svg.count() > 0 && await svg.isVisible().catch(() => false)) {
-      await page.getByRole('radio').first().click();
-      await expect(page.getByRole('complementary', { name: /Détail de la presse sélectionnée/i })).toBeVisible();
-    }
+    await expect(page.locator('.workshop-page-ready')).toBeVisible({ timeout: 30000 });
+    await expect(page.locator('svg[role="radiogroup"]').first()).toBeVisible();
+    await page.getByRole('radio').first().click();
+    await expect(page.getByRole('complementary', { name: /Détail de la presse sélectionnée/i })).toBeVisible();
   });
 
   test("navigue vers la page incidents depuis l'atelier", async ({ page }) => {
@@ -105,10 +71,7 @@ test.describe('Parcours complet : overview → sites → atelier → incidents',
     await page.waitForSelector('.site-card, .empty-panel', { timeout: 15000 });
 
     const openButtons = page.locator('button.site-open');
-    if (await openButtons.count() === 0) {
-      test.skip(true, 'Aucun site disponible');
-      return;
-    }
+    await expect(openButtons).toHaveCount(1);
     await openButtons.first().click();
     await page.waitForLoadState('networkidle');
     await page.getByRole('link', { name: /Incidents/i }).first().click();

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import os
+import subprocess
+import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -79,6 +81,54 @@ class FakeStore:
     def requeue_processing(self, job, *, reason, now=None):
         job.status = "retry_wait"
         return job
+
+
+def test_worker_detector_import_does_not_require_api_settings():
+    env = os.environ.copy()
+    env.update({
+        "APP_ENV": "pilot",
+        "WORKER_DATABASE_URL": "postgresql://worker:password@db/iddrv",
+    })
+    env.pop("API_DATABASE_URL", None)
+    env.pop("SESSION_SECRET", None)
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "import ingest.watcher; import backend.app.diagnostics.runtime",
+        ],
+        cwd=Path(__file__).resolve().parents[1],
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+
+
+def test_default_detector_receives_worker_database_url(tmp_path: Path, monkeypatch):
+    from backend.app.diagnostics import runtime
+
+    received = []
+    monkeypatch.setattr(
+        runtime,
+        "trigger_after_import",
+        lambda job, result, *, db_url: received.append(db_url),
+    )
+    worker_url = "postgresql://worker:password@db/iddrv"
+    worker = WatchedFolderWorker(
+        WatcherConfig(root=tmp_path, stable_seconds=0, db_url=worker_url),
+        store=FakeStore(),
+    )
+    worker._default_detector(
+        ImportJob(
+            id="job-1", site_id=1, source_kind="machine_cycle", file_name="cycles.csv",
+            source_path="cycles.csv", status="processing", file_hash="hash",
+            attempt_count=1, max_attempts=1,
+        ),
+        {"transaction_committed": True},
+    )
+    assert received == [worker_url]
 
 
 def test_watcher_archives_duplicate_and_triggers_only_after_commit(tmp_path: Path):
