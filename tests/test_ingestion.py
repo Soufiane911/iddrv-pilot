@@ -42,6 +42,7 @@ def assert_equal(label: str, actual, expected):
         print(f"     Attendu  : {expected!r}")
         print(f"     Obtenu   : {actual!r}")
         _test_fail += 1
+        raise AssertionError(f"{label}: attendu {expected!r}, obtenu {actual!r}")
 
 
 def assert_true(label: str, condition: bool):
@@ -52,6 +53,7 @@ def assert_true(label: str, condition: bool):
     else:
         print(f"  ❌ {label}")
         _test_fail += 1
+        raise AssertionError(label)
 
 
 def assert_in(label: str, item, container):
@@ -251,10 +253,11 @@ def test_schema_contains_staging_and_idempotency_contracts():
     print("\n📋 Test 9: Schéma SQL staging et idempotence")
 
     init_sql = Path("db/init.sql").read_text(encoding="utf-8")
+    site_scope_sql = Path("db/migrations/007_ingestion_site_scope.sql").read_text(encoding="utf-8")
 
     assert_true("Table staging_import_rows présente", "CREATE TABLE IF NOT EXISTS staging_import_rows" in init_sql)
     assert_true("Table import_rejections présente", "CREATE TABLE IF NOT EXISTS import_rejections" in init_sql)
-    assert_true("Passeport file_hash unique", "UNIQUE(file_hash)" in init_sql or "file_hash VARCHAR(64) UNIQUE" in init_sql)
+    assert_true("Passeport unique par site/hash", "uq_import_passports_site_file_hash" in site_scope_sql and "ON import_passports(site_id, file_hash)" in site_scope_sql)
     assert_true("Cycles contiennent source_row_hash", "source_row_hash" in init_sql)
     assert_true("Cycles ont une contrainte unique d'idempotence", "uq_machine_cycles_source_row" in init_sql)
 

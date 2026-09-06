@@ -36,7 +36,7 @@ Dataset industriel fictif pour tester un agent capable de correler donnees ERP, 
 
 ## Statistiques
 
-- Periode : 7 jours (10-16 fevrier 2025)
+- Periode : du 10 fevrier 2025 a 06:34 UTC au 17 fevrier 2025 a 02:12 UTC (environ 7 jours)
 - 3 machines d'injection plastique (152, 1003, 606)
 - 60 ordres de fabrication
 - 38313 cycles machine

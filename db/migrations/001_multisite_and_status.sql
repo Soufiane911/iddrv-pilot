@@ -81,7 +81,17 @@ END $$;
 -- Also add foreign key constraint on production_order_id if not exists
 DO $$
 BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'machine_cycles_production_order_id_fkey') THEN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'machine_cycles_production_order_id_fkey')
+       AND EXISTS (
+           SELECT 1
+           FROM pg_constraint c
+           JOIN pg_class t ON t.oid = c.conrelid
+           JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = c.conkey[1]
+           WHERE t.relname = 'production_orders'
+             AND c.contype IN ('p', 'u')
+             AND cardinality(c.conkey) = 1
+             AND a.attname = 'id'
+       ) THEN
         ALTER TABLE machine_cycles ADD CONSTRAINT machine_cycles_production_order_id_fkey FOREIGN KEY (production_order_id) REFERENCES production_orders(id) ON DELETE SET NULL;
     END IF;
 END $$;

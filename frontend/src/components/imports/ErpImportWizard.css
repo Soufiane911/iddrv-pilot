@@ -1,0 +1,23 @@
+.erp-import-card, .erp-site-preparation { margin-bottom: 20px; }
+.erp-machine-association { display: grid; gap: 10px; margin: 16px 0; padding: 16px; border: 1px solid var(--color-border); background: var(--color-muted); }
+.erp-machine-association h4, .erp-machine-association p { margin: 0; }
+.erp-machine-association-row { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.erp-machine-association-row strong { min-width: 150px; }
+.erp-machine-association-row select { flex: 1 1 240px; }
+.erp-site-preparation { padding: 20px; }
+.erp-site-preparation summary, .erp-import-card summary { cursor: pointer; font-weight: 600; padding: 10px 0; }
+.erp-import-card .form-grid, .erp-site-preparation .form-grid { display: grid; gap: 12px; max-width: 740px; margin: 18px 0; }
+.erp-import-card label, .erp-site-preparation label { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 10px 0; font-size: 14px; }
+.erp-import-card label > input:not([type=checkbox]), .erp-import-card label > select,
+.erp-site-preparation label > input { flex: 1 1 220px; min-width: 0; }
+.erp-import-card input[type=checkbox] { width: 18px; height: 18px; min-height: 18px; margin: 0; accent-color: var(--color-primary); }
+.erp-import-card details { margin: 16px 0; padding-top: 10px; border-top: 1px solid var(--color-border); }
+.erp-import-card .form-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 20px; }
+.erp-site-preparation fieldset { border: 1px solid var(--color-border); border-radius: var(--radius); padding: 12px; }
+.erp-import-card > ul { padding-left: 16px; }
+.erp-import-site { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; }
+.erp-import-site select { max-width: 360px; }
+@media (max-width: 640px) {
+  .erp-import-site { align-items: stretch; flex-direction: column; gap: 8px; }
+  .erp-import-card .form-actions > button { width: 100%; }
+}

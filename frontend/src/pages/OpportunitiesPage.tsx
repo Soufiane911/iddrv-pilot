@@ -1,0 +1,20 @@
+import { ArrowLeftIcon } from '@phosphor-icons/react/ArrowLeft';
+import { useQuery } from '@tanstack/react-query';
+import { Link, useParams } from 'react-router-dom';
+import { useApi } from '../App';
+import { defectTypeLabel, EmptyPanel, formatDate, incidentConfidenceLabel, incidentSeverityLabel, StatePanel } from '../components/Ui';
+
+function money(value: number): string { return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(value); }
+
+export function OpportunitiesPage() {
+  const { siteId: siteIdParam } = useParams();
+  const siteId = Number(siteIdParam);
+  const api = useApi();
+  const query = useQuery({ queryKey: ['opportunities', siteId, 'open'], queryFn: () => api.getIncidents({ siteId, status: 'open' }), enabled: Number.isFinite(siteId) });
+  const opportunities = (query.data ?? []).map((incident) => {
+    const central = incident.defect_type === 'short_shot' ? 4580 : 1200;
+    return { incident, low: central * .6, central, high: central * 1.35 };
+  });
+  if (!Number.isFinite(siteId)) return <section className="page"><StatePanel tone="error" title="Site invalide" text="L’identifiant du site n’est pas reconnu." /></section>;
+  return <section className="page page-wide opportunities-page"><div className="page-intro"><div><p className="eyebrow">ANALYSE ÉCONOMIQUE · SITE {siteId}</p><h2>Opportunités de gain</h2><p className="muted">Simulation de démonstration fondée sur des barèmes fictifs. Les incidents sont persistés, mais les montants ne constituent pas des gains validés.</p></div><Link className="button-secondary" to={`/sites/${siteId}/workshop`}><ArrowLeftIcon size={17} aria-hidden="true" />Retour à l’atelier</Link></div><section className="opportunity-banner surface-card"><div><p className="eyebrow">POTENTIEL IDENTIFIÉ</p><strong>{money(opportunities.reduce((sum, item) => sum + item.central, 0))}</strong><span>estimation centrale sur les incidents ouverts</span></div><div className="opportunity-confidence"><span className="status-pulse" /> Estimation fictive · hypothèses à configurer avant usage terrain</div></section>{query.isPending && <StatePanel tone="loading" title="Analyse des pertes" text="Les preuves industrielles sont en cours de lecture." />}{query.isError && <StatePanel tone="error" title="Opportunités indisponibles" text={query.error instanceof Error ? query.error.message : 'Impossible de charger les incidents.'} action="Réessayer" onAction={() => query.refetch()} />}{!query.isPending && !query.isError && opportunities.length === 0 && <EmptyPanel title="Aucune opportunité détectée" text="Le moteur attend des données qualité et production suffisantes." />}{opportunities.length > 0 && <div className="opportunity-list">{opportunities.map(({ incident, low, central, high }) => <article className="surface-card opportunity-card" key={incident.id}><div className="opportunity-card-head"><div><p className="eyebrow">OPPORTUNITÉ · {incidentSeverityLabel(incident.severity).toUpperCase()}</p><h3>Réduire les pertes liées à « {defectTypeLabel(incident.defect_type)} »</h3><p className="muted">Presse {incident.machine_erp_ref ?? incident.machine_id} · ouverte le {formatDate(incident.started_at)}</p></div><span className="status-label status-label-pending">À décider</span></div><div className="opportunity-values"><div><small>BAS</small><strong>{money(low)}</strong></div><div className="central"><small>CENTRAL</small><strong>{money(central)}</strong></div><div><small>HAUT</small><strong>{money(high)}</strong></div></div><div className="opportunity-proof"><strong>Pourquoi cette proposition ?</strong><span>Hypothèse de hausse de rebut à vérifier · confiance {incidentConfidenceLabel(incident.confidence).toLowerCase()} · preuves consultables dans l’investigation.</span></div><div className="opportunity-actions"><Link className="button-secondary" to={`/incidents/${incident.id}`}>Voir les preuves</Link><button className="button-primary" type="button" disabled title="Workflow d’action non disponible dans cette prévisualisation">Action en prévisualisation</button></div></article>)}</div>}</section>;
+}

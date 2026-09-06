@@ -1,0 +1,27 @@
+{
+  "version": "erp-trs-v1",
+  "brand": "generic",
+  "site_id": "*",
+  "machine_erp_ref": "*",
+  "record_kind": "production_order",
+  "description": "ERP/TRS tabular order summary mapping; field validation pending",
+  "aliases": {
+    "Réf OF": {"canonical": "production_order_id", "unit": null},
+    "Réf. Machine": {"canonical": "machine_erp_ref", "unit": null},
+    "Lib. Machine": {"canonical": "machine_name", "unit": null},
+    "Num Equipe": {"canonical": "shift_number", "unit": "count"},
+    "Début Equipe": {"canonical": "started_at", "unit": null},
+    "Fin Equipe": {"canonical": "ended_at", "unit": null},
+    "Réf. produit": {"canonical": "product_ref", "unit": null},
+    "Lib. Produit": {"canonical": "product_name", "unit": null},
+    "Réf. outil": {"canonical": "tool_ref", "unit": null},
+    "Réf. Matière": {"canonical": "material_ref", "unit": null},
+    "Tps Disponible (h)": {"canonical": "erp_available_time_h", "unit": "h"},
+    "Tps Fct Brut (h)": {"canonical": "erp_running_time_h", "unit": "h"},
+    "T.R.S.": {"canonical": "erp_trs", "unit": "ratio"},
+    "Cycle Moyen": {"canonical": "erp_cycle_time_s", "unit": "s"},
+    "Nb Cycles": {"canonical": "nb_cycles", "unit": "count"},
+    "Qté Pieces Bonnes": {"canonical": "erp_good_parts", "unit": "count"},
+    "Total Rebuts": {"canonical": "erp_scrap_count", "unit": "count"}
+  }
+}

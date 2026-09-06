@@ -1,0 +1,21 @@
+{
+  "schema": "iddrv.structural-profile",
+  "schema_version": 1,
+  "profile_id": "fanuc-dat-v1",
+  "profile_version": "1.0.0",
+  "status": "candidate",
+  "match_enabled": false,
+  "fingerprint": null,
+  "mapping": {
+    "parser_version": "fanuc-dat-v1"
+  },
+  "qualification": {
+    "evidence": "binary DAT family observed",
+    "reason_disabled": "binary format requires an official specification or dedicated decoder",
+    "field_validated": false
+  },
+  "approval": {
+    "approved_at": null,
+    "approved_by": null
+  }
+}

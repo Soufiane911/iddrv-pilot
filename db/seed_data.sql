@@ -12,15 +12,35 @@ VALUES
     (1, '254',  'PRESSE 254',          'kraussmaffei',  'CX 160',             1600.0, 310.0,  'MC6')
 ON CONFLICT (site_id, erp_ref) DO NOTHING;
 
--- Aliases (correspondances ERP ↔ fichiers ↔ OPC UA)
-INSERT INTO machine_aliases (machine_id, alias_context, alias_value)
-SELECT id, 'file', '1003'   FROM machines WHERE erp_ref = '1003'
-ON CONFLICT DO NOTHING;
-
-INSERT INTO machine_aliases (machine_id, alias_context, alias_value)
-SELECT id, 'file', '606'    FROM machines WHERE erp_ref = '606'
-ON CONFLICT DO NOTHING;
-
-INSERT INTO machine_aliases (machine_id, alias_context, alias_value)
-SELECT id, 'file', 'machine_152' FROM machines WHERE erp_ref = '152'
-ON CONFLICT DO NOTHING;
+-- Aliases (compatible with both pre-011 upgrades and fresh schemas).
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema='public' AND table_name='machine_aliases' AND column_name='site_id'
+    ) THEN
+        INSERT INTO machine_aliases (machine_id, site_id, alias_context, alias_value)
+        SELECT id, site_id, 'file', alias_value
+        FROM machines
+        CROSS JOIN LATERAL (
+            VALUES
+                ('1003', CASE WHEN erp_ref='1003' THEN '1003' END),
+                ('606', CASE WHEN erp_ref='606' THEN '606' END),
+                ('152', CASE WHEN erp_ref='152' THEN 'machine_152' END)
+        ) AS aliases(ref, alias_value)
+        WHERE erp_ref=aliases.ref AND alias_value IS NOT NULL
+        ON CONFLICT DO NOTHING;
+    ELSE
+        INSERT INTO machine_aliases (machine_id, alias_context, alias_value)
+        SELECT id, 'file', alias_value
+        FROM machines
+        CROSS JOIN LATERAL (
+            VALUES
+                ('1003', CASE WHEN erp_ref='1003' THEN '1003' END),
+                ('606', CASE WHEN erp_ref='606' THEN '606' END),
+                ('152', CASE WHEN erp_ref='152' THEN 'machine_152' END)
+        ) AS aliases(ref, alias_value)
+        WHERE erp_ref=aliases.ref AND alias_value IS NOT NULL
+        ON CONFLICT DO NOTHING;
+    END IF;
+END $$;

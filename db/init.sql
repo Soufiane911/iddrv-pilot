@@ -20,6 +20,10 @@ CREATE TABLE IF NOT EXISTS sites (
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+INSERT INTO sites (id, name, timezone)
+VALUES (1, 'Usine Principale', 'Europe/Paris')
+ON CONFLICT (id) DO NOTHING;
+
 -- Machines (presses à injecter)
 CREATE TABLE IF NOT EXISTS machines (
     id SERIAL PRIMARY KEY,
@@ -41,9 +45,11 @@ CREATE TABLE IF NOT EXISTS machines (
 CREATE TABLE IF NOT EXISTS machine_aliases (
     id SERIAL PRIMARY KEY,
     machine_id INT NOT NULL REFERENCES machines(id) ON DELETE CASCADE,
+    site_id INT NOT NULL REFERENCES sites(id),
     alias_context VARCHAR(50) NOT NULL,   -- 'erp', 'file', 'opcua', 'network'
     alias_value VARCHAR(100) NOT NULL,
-    UNIQUE(alias_context, alias_value)
+    CONSTRAINT machine_aliases_site_context_value_key
+        UNIQUE(site_id, alias_context, alias_value)
 );
 
 -- Ordres de Fabrication (OF)
@@ -86,6 +92,7 @@ CREATE TABLE IF NOT EXISTS shifts (
 -- Passeports d'import (traçabilité des fichiers importés)
 CREATE TABLE IF NOT EXISTS import_passports (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    site_id INT NOT NULL REFERENCES sites(id) DEFAULT 1,
     file_name VARCHAR(255),
     file_hash VARCHAR(64),
     file_path_raw TEXT,
@@ -101,8 +108,7 @@ CREATE TABLE IF NOT EXISTS import_passports (
     imported_at TIMESTAMPTZ DEFAULT NOW(),
     error_log TEXT,
     metadata JSONB,
-    status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'completed', 'failed')),
-    UNIQUE(file_hash)
+    status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'completed', 'failed'))
 );
 
 -- Staging brut : 1 ligne source = 1 trace rejouable
@@ -179,6 +185,7 @@ CREATE TABLE IF NOT EXISTS machine_cycles (
     cycle_time_s NUMERIC(7,3),
     dosing_time_s NUMERIC(7,3),
     injection_time_s NUMERIC(7,3),
+    cooling_time_s NUMERIC(7,3),
     cushion_mm NUMERIC(6,3),
     switchover_pressure_bar NUMERIC(8,2),
     switchover_position NUMERIC(6,3),
@@ -192,10 +199,15 @@ CREATE TABLE IF NOT EXISTS machine_cycles (
     barrel_temp_zone1_c NUMERIC(6,2),
     barrel_temp_zone2_c NUMERIC(6,2),
     barrel_temp_zone3_c NUMERIC(6,2),
+    mold_temperature_c NUMERIC(6,2),
     oil_temperature_c NUMERIC(6,2),
+    energy_kwh NUMERIC(10,4),
     -- Métadonnées de réconciliation
     link_confidence NUMERIC(4,3) DEFAULT 1.0,
     quality_flag VARCHAR(20) DEFAULT 'valid' CHECK (quality_flag IN ('valid', 'suspect', 'outlier', 'sensor_error')),
+    data_quality_status VARCHAR(20) DEFAULT 'valid',
+    part_quality_status VARCHAR(30),
+    defect_type VARCHAR(100),
     -- Données brutes supplémentaires (colonnes non canoniques)
     raw_data JSONB
 );

@@ -10,7 +10,8 @@
       { "brand": "kraussmaffei", "source_labels": ["CycleTime", "t_zyklus"] },
       { "brand": "sumitomo",     "source_labels": ["CycleTime", "tc_s"] },
       { "brand": "fanuc",        "source_labels": ["CycleTime", "CYCLE_TIME"] },
-      { "brand": "generic",      "source_labels": ["cycle_time_s", "cycle_time", "CycleTime", "t_cycle", "tc", "temps_cycle", "cycle", "Cycle_Time", "Cycle_Time_ms"] }
+      { "brand": "generic",      "source_labels": ["cycle_time_s", "cycle_time", "CycleTime", "t_cycle", "tc", "temps_cycle", "cycle", "Cycle_Time"] },
+      { "brand": "generic",      "source_labels": ["Cycle_Time_ms"], "source_unit": "ms", "scale": 0.001 }
     ]
   },
   {
@@ -73,7 +74,7 @@
       { "brand": "arburg",       "source_labels": ["V4065", "v4065", "Volume de commutation, valeur réelle"] },
       { "brand": "engel",        "source_labels": ["v_sw", "SwitchoverPosition", "pos_sw"] },
       { "brand": "haitian",      "source_labels": ["SwitchoverPos", "v_switch"] },
-      { "brand": "generic",      "source_labels": ["switchover_position_mm", "switchover_position", "SwitchoverPos", "V4065", "v_switch", "v_commut"] }
+      { "brand": "generic",      "source_labels": ["switchover_position_mm", "switchover_position", "SwitchoverPosition", "SwitchoverPos", "V4065", "v_switch", "v_commut"] }
     ]
   },
   {
@@ -116,7 +117,8 @@
     "mappings": [
       { "brand": "arburg",       "source_labels": ["p4073", "Pression de pointe"] },
       { "brand": "engel",        "source_labels": ["p_max", "PeakPressure"] },
-      { "brand": "generic",      "source_labels": ["peak_pressure_bar", "peak_pressure", "PeakPressure", "Inj_Pres", "Inj_Pres_psi"] }
+      { "brand": "generic",      "source_labels": ["peak_pressure_bar", "peak_pressure", "PeakPressure", "Inj_Pres"] },
+      { "brand": "generic",      "source_labels": ["Inj_Pres_psi"], "source_unit": "psi", "scale": 0.0689475729 }
     ]
   },
   {
@@ -142,6 +144,54 @@
     "unit": "celsius",
     "mappings": [
       { "brand": "generic",      "source_labels": ["barrel_temp_zone1_c", "barrel_temp_zone1"] }
+    ]
+  },
+  {
+    "canonical_metric": "barrel_temp_zone2_c",
+    "description": "Température de la zone 2 du fourreau",
+    "unit": "celsius",
+    "mappings": [
+      { "brand": "generic",      "source_labels": ["barrel_temp_zone2_c", "barrel_temp_zone2"] }
+    ]
+  },
+  {
+    "canonical_metric": "barrel_temp_zone3_c",
+    "description": "Température de la zone 3 du fourreau",
+    "unit": "celsius",
+    "mappings": [
+      { "brand": "generic",      "source_labels": ["barrel_temp_zone3_c", "barrel_temp_zone3"] }
+    ]
+  },
+  {
+    "canonical_metric": "cooling_time_s",
+    "description": "Temps de refroidissement du cycle",
+    "unit": "s",
+    "mappings": [
+      { "brand": "generic",      "source_labels": ["cooling_time_s", "cooling_time", "CoolingTime", "t_cooling"] }
+    ]
+  },
+  {
+    "canonical_metric": "mold_temperature_c",
+    "description": "Température du moule",
+    "unit": "celsius",
+    "mappings": [
+      { "brand": "generic",      "source_labels": ["mold_temperature_c", "mold_temperature", "MoldTemperature"] }
+    ]
+  },
+  {
+    "canonical_metric": "energy_kwh",
+    "description": "Énergie consommée",
+    "unit": "kwh",
+    "mappings": [
+      { "brand": "generic",      "source_labels": ["energy_kwh", "energy", "EnergyKWh"] }
+    ]
+  },
+  {
+    "canonical_metric": "mold_open_time_s",
+    "description": "Temps d'ouverture du moule",
+    "unit": "s",
+    "mappings": [
+      { "brand": "generic",      "source_labels": ["mold_open_time_s", "mold_open_time", "MoldOpenTime"] }
     ]
   }
 ]

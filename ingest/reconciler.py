@@ -16,13 +16,64 @@ import psycopg2
 import psycopg2.extras
 from datetime import datetime, timedelta, timezone
 from typing import Optional
-import os
 import hashlib
 import json
 
+try:
+    from .runtime_config import worker_database_url
+except ImportError:  # direct module execution compatibility
+    from runtime_config import worker_database_url
 
-DB_URL = os.getenv("DATABASE_URL", "postgresql://iddrv_user:iddrv_secret_2024@localhost:5432/iddrv")
+
+DB_URL = worker_database_url()
 OVERLAP_WINDOW = timedelta(minutes=30)
+
+
+def _lock_active_site(cursor, site_id: int) -> None:
+    cursor.execute("SELECT status FROM sites WHERE id=%s FOR UPDATE", (site_id,))
+    site = cursor.fetchone()
+    if not site:
+        raise ValueError("site_not_found")
+    if site["status"] == "archived":
+        raise ValueError("site_archived")
+
+
+def _lock_active_machine(cursor, site_id: int, machine_id: int) -> None:
+    cursor.execute(
+        "SELECT status FROM machines WHERE site_id=%s AND id=%s FOR UPDATE",
+        (site_id, machine_id),
+    )
+    machine = cursor.fetchone()
+    if not machine:
+        raise ValueError("machine_not_found")
+    if machine["status"] == "archived":
+        raise ValueError("machine_archived")
+
+
+def normalize_bool_flag(value, default=False) -> bool:
+    """Normalise les booléens des CSV (True/False, 1/0) sans envoyer du texte SQL."""
+    if value is None or value == "":
+        return default
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return value != 0
+    return str(value).strip().lower() in {"true", "1", "yes", "y", "oui"}
+
+
+def normalize_good_parts(value) -> int | None:
+    """Retourne 0/1 pour la colonne SMALLINT good_parts."""
+    if value is None or value == "":
+        return None
+    return 1 if normalize_bool_flag(value) else 0
+
+
+def derive_part_quality(raw_data, scrap_flag) -> tuple[str | None, str | None]:
+    """Retourne le statut pièce et le défaut canonique depuis la source brute."""
+    source = str((raw_data or {}).get("quality_flag", "")).strip()
+    if scrap_flag is None:
+        return ("good", None) if source.lower() in {"good", "ok", "conforming"} else (None, None)
+    return ("scrap" if scrap_flag else "good", None if source.lower() in {"", "good", "ok", "valid"} else source)
 
 
 def get_db_connection():
@@ -44,11 +95,12 @@ def resolve_of_for_cycle(
     cursor,
     machine_id: int,
     cycle_time: datetime,
+    site_id: int | None = None,
     window: timedelta = OVERLAP_WINDOW
 ) -> tuple[Optional[str], float]:
     """
     Recherche l'OF correspondant pour un cycle donné.
-    
+
     Retourne (production_order_id, link_confidence).
     """
     if cycle_time.tzinfo is None:
@@ -57,14 +109,20 @@ def resolve_of_for_cycle(
     window_start = cycle_time - window
     window_end = cycle_time + window
 
-    cursor.execute("""
+    site_filter = "AND po.site_id = %s" if site_id is not None else ""
+    params = [machine_id, window_end, window_start]
+    if site_id is not None:
+        params.append(site_id)
+
+    cursor.execute(f"""
         SELECT id, started_at, ended_at
-        FROM production_orders
-        WHERE machine_id = %s
-          AND started_at <= %s
-          AND (ended_at IS NULL OR ended_at >= %s)
-        ORDER BY started_at ASC
-    """, (machine_id, window_end, window_start))
+        FROM production_orders po
+        WHERE po.machine_id = %s
+          AND po.started_at <= %s
+          AND (po.ended_at IS NULL OR po.ended_at >= %s)
+          {site_filter}
+        ORDER BY po.started_at ASC
+    """, params)
 
     candidates = cursor.fetchall()
 
@@ -109,19 +167,25 @@ def resolve_of_for_cycle(
     return None, 0.0
 
 
-def resolve_shift_for_cycle(cursor, machine_id: int, cycle_time: datetime, production_order_id: str | None = None) -> int | None:
+def resolve_shift_for_cycle(cursor, machine_id: int, cycle_time: datetime, production_order_id: str | None = None, site_id: int | None = None) -> int | None:
     """Retourne le shift actif couvrant réellement le cycle."""
-    cursor.execute("""
+    site_filter = "AND s.order_site_id = %s" if site_id is not None else ""
+    params = [machine_id, cycle_time, cycle_time]
+    if site_id is not None:
+        params.append(site_id)
+    params.append(production_order_id)
+    cursor.execute(f"""
         SELECT id
-        FROM shifts
-        WHERE machine_id = %s
-          AND started_at <= %s
-          AND (ended_at IS NULL OR ended_at >= %s)
+        FROM shifts s
+        WHERE s.machine_id = %s
+          AND s.started_at <= %s
+          AND (s.ended_at IS NULL OR s.ended_at >= %s)
+          {site_filter}
         ORDER BY
-            CASE WHEN production_order_id = %s THEN 0 ELSE 1 END,
-            started_at DESC
+            CASE WHEN s.production_order_id = %s THEN 0 ELSE 1 END,
+            s.started_at DESC
         LIMIT 1
-    """, (machine_id, cycle_time, cycle_time, production_order_id))
+    """, params)
     row = cursor.fetchone()
     return row["id"] if row else None
 
@@ -145,39 +209,47 @@ def count_overlapping_production_orders() -> int:
     return count
 
 
-def reconcile_existing_cycles() -> int:
-    """Rattache les cycles sans OF aux ordres ERP maintenant disponibles."""
+def reconcile_existing_cycles(site_id: int | None = None) -> int:
+    """Legacy-only repair; durable declarations use append-only context links."""
     conn = get_db_connection()
     cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
     cursor.execute("""
-        SELECT time, machine_id
-        FROM machine_cycles
-        WHERE production_order_id IS NULL
-        ORDER BY time, machine_id
-    """)
+        SELECT c.time, c.machine_id, m.site_id
+        FROM machine_cycles c
+        JOIN machines m ON m.id = c.machine_id
+        WHERE c.production_order_id IS NULL
+          AND c.source_event_id IS NULL
+          AND NOT EXISTS (SELECT 1 FROM erp_declarations d WHERE d.site_id=m.site_id AND d.machine_id=c.machine_id)
+          AND (%s IS NULL OR m.site_id = %s)
+        ORDER BY c.time, c.machine_id
+    """, (site_id, site_id))
     cycles = cursor.fetchall()
 
     updated = 0
     for cycle in cycles:
         cycle_time = cycle["time"]
         machine_id = cycle["machine_id"]
+        cycle_site_id = int(cycle["site_id"])
         production_order_id, link_confidence = resolve_of_for_cycle(
             cursor,
             machine_id,
             cycle_time,
+            site_id=cycle_site_id,
         )
-        
+
         shift_id = resolve_shift_for_cycle(
             cursor,
             machine_id,
             cycle_time,
             production_order_id,
+            site_id=cycle_site_id,
         )
 
         cursor.execute("""
             UPDATE machine_cycles
             SET production_order_id = %s,
+                order_site_id = %s,
                 shift_id = %s,
                 link_confidence = %s
             WHERE time = %s
@@ -185,6 +257,7 @@ def reconcile_existing_cycles() -> int:
               AND production_order_id IS NULL
         """, (
             production_order_id,
+            cycle_site_id if production_order_id is not None else None,
             shift_id,
             link_confidence,
             cycle_time,
@@ -198,7 +271,7 @@ def reconcile_existing_cycles() -> int:
     return updated
 
 
-def insert_cycles(machine_cycles: list[dict], machine_id: int, passport_id: str):
+def insert_cycles(machine_cycles: list[dict], machine_id: int, passport_id: str, site_id: int | None = None):
     """
     Insère les cycles machine dans la base de données avec réconciliation temporelle.
     
@@ -209,6 +282,23 @@ def insert_cycles(machine_cycles: list[dict], machine_id: int, passport_id: str)
     """
     conn = get_db_connection()
     cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    # Keep the lifecycle rows locked for the complete materialisation
+    # transaction. All callers use the same explicit site-then-machine order;
+    # a JOIN with FOR UPDATE would leave that order to the query planner.
+    if site_id is None:
+        cursor.execute("SELECT site_id FROM machines WHERE id=%s", (machine_id,))
+        identity = cursor.fetchone()
+        if not identity:
+            cursor.close(); conn.close()
+            raise ValueError("machine_not_found")
+        site_id = int(identity["site_id"])
+    try:
+        _lock_active_site(cursor, site_id)
+        _lock_active_machine(cursor, site_id, machine_id)
+    except Exception:
+        cursor.close()
+        conn.close()
+        raise
 
     inserted = 0
     skipped = 0
@@ -234,7 +324,7 @@ def insert_cycles(machine_cycles: list[dict], machine_id: int, passport_id: str)
 
         # Réconciliation temporelle avec l'ERP et résolution du poste (shift)
         production_order_id, link_confidence = resolve_of_for_cycle(
-            cursor, machine_id, cycle_time
+            cursor, machine_id, cycle_time, site_id=site_id
         )
         
         shift_id = resolve_shift_for_cycle(
@@ -242,6 +332,7 @@ def insert_cycles(machine_cycles: list[dict], machine_id: int, passport_id: str)
             machine_id,
             cycle_time,
             production_order_id,
+            site_id=site_id,
         )
 
         # Validation de plausibilité des valeurs (détection d'outliers simples)
@@ -265,58 +356,72 @@ def insert_cycles(machine_cycles: list[dict], machine_id: int, passport_id: str)
         # Construction de la valeur pour raw_data (JSONB)
         raw_data = cycle.get("raw_data")
         raw_data_json = json.dumps(raw_data) if raw_data else None
+        def source_value(name):
+            value = cycle.get(name)
+            return value if value is not None else (raw_data or {}).get(name)
+        scrap_flag = normalize_bool_flag(cycle.get("scrap_flag"), default=None)
+        part_quality_status, defect_type = derive_part_quality(raw_data, scrap_flag)
         source_row_hash = cycle.get("source_row_hash") or compute_source_row_hash(cycle)
 
         # Insertion du cycle
         cursor.execute("""
             INSERT INTO machine_cycles (
-                time, machine_id, production_order_id, shift_id, passport_id,
+                time, machine_id, production_order_id, order_site_id, shift_id, passport_id,
                 source_line_no, source_row_hash, cycle_counter,
                 cycle_time_s, dosing_time_s, injection_time_s,
+                cooling_time_s,
                 cushion_mm, switchover_pressure_bar, switchover_position,
                 peak_pressure_bar, clamp_force_kn, mold_open_time_s,
                 good_parts, scrap_flag,
-                barrel_temp_zone1_c, oil_temperature_c,
-                link_confidence, quality_flag, raw_data
+                barrel_temp_zone1_c, barrel_temp_zone2_c, barrel_temp_zone3_c,
+                mold_temperature_c, oil_temperature_c, energy_kwh,
+                link_confidence, quality_flag, part_quality_status, defect_type, raw_data
             ) VALUES (
-                %s, %s, %s, %s, %s,
-                %s, %s, %s,
+                %s, %s, %s, %s, %s, %s,
+                %s, %s, %s, %s, %s, %s,
                 %s, %s, %s,
                 %s, %s, %s,
                 %s, %s, %s,
                 %s, %s,
-                %s, %s,
-                %s, %s, %s
+                %s, %s, %s, %s,
+                %s, %s, %s, %s, %s
             )
             ON CONFLICT DO NOTHING
         """, (
             cycle_time,
             machine_id,
             production_order_id,
+            site_id,
             shift_id,
             passport_id,
             cycle.get("source_line_no"),
             source_row_hash,
             cycle.get("cycle_counter"),
-            cycle.get("cycle_time_s"),
-            cycle.get("dosing_time_s"),
-            cycle.get("cushion_mm"),
-            cycle.get("switchover_pressure_bar"),
-            cycle.get("switchover_position"),
-            cycle.get("peak_pressure_bar"),
-            cycle.get("clamp_force_kn"),
-            cycle.get("mold_open_time_s"),
-            cycle.get("good_parts", 1),
-            bool(cycle.get("scrap_flag", False)),
-            cycle.get("barrel_temp_zone1_c"),
-            cycle.get("oil_temperature_c"),
+                source_value("cycle_time_s"),
+                source_value("dosing_time_s"),
+                source_value("injection_time_s"),
+                source_value("cooling_time_s"),
+                source_value("cushion_mm"),
+            source_value("switchover_pressure_bar"),
+            source_value("switchover_position"),
+            source_value("peak_pressure_bar"),
+            source_value("clamp_force_kn"),
+            source_value("mold_open_time_s"),
+            normalize_good_parts(cycle.get("good_parts", cycle.get("good_part"))),
+            scrap_flag,
+            source_value("barrel_temp_zone1_c"),
+            source_value("barrel_temp_zone2_c"),
+            source_value("barrel_temp_zone3_c"),
+            source_value("mold_temperature_c"),
+            source_value("oil_temperature_c"),
+            source_value("energy_kwh"),
             link_confidence,
             quality_flag,
+            part_quality_status,
+            defect_type,
             raw_data_json
         ))
         inserted += cursor.rowcount
-
-    conn.commit()
 
     # Insertion des problèmes de qualité détectés
     if quality_issues:
@@ -333,7 +438,7 @@ def insert_cycles(machine_cycles: list[dict], machine_id: int, passport_id: str)
                 issue.get("raw_value"),
                 issue.get("description")
             ))
-        conn.commit()
+    conn.commit()
 
     cursor.close()
     conn.close()

@@ -1,0 +1,23 @@
+{
+  "schema": "iddrv.structural-profile",
+  "schema_version": 1,
+  "profile_id": "arburg-selogica-gestica-sample-v1",
+  "profile_version": "1.0.0",
+  "status": "candidate",
+  "match_enabled": true,
+  "fingerprint": {
+    "version": "iddrv.tabular-fingerprint/v1",
+    "digest": "67b0183a49eb4b6a868461e383548b148ad03cdaa0e69427ef52663122c054ba"
+  },
+  "mapping": {
+    "parser_version": "arburg-selogica-gestica-v1"
+  },
+  "qualification": {
+    "evidence": "repository synthetic sample",
+    "field_validated": false
+  },
+  "approval": {
+    "approved_at": null,
+    "approved_by": null
+  }
+}

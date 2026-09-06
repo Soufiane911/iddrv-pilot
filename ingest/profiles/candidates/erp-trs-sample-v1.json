@@ -1,0 +1,24 @@
+{
+  "schema": "iddrv.structural-profile",
+  "schema_version": 1,
+  "profile_id": "erp-trs-sample-v1",
+  "profile_version": "1.0.0",
+  "status": "candidate",
+  "match_enabled": true,
+  "fingerprint": {
+    "version": "iddrv.tabular-fingerprint/v1",
+    "digest": "9f431e0b74ac2d512a75c470f8dde8e7e86c6c3876329e10bac063e4faa0d9e3"
+  },
+  "mapping": {
+    "parser_version": "erp-trs-v1"
+  },
+  "qualification": {
+    "evidence": "repository synthetic sample",
+    "record_kind": "production_order",
+    "field_validated": false
+  },
+  "approval": {
+    "approved_at": null,
+    "approved_by": null
+  }
+}
