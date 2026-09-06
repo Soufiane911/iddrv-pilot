@@ -5,7 +5,9 @@ from .repository import DiagnosticRepository
 from ..db import get_connection
 
 class PostgresDiagnosticRepository:
-    def __init__(self, db_url: str | None = None):
+    def __init__(self, db_url: str | None = None, *, site_id=None, known_at=None):
+        self.site_id, self.known_at = site_id, known_at
+        self.context_snapshot = {"cycles": [], "known_at": known_at.isoformat() if known_at else None}
         self.db_url = db_url or os.getenv("API_DATABASE_URL") or os.getenv("DATABASE_URL")
 
     def _connection(self):
@@ -18,7 +20,7 @@ class PostgresDiagnosticRepository:
         # context signals without ever fetching raw import files.
         columns = {
             "machine_cycles": (
-                "time, machine_id, production_order_id, scrap_flag, "
+                "time, machine_id, production_order_id, scrap_flag, source_event_id, context_cycle_id, "
                 "part_quality_status, defect_type, quality_flag, "
                 "cycle_time_s, dosing_time_s, injection_time_s, cooling_time_s, "
                 "cushion_mm, switchover_pressure_bar, switchover_position, "
@@ -54,12 +56,41 @@ class PostgresDiagnosticRepository:
                 )
                 names=[x.strip() for x in columns.split(',')]
                 return [dict(zip(names,row)) for row in cur.fetchall()]
-    def cycles(self, machine_id, start, end): return self._rows("machine_cycles",machine_id,start,end)
+    def cycles(self, machine_id, start, end):
+        rows = self._rows("machine_cycles",machine_id,start,end)
+        return self._with_context(rows, machine_id, start, end)
+
+    def _with_context(self, rows, machine_id, start, end):
+        if self.site_id is None or self.known_at is None or not rows:
+            return rows
+        from datetime import timedelta
+        from ..api.production_context import context_history
+        with self._connection() as conn:
+            snapshot = context_history(conn,site_id=self.site_id,machine_id=machine_id,start=start,
+                end=end+timedelta(microseconds=1),known_at=self.known_at,limit=100000)
+        if snapshot['truncated']:
+            raise ValueError('investigation_context_window_too_large')
+        by_key = {row['cycle_key']:row for row in snapshot['items']}
+        declarations = {str(row['id']):row for row in snapshot['declarations']}
+        accepted = []
+        for row in rows:
+            key = str(row['source_event_id']) if row['source_event_id'] else 'legacy:' + str(row['context_cycle_id'])
+            context = by_key.get(key)
+            if context is None:
+                continue  # Received after the investigation knowledge cutoff.
+            row = dict(row)
+            declaration = declarations.get(str(context['revision_id']))
+            if context['source_event_id']:
+                row['production_order_id'] = declaration['production_order_id'] if declaration else None
+            self.context_snapshot['cycles'].append(context)
+            accepted.append(row)
+        self.context_snapshot.setdefault('declarations',[]).extend(snapshot['declarations'])
+        return accepted
 
     def comparable_baseline_cycles(self, machine_id, production_order_id, before, minimum):
         """Select the most specific healthy context with enough prior cycles."""
         columns = (
-            "c.time, c.machine_id, c.production_order_id, c.scrap_flag, "
+            "c.time, c.machine_id, c.production_order_id, c.scrap_flag, c.source_event_id, c.context_cycle_id, "
             "c.part_quality_status, c.defect_type, c.quality_flag, "
             "c.cycle_time_s, c.dosing_time_s, c.injection_time_s, c.cooling_time_s, "
             "c.cushion_mm, c.switchover_pressure_bar, c.switchover_position, "
@@ -116,7 +147,7 @@ class PostgresDiagnosticRepository:
                     )
                     rows = cur.fetchall()
                     if len(rows) >= minimum:
-                        return [dict(zip(names, row)) for row in reversed(rows)]
+                        return self._with_context([dict(zip(names, row)) for row in reversed(rows)],machine_id,rows[-1][0],rows[0][0])
         return []
 
     def quality_checks(self, machine_id, start, end): return self._rows("quality_checks",machine_id,start,end)

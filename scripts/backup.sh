@@ -37,7 +37,8 @@ mkdir -p "$BACKUP_DIR"
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 OUT="$BACKUP_DIR/iddrv-$STAMP.dump"
 MC_OUT="$OUT.machine_cycles.csv"
-MC_COLUMNS='time,machine_id,production_order_id,order_site_id,shift_id,passport_id,source_line_no,source_row_hash,cycle_counter,cycle_time_s,dosing_time_s,injection_time_s,cushion_mm,switchover_pressure_bar,switchover_position,peak_pressure_bar,clamp_force_kn,mold_open_time_s,good_parts,scrap_flag,barrel_temp_zone1_c,barrel_temp_zone2_c,barrel_temp_zone3_c,oil_temperature_c,link_confidence,quality_flag,raw_data,data_quality_status,part_quality_status,defect_type,cooling_time_s,mold_temperature_c,energy_kwh'
+MANIFEST="$OUT.manifest"
+MC_COLUMNS='time,machine_id,production_order_id,order_site_id,shift_id,passport_id,source_line_no,source_row_hash,source_event_id,context_cycle_id,cycle_counter,cycle_time_s,dosing_time_s,injection_time_s,cushion_mm,switchover_pressure_bar,switchover_position,peak_pressure_bar,clamp_force_kn,mold_open_time_s,good_parts,scrap_flag,barrel_temp_zone1_c,barrel_temp_zone2_c,barrel_temp_zone3_c,oil_temperature_c,link_confidence,quality_flag,raw_data,data_quality_status,part_quality_status,defect_type,cooling_time_s,mold_temperature_c,energy_kwh'
 
 USE_HOST_TOOLS=false
 if command -v pg_dump >/dev/null 2>&1 && command -v psql >/dev/null 2>&1; then
@@ -64,7 +65,7 @@ if [ -z "$TARGET_SYSTEM_ID" ] || [ "$TARGET_SYSTEM_ID" != "$CONTAINER_SYSTEM_ID"
   exit 1
 fi
 
-RUNNING_WRITERS="$(docker compose ps --status running --services api worker | tr '\n' ' ')"
+RUNNING_WRITERS="$(docker compose ps --status running --services api worker collector scorer | tr '\n' ' ')"
 if [ -n "$RUNNING_WRITERS" ]; then
   docker compose pause $RUNNING_WRITERS >/dev/null
   WRITERS_PAUSED=true
@@ -72,14 +73,15 @@ fi
 
 if [ "$USE_HOST_TOOLS" = "true" ]; then
   PGPASSFILE="$PGPASSFILE_LOCAL" pg_dump "$SAFE_DATABASE_URL" \
-    --schema=public --format=custom --data-only --no-owner --file="$OUT"
+    --format=custom --no-owner --file="$OUT" --exclude-table-data=public.machine_cycles
   PGPASSFILE="$PGPASSFILE_LOCAL" psql "$SAFE_DATABASE_URL" \
     -c "\\copy (SELECT $MC_COLUMNS FROM public.machine_cycles ORDER BY time, machine_id) TO STDOUT WITH CSV HEADER" >"$MC_OUT"
 else
   docker compose exec -T -e PGPASSFILE="$PGPASSFILE_CONTAINER" "$DB_CONTAINER" \
-    pg_dump "$SAFE_DATABASE_URL" --schema=public --format=custom --data-only --no-owner >"$OUT"
+    pg_dump "$SAFE_DATABASE_URL" --format=custom --no-owner --exclude-table-data=public.machine_cycles >"$OUT"
   docker compose exec -T -e PGPASSFILE="$PGPASSFILE_CONTAINER" "$DB_CONTAINER" \
     psql "$SAFE_DATABASE_URL" \
     -c "\\copy (SELECT $MC_COLUMNS FROM public.machine_cycles ORDER BY time, machine_id) TO STDOUT WITH CSV HEADER" >"$MC_OUT"
 fi
+printf 'iddrv-backup-version=2\nformat=full-custom-timescale\nmachine_cycles_sidecar=version-2\n' >"$MANIFEST"
 printf '%s\n' "$OUT"

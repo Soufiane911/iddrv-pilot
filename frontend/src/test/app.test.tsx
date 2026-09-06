@@ -175,13 +175,13 @@ test('refuse d’afficher un run appartenant à un autre incident', async () => 
   expect(screen.queryByText('Hypothèse étrangère')).not.toBeInTheDocument();
 });
 
-test('reprend un workspace depuis son identifiant dans l’URL', async () => {
+test('redirige une ancienne session catalogue vers le journal sans charger ses métadonnées', async () => {
   const getImportSession = vi.fn(mockApiClient.getImportSession);
   window.history.pushState({}, '', '/workspace?session=session-1');
   render(<App api={{ ...mockApiClient, getImportSession }} />);
-  expect(await screen.findByRole('heading', { name: 'Référencer les exports' })).toBeInTheDocument();
-  expect(getImportSession).toHaveBeenCalledWith('session-1');
-  expect(screen.getByText(/Session reprise par l’URL/i)).toBeInTheDocument();
+  expect(await screen.findByRole('heading', { name: 'Historique des imports' })).toBeInTheDocument();
+  expect(window.location.pathname).toBe('/imports');
+  expect(getImportSession).not.toHaveBeenCalled();
 });
 
 test('ouvre le plan 2D et expose les presses au clavier', async () => {

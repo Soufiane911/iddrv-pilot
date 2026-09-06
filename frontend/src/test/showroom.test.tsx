@@ -153,10 +153,8 @@ describe('showroom industriel', () => {
   test('affiche une seule entrée nav active selon le hash', async () => {
     renderShowroom('/showroom#donnees');
     await screen.findByText(/Données présentées/i);
-    const active = document.querySelectorAll('.nav-link.active');
-    expect(active).toHaveLength(1);
-    expect(active[0]).toHaveTextContent('Démonstration');
-    expect(active[0]).toHaveAttribute('aria-current', 'page');
+    expect(document.querySelectorAll('.nav-link.active')).toHaveLength(0);
+    expect(screen.queryByRole('link', { name: /Démonstration/i })).not.toBeInTheDocument();
   });
 
   test('ouvre une feuille mobile avec scrim, verrouillage, Escape et restitution du focus', async () => {

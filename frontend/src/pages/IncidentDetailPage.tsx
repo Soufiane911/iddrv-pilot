@@ -7,14 +7,11 @@ import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useApi } from '../App';
 import { EmptyPanel, formatDate, formatNumber, formatPercent, incidentConfidenceLabel, incidentSeverityLabel, incidentSymptomLabel, MetricCard, SectionTitle, StatePanel } from '../components/Ui';
 import { canWriteSite, type AuthUser, type Evidence, type Hypothesis, type Incident } from '../lib/api';
+import { metricLabel } from '../lib/metricLabels';
 
 function evidenceValue(evidence: Evidence, field: string): number | undefined {
   const value = evidence.observation[field];
   return typeof value === 'number' ? value : undefined;
-}
-
-function evidenceMetricLabel(value: string): string {
-  return ({ scrap_rate: 'Taux de rebut', barrel_temp_zone2_c: 'Température zone 2', operator_note: 'Note opérateur' } as Record<string, string>)[value] ?? value.split('_').join(' ');
 }
 
 function evidenceSourceLabel(value: string): string {
@@ -22,24 +19,57 @@ function evidenceSourceLabel(value: string): string {
 }
 
 function nextCheckLabel(value: string): string {
-  return ({ inspect_barrel_zone_2_heating: 'Contrôler la chauffe de la zone 2' } as Record<string, string>)[value] ?? value.split('_').join(' ');
+  return ({
+    inspect_barrel_zone_2_heating: 'Contrôler la chauffe de la zone 2',
+    compare_peak_pressure_and_clamp_force_to_order_nominal: 'Comparer la pression maximale et la force de fermeture aux valeurs prévues pour cet OF',
+    trend_cooling_time_and_mold_temperature_by_cycle: 'Examiner le temps de refroidissement et la température du moule, cycle par cycle',
+    verify_material_drying_and_purge_after_lot_change: 'Vérifier le séchage matière et la purge après le changement de lot',
+    verify_restart_sequence_and_wait_for_thermal_steady_state: 'Vérifier le redémarrage et la stabilisation des températures',
+    inspect_mold_cavity_dimensions_and_tool_wear: 'Contrôler les dimensions des empreintes et l’usure du moule',
+  } as Record<string, string>)[value] ?? value.split('_').join(' ');
 }
 
 function observationFieldLabel(value: string): string {
-  return ({ value: 'Valeur', slope_per_day: 'Pente par jour', count: 'Nombre', mean: 'Moyenne', min: 'Minimum', max: 'Maximum' } as Record<string, string>)[value] ?? value.split('_').join(' ');
+  return ({ value: 'Valeur', stat: 'Mesure', n: 'Observations', slope_per_day: 'Évolution par jour', first_last_delta: 'Écart début–fin', count: 'Nombre', mean: 'Moyenne', min: 'Minimum', max: 'Maximum', zone1_stdev: 'Écart-type zone 1', zone2_stdev: 'Écart-type zone 2' } as Record<string, string>)[value] ?? value.split('_').join(' ');
+}
+
+function measurement(value: number, unit: string): string {
+  if (unit === 'fraction') return formatPercent(value);
+  const label = ({ C: '°C', defects: 'défauts' } as Record<string, string>)[unit] ?? unit;
+  return `${formatNumber(value, unit === 'defects' ? 0 : 2)}${label ? ` ${label}` : ''}`;
 }
 
 function evidenceObservation(evidence: Evidence): string {
   const unit = typeof evidence.observation.unit === 'string' ? evidence.observation.unit : '';
-  const fields = Object.entries(evidence.observation).filter(([key, value]) => key !== 'unit' && (typeof value === 'number' || typeof value === 'string' || typeof value === 'boolean'));
+  const fields = Object.entries(evidence.observation).filter(([key, value]) => !['unit', 'stat'].includes(key) && (typeof value === 'number' || typeof value === 'string' || typeof value === 'boolean'));
   if (fields.length === 0) return 'Observation structurée sans valeur scalaire.';
-  return fields.map(([key, value]) => `${observationFieldLabel(key)} : ${typeof value === 'number' ? formatNumber(value, 2) : String(value)}${typeof value === 'number' && unit ? ` ${unit}` : ''}`).join(' · ');
+  return fields.map(([key, value]) => `${observationFieldLabel(key)} : ${typeof value === 'number' ? ['n', 'count'].includes(key) ? formatNumber(value, 0) : measurement(value, unit) : typeof value === 'boolean' ? value ? 'Oui' : 'Non' : value}`).join(' · ');
 }
 
 function EvidenceRow({ evidence }: { evidence: Evidence }) {
   const baseline = evidence.baseline && typeof evidence.baseline.value === 'number' ? evidence.baseline.value : undefined;
   const unit = typeof evidence.observation.unit === 'string' ? evidence.observation.unit : '';
-  return <article className={`evidence-row ${evidence.supports ? 'supports' : 'contradicts'}`}><div className="evidence-mark" aria-hidden="true">{evidence.supports ? <CheckIcon size={17} weight="bold" /> : <XIcon size={17} weight="bold" />}</div><div className="evidence-main"><span className="visually-hidden">{evidence.supports ? 'Élément favorable' : 'Élément contradictoire'}</span><div className="evidence-heading"><strong>{evidenceMetricLabel(evidence.metric)}</strong><span>{evidenceSourceLabel(evidence.source_kind)}</span></div><p>{evidenceObservation(evidence)}</p>{baseline !== undefined && <small>Baseline : {formatNumber(baseline, 2)} {typeof evidence.baseline?.unit === 'string' ? evidence.baseline.unit : unit} · Δ {evidence.delta !== null && evidence.delta !== undefined ? formatNumber(evidence.delta, 2) : 'N/D'}</small>}{evidence.excerpt && <small className="evidence-excerpt">“{evidence.excerpt}”</small>}</div><div className="evidence-window">{formatDate(evidence.window.start, false)}<br /><span>→ {formatDate(evidence.window.end, false)}</span></div></article>;
+  const value = evidenceValue(evidence, 'value');
+  const stat = typeof evidence.observation.stat === 'string' ? evidence.observation.stat : '';
+  const statLabel = ({ mean: 'Moyenne', median: 'Médiane', stdev: 'Écart-type', rate: 'Taux', first_half_rate: 'Taux en début de période', count: 'Nombre' } as Record<string, string>)[stat] ?? stat;
+  return <details className={`evidence-row ${evidence.supports ? 'supports' : 'contradicts'}`}>
+    <summary className="evidence-summary">
+      <span className="evidence-mark" aria-hidden="true">{evidence.supports ? <CheckIcon size={17} weight="bold" /> : <XIcon size={17} weight="bold" />}</span>
+      <span className="evidence-main">
+        <span className="visually-hidden">{evidence.supports ? 'Élément favorable. ' : 'Élément contradictoire. '}</span>
+        <span className="evidence-heading"><strong>{metricLabel(evidence.metric)}</strong><span>{evidenceSourceLabel(evidence.source_kind)}</span></span>
+        <span className="evidence-value"><span>{value !== undefined ? `${statLabel ? `${statLabel} : ` : ''}${measurement(value, unit)}` : evidenceObservation(evidence)}</span>{baseline !== undefined && <small>Référence : {measurement(baseline, typeof evidence.baseline?.unit === 'string' ? evidence.baseline.unit : unit)}</small>}</span>
+      </span>
+      <span className="evidence-toggle" aria-hidden="true" />
+    </summary>
+    <div className="evidence-details">
+      <p>{evidenceObservation(evidence)}</p>
+      {typeof evidence.delta === 'number' && <p>Écart : {unit === 'fraction' ? `${formatNumber(evidence.delta * 100, 1)} points de pourcentage` : measurement(evidence.delta, unit)}</p>}
+      {evidence.excerpt && <p className="evidence-excerpt">“{evidence.excerpt}”</p>}
+      <dl><div><dt>Période</dt><dd><time dateTime={evidence.window.start}>{formatDate(evidence.window.start)}</time> → <time dateTime={evidence.window.end}>{formatDate(evidence.window.end)}</time></dd></div><div><dt>Identifiant</dt><dd>{evidence.id}</dd></div><div><dt>Mesure source</dt><dd>{evidence.metric}</dd></div><div><dt>Source</dt><dd>{evidence.source_ref}</dd></div></dl>
+      <pre>{JSON.stringify({ observation: evidence.observation, baseline: evidence.baseline, delta: evidence.delta }, null, 2)}</pre>
+    </div>
+  </details>;
 }
 
 export function IncidentDetailPage() {

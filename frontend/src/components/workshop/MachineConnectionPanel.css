@@ -1,0 +1,17 @@
+.machine-connection-form { display: grid; gap: 12px; }
+.machine-connection-form fieldset { display: grid; gap: 12px; border: 0; padding: 0; min-width: 0; }
+.machine-connection-form label { display: grid; gap: 5px; font-size: 12px; }
+.machine-connection-form input:not([type="checkbox"]) { width: 100%; min-width: 0; padding: 9px; border: 1px solid var(--border, #d8dde2); border-radius: 5px; background: var(--surface, #fff); color: inherit; }
+.machine-connection-form label:has(input[type="checkbox"]) { display: flex; align-items: center; gap: 8px; }
+.machine-connection-form input[type="checkbox"], .continuity-confirm input[type="checkbox"] { width: 16px; height: 16px; min-height: 16px; margin: 0; flex: 0 0 auto; accent-color: var(--color-primary); }
+.machine-connection-form dl { margin: 0; display: grid; gap: 8px; font-size: 12px; }
+.machine-connection-form dd { margin: 3px 0 0; overflow-wrap: anywhere; }
+.continuity-recovery { display: grid; gap: 8px; margin-top: 14px; border-top: 1px solid var(--border, #d8dde2); padding-top: 12px; }
+.continuity-recovery h4 { margin: 0; font-size: 14px; }
+.continuity-recovery p { margin: 0; font-size: 12px; }
+.continuity-recovery label { display: grid; gap: 4px; color: var(--color-secondary, #4b5560); font-size: 12px; }
+.continuity-recovery select, .continuity-recovery input:not([type="checkbox"]) { min-width: 0; padding: 7px; border: 1px solid var(--border, #d8dde2); background: var(--surface, #fff); color: inherit; }
+.continuity-recovery dl { display: grid; gap: 7px; margin: 0; font-size: 12px; }
+.continuity-recovery dd { margin: 2px 0 0; overflow-wrap: anywhere; }
+.continuity-confirm { display: flex !important; grid-template-columns: none !important; align-items: center; gap: 7px; }
+.workshop-inspector-section > summary { cursor: pointer; font-weight: 600; margin-bottom: 12px; }

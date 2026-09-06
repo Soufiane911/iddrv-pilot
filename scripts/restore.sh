@@ -47,7 +47,8 @@ trap finish_restore EXIT INT TERM
 
 SAFE_DATABASE_URL="$(python3 "$SCRIPT_DIR/pg_url_guard.py" --passfile "$PGPASSFILE_LOCAL" --require-local)"
 MC_FILE="${BACKUP_FILE}.machine_cycles.csv"
-MC_COLUMNS='time,machine_id,production_order_id,order_site_id,shift_id,passport_id,source_line_no,source_row_hash,cycle_counter,cycle_time_s,dosing_time_s,injection_time_s,cushion_mm,switchover_pressure_bar,switchover_position,peak_pressure_bar,clamp_force_kn,mold_open_time_s,good_parts,scrap_flag,barrel_temp_zone1_c,barrel_temp_zone2_c,barrel_temp_zone3_c,oil_temperature_c,link_confidence,quality_flag,raw_data,data_quality_status,part_quality_status,defect_type,cooling_time_s,mold_temperature_c,energy_kwh'
+MANIFEST="${BACKUP_FILE}.manifest"
+MC_COLUMNS='time,machine_id,production_order_id,order_site_id,shift_id,passport_id,source_line_no,source_row_hash,source_event_id,context_cycle_id,cycle_counter,cycle_time_s,dosing_time_s,injection_time_s,cushion_mm,switchover_pressure_bar,switchover_position,peak_pressure_bar,clamp_force_kn,mold_open_time_s,good_parts,scrap_flag,barrel_temp_zone1_c,barrel_temp_zone2_c,barrel_temp_zone3_c,oil_temperature_c,link_confidence,quality_flag,raw_data,data_quality_status,part_quality_status,defect_type,cooling_time_s,mold_temperature_c,energy_kwh'
 
 if [ ! -f "$BACKUP_FILE" ]; then
   echo "Missing backup file: $BACKUP_FILE" >&2
@@ -59,7 +60,11 @@ if [ ! -f "$MC_FILE" ]; then
 fi
 MC_HEADER="$(head -n 1 "$MC_FILE" | tr -d '\r')"
 if [ "$MC_HEADER" != "$MC_COLUMNS" ]; then
-  echo "Invalid TimescaleDB sidecar header" >&2
+  echo "Invalid or legacy TimescaleDB sidecar header; create a version-2 full backup first." >&2
+  exit 1
+fi
+if [ ! -f "$MANIFEST" ] || ! grep -qx 'iddrv-backup-version=2' "$MANIFEST"; then
+  echo "Missing or legacy backup manifest; refusing to mix data-only backup with the current schema." >&2
   exit 1
 fi
 
@@ -136,36 +141,24 @@ $guard$;
 SQL
 fi
 
-run_psql -v ON_ERROR_STOP=1 <<'SQL'
-DO $truncate$
-DECLARE
-  targets TEXT;
-BEGIN
-  SELECT string_agg(format('%I.%I', schemaname, tablename), ', ' ORDER BY tablename)
-    INTO targets
-  FROM pg_tables
-  WHERE schemaname = 'public'
-    AND tablename NOT IN ('spatial_ref_sys', '_iddrv_e2e_guard');
-  IF targets IS NOT NULL THEN
-    EXECUTE 'TRUNCATE TABLE ' || targets || ' CASCADE';
-  END IF;
-END
-$truncate$;
-SQL
+run_psql -v ON_ERROR_STOP=1 -c 'CREATE EXTENSION IF NOT EXISTS timescaledb' >/dev/null
+run_psql -v ON_ERROR_STOP=1 -c 'SELECT timescaledb_pre_restore()' >/dev/null
 
 if [ "$USE_HOST_TOOLS" = "true" ]; then
   PGPASSFILE="$PGPASSFILE_LOCAL" pg_restore \
-    --dbname="$SAFE_DATABASE_URL" --data-only --no-owner --exit-on-error --single-transaction "$BACKUP_FILE"
+    --dbname="$SAFE_DATABASE_URL" --no-owner --no-privileges --exit-on-error "$BACKUP_FILE"
   PGPASSFILE="$PGPASSFILE_LOCAL" psql "$SAFE_DATABASE_URL" -v ON_ERROR_STOP=1 \
     -c "\\copy public.machine_cycles ($MC_COLUMNS) FROM STDIN WITH CSV HEADER" <"$MC_FILE"
 else
   docker compose cp "$MC_FILE" "$DB_CONTAINER:$MC_CONTAINER" >/dev/null
   MC_IN_CONTAINER=true
   docker compose exec -T -e PGPASSFILE="$PGPASSFILE_CONTAINER" "$DB_CONTAINER" \
-    pg_restore --dbname="$SAFE_DATABASE_URL" --data-only --no-owner --exit-on-error --single-transaction "$DUMP_CONTAINER"
+    pg_restore --dbname="$SAFE_DATABASE_URL" --no-owner --no-privileges --exit-on-error "$DUMP_CONTAINER"
   docker compose exec -T -e PGPASSFILE="$PGPASSFILE_CONTAINER" "$DB_CONTAINER" \
     psql "$SAFE_DATABASE_URL" -v ON_ERROR_STOP=1 \
     -c "\\copy public.machine_cycles ($MC_COLUMNS) FROM '$MC_CONTAINER' WITH CSV HEADER"
 fi
+
+run_psql -v ON_ERROR_STOP=1 -c 'SELECT timescaledb_post_restore()' >/dev/null
 
 printf 'Restore completed in isolated database %s. Validate it before switching application connections.\n' "$ACTUAL_DATABASE"

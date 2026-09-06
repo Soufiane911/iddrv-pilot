@@ -335,72 +335,21 @@ def read_transposed_file(profile: FileProfile, mapping_builder=build_column_map)
     return rows, col_map
 
 
-def read_erp_trs_xlsx(file_path: str, sheet_name: str = "Données_Audit") -> list[dict]:
-    """
-    Lit un fichier ERP/TRS Excel et retourne les lignes d'ordres de fabrication.
-    """
-    try:
-        xl = pd.ExcelFile(file_path)
-        sheets = xl.sheet_names
-        if sheet_name not in sheets:
-            if len(sheets) > 0:
-                sheet_name = sheets[0]
-        df = pd.read_excel(xl, sheet_name=sheet_name)
-    except Exception as e:
-        print(f"[ERREUR] Impossible de lire {file_path}: {e}")
-        return []
-
-    orders = []
-    for _, row in df.iterrows():
-        order = {}
-
-        # Mapping des colonnes ERP standard (supporte français et anglais)
-        field_map = {
-            "Réf OF": "id",
-            "production_order_id": "id",
-            "Réf. Machine": "machine_erp_ref",
-            "machine_erp_ref": "machine_erp_ref",
-            "Lib. Machine": "machine_name",
-            "machine_name": "machine_name",
-            "Début Equipe": "started_at",
-            "started_at": "started_at",
-            "Fin Equipe": "ended_at",
-            "ended_at": "ended_at",
-            "Num Equipe": "shift_number",
-            "shift_number": "shift_number",
-            "Réf. produit": "product_ref",
-            "product_ref": "product_ref",
-            "Lib. Produit": "product_name",
-            "product_name": "product_name",
-            "Réf. outil": "tool_ref",
-            "tool_ref": "tool_ref",
-            "Réf. Matière": "material_ref",
-            "material_ref": "material_ref",
-            "Qté Pieces Bonnes": "erp_good_parts",
-            "good_parts": "erp_good_parts",
-            "Total Rebuts": "erp_scrap_count",
-            "scrap_count": "erp_scrap_count",
-            "T.R.S.": "erp_trs",
-            "expected_trs": "erp_trs",
-            "Tps Disponible (h)": "erp_available_time_h",
-            "planned_runtime_h": "erp_available_time_h",
-            "Tps Fct Brut (h)": "erp_running_time_h",
-            "Cycle Moyen": "erp_cycle_time_s",
-            "theoretical_cycle_time_s": "erp_cycle_time_s",
-            "Nb Cycles": "nb_cycles",
-        }
-
-        for src_col, dst_col in field_map.items():
-            val = row.get(src_col)
-            if pd.notna(val):
-                if dst_col in ("started_at", "ended_at"):
-                    val = _parse_source_datetime(val)
-                order[dst_col] = val
-
-        if order.get("id") and order.get("machine_erp_ref"):
-            orders.append(order)
-
-    return orders
+def read_erp_trs_xlsx(file_path: str, sheet_name: str | None = None) -> list[dict]:
+    """Compatibility adapter: one result per team/order declaration."""
+    from ingest.erp_reader import read_trs_declarations
+    result = read_trs_declarations(Path(file_path), source_timezone="UTC", sheet_name=sheet_name)
+    if any(issue.severity == 'error' for issue in result.issues):
+        raise ValueError(result.issues[0].code)
+    return [{"id": row.order_ref, "machine_erp_ref": row.machine_ref,
+             "started_at": row.shift_started_at, "ended_at": row.production_ended_at,
+             "shift_number": row.shift_number, "order_type": row.order_type,
+             "product_ref": row.product_ref, "tool_ref": row.tool_ref,
+             "erp_good_parts": row.good_parts, "erp_scrap_count": row.scrap_parts,
+             "produced_parts": row.produced_parts, "nb_cycles": row.cycle_count,
+             "erp_trs": row.declared_trs, "erp_available_time_h": row.available_hours,
+             "erp_running_time_h": row.running_hours, "erp_cycle_time_s": row.cycle_time_s}
+            for row in result.declarations]
 
 
 def load_file(

@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query
 from ..repositories import list_incidents, get_incident, get_evidence, save_feedback, persist_investigation
@@ -44,12 +44,16 @@ def investigate(incident_id: UUID, as_of: datetime | None = None,
     inc = get_incident(incident_id, allowed_site_ids=identity.site_ids)
     if inc is None: raise HTTPException(404, detail="incident_not_found")
     require_site_roles(identity, int(inc["site_id"]), "analyst", "supervisor", "admin")
+    if as_of is not None and as_of.utcoffset() is None:
+        raise HTTPException(status_code=422, detail="as_of_timezone_required")
+    knowledge_at = as_of or (datetime.now(timezone.utc) if inc.get('origin') == 'process_drift' else inc['data_cutoff'])
     try:
         from ..diagnostics.engine import DeterministicInvestigator
         from ..diagnostics.postgres import PostgresDiagnosticRepository
         from ..diagnostics.models import InsufficientDataError
+        repository = PostgresDiagnosticRepository(site_id=inc["site_id"],known_at=knowledge_at)
         engine = DeterministicInvestigator(
-            PostgresDiagnosticRepository(),
+            repository,
             minimum_event_cycles=30,
             minimum_baseline_cycles=30,
             minimum_quality_checks=1,
@@ -63,6 +67,8 @@ def investigate(incident_id: UUID, as_of: datetime | None = None,
         raise HTTPException(status_code=422, detail="as_of_timezone_required")
     effective_cutoff = min(as_of, inc["data_cutoff"]) if as_of is not None else inc["data_cutoff"]
     incident_end = min(inc.get("ended_at") or effective_cutoff, effective_cutoff)
+    if inc.get('origin') == 'process_drift' and not list(repository.quality_checks(inc['machine_id'],inc['started_at'],incident_end)):
+        raise HTTPException(422,'process_drift_quality_observations_required')
     try:
         result = engine.investigate(
             machine_id=inc["machine_id"],
@@ -71,14 +77,14 @@ def investigate(incident_id: UUID, as_of: datetime | None = None,
             started_at=inc["started_at"],
             ended_at=incident_end,
             as_of=effective_cutoff,
-            defect_type=inc.get("defect_type") or "short_shot",
+            defect_type=inc.get("defect_type") or (None if inc.get("origin") == "process_drift" else "short_shot"),
             incident_id=str(incident_id),
         )
     except InsufficientDataError as exc:
         from ..metrics import record_investigation_outcome
         record_investigation_outcome("insufficient_data")
         raise HTTPException(status_code=422, detail={"code": "insufficient_data", "message": str(exc)}) from exc
-    run_id = persist_investigation(incident_id, result, effective_cutoff)
+    run_id = persist_investigation(incident_id, result, knowledge_at, context_snapshot=repository.context_snapshot)
     from ..metrics import record_investigation_outcome
     record_investigation_outcome("succeeded")
     return {"incident": inc, "run_id": run_id, "hypotheses": [h.to_dict() for h in result.hypotheses], "evidence": [e.to_dict() for e in result.evidence]}
@@ -90,4 +96,11 @@ def feedback(incident_id: UUID, payload: FeedbackRequest,
     if inc is None:
         raise HTTPException(404, detail="incident_not_found")
     require_site_roles(identity, int(inc["site_id"]), "analyst", "supervisor", "admin")
-    return save_feedback(incident_id, payload.verdict, payload.comment)
+    if payload.run_id is not None:
+        from ..repositories import get_investigation
+        run = get_investigation(payload.run_id,allowed_site_ids=identity.site_ids)
+        if run is None or str(run['incident_id']) != str(incident_id):
+            raise HTTPException(422,'feedback_run_mismatch')
+    elif inc.get('origin') == 'process_drift':
+        raise HTTPException(422,'feedback_run_required')
+    return save_feedback(incident_id, payload.verdict, payload.comment, payload.run_id)

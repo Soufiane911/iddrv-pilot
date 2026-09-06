@@ -69,7 +69,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  min-height: 52px;
+  min-height: 48px;
   padding: 8px 10px;
   border: 1px solid transparent;
   border-radius: var(--radius);
@@ -131,10 +131,11 @@
 }
 .topbar-title p { margin: 0; color: var(--color-muted-foreground); font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
 .topbar-title h1 { margin: 4px 0 0; color: var(--color-foreground); font-size: 20px; font-weight: 650; letter-spacing: -.015em; }
-.topbar-context { display: flex; align-items: stretch; min-height: 44px; border: 1px solid var(--color-border); background: var(--color-card); }
+.topbar-context { display: flex; align-items: center; min-height: 44px; }
 .topbar-context > span { display: grid; align-content: center; min-width: 140px; padding: 0 14px; border-right: 1px solid var(--color-border); color: var(--color-foreground); font-size: 12px; }
 .topbar-context small { display: block; margin-bottom: 2px; color: var(--color-muted-foreground); font-size: 12px; }
-.topbar-context > a { display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px; color: var(--color-foreground); text-decoration: none; font-size: 12px; }
+.topbar-context > a { display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 8px; color: var(--color-muted-foreground); text-decoration: none; font-size: 13px; }
+.topbar-context > a:hover { color: var(--color-foreground); text-decoration: underline; text-underline-offset: 3px; }
 .topbar-context > a i { width: 8px; height: 8px; border-radius: 50%; background: var(--color-secondary); }
 
 .skip-link {

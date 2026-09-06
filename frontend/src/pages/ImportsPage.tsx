@@ -1,6 +1,9 @@
+import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { ErpImportWizard } from '../components/imports/ErpImportWizard';
 import { useQuery } from '@tanstack/react-query';
 import { useApi } from '../App';
-import { EmptyPanel, formatDate, MetricCard, SectionTitle, StatePanel } from '../components/Ui';
+import { formatDate, MetricCard, SectionTitle, StatePanel } from '../components/Ui';
 
 function importStatusLabel(status: string): string {
   return ({
@@ -23,6 +26,13 @@ function importStatusTone(status: string): 'completed' | 'pending' | 'failed' {
 
 export function ImportsPage() {
   const api = useApi();
+  const [searchParams] = useSearchParams();
+  const requestedSite = Number(searchParams.get('site'));
+  const [selectedSite, setSelectedSite] = useState<number | null>(Number.isFinite(requestedSite) ? requestedSite : null);
+  const sites = useQuery({ queryKey: ['sites'], queryFn: () => api.getSites() });
+  const auth = useQuery({ queryKey: ['auth-me'], queryFn: () => api.getCurrentUser() });
+  const site = sites.data?.find(item => item.id === selectedSite) ?? sites.data?.[0];
+  const role = site ? auth.data?.siteRoles?.[site.id] ?? auth.data?.role : undefined;
   const query = useQuery({ queryKey: ['imports'], queryFn: () => api.getImports() });
   const imports = query.data ?? [];
   const completed = imports.filter((item) => item.status === 'completed').length;
@@ -36,9 +46,14 @@ export function ImportsPage() {
       <button className="button-primary" type="button" onClick={() => query.refetch()} disabled={query.isFetching}>{query.isFetching ? 'Actualisation…' : 'Actualiser'}</button>
     </div>
 
+    {sites.isError && <StatePanel tone="error" title="Sites indisponibles" text="Impossible de choisir un site pour l’import." />}
+    {site && <>
+      <label className="erp-import-site">Site de l’import<select value={site.id} onChange={event => setSelectedSite(Number(event.target.value))}>{sites.data?.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+      <ErpImportWizard key={site.id} siteId={site.id} timezone={site.timezone ?? 'UTC'} canImport={role === 'analyst' || role === 'supervisor' || role === 'admin'} canConfigure={role === 'supervisor' || role === 'admin'} />
+    </>}
+
     {query.isPending && <StatePanel tone="loading" title="Chargement du journal" text="Les traitements d’import sont en cours de récupération." />}
     {query.isError && <StatePanel tone="error" title="Journal indisponible" text={query.error instanceof Error ? query.error.message : 'Impossible de lire les imports.'} action="Réessayer" onAction={() => query.refetch()} />}
-    {!query.isPending && !query.isError && imports.length === 0 && <EmptyPanel title="Aucun import enregistré" text="Le worker d’ingestion publiera ici le premier fichier traité." />}
 
     {!query.isPending && !query.isError && imports.length > 0 && <>
       <div className="metric-grid metric-grid-three">

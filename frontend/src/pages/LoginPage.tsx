@@ -36,7 +36,7 @@ export function LoginPage() {
 
   return <main className="login-shell">
     <section className="login-card">
-      <div className="brand login-brand"><span className="brand-mark" aria-hidden="true"><i /><i /><i /></span><span><strong>IDDRV</strong><small>Industrial evidence system</small></span></div>
+      <div className="brand login-brand"><span className="brand-mark" aria-hidden="true"><i /><i /><i /></span><span><strong>IDDRV</strong></span></div>
       <p className="eyebrow">ACCÈS PILOTE</p>
       <h1>Reprendre la supervision</h1>
       <p className="muted">Identifiez-vous pour retrouver les sites, les incidents et leurs preuves.</p>
@@ -49,7 +49,7 @@ export function LoginPage() {
         {mutation.isSuccess && <StatePanel tone="success" title="Connexion établie" text="Ouverture de votre périmètre…" />}
         <button className="button-primary login-submit" type="submit" disabled={mutation.isPending}>{mutation.isPending ? 'Connexion…' : 'Ouvrir la supervision'}</button>
       </form>
-      <p className="login-note">La session est conservée par un cookie HttpOnly. Aucun jeton n’est stocké dans le navigateur.</p>
+      <p className="login-note">Vous accédez uniquement aux sites qui vous sont attribués.</p>
     </section>
   </main>;
 }

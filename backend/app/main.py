@@ -22,6 +22,12 @@ from .api.workspace import router as workspace_router
 from .api.scrap_risk import router as scrap_risk_router
 from .api.process_drift import _model_artifact, router as process_drift_router
 
+from .api.erp_imports import router as erp_imports_router
+from .api.machine_management import router as machine_management_router
+from .api.machine_connections import router as machine_connections_router
+from .api.shift_calendars import router as shift_calendars_router
+from .api.site_management import router as site_management_router
+
 
 app = FastAPI(title=settings.app_name, version=settings.app_version)
 app.add_middleware(RequestContextMiddleware)
@@ -39,6 +45,15 @@ app.include_router(investigations_router)
 app.include_router(workspace_router)
 app.include_router(scrap_risk_router)
 app.include_router(process_drift_router)
+app.include_router(erp_imports_router)
+app.include_router(machine_management_router)
+app.include_router(machine_connections_router)
+app.include_router(shift_calendars_router)
+app.include_router(site_management_router)
+from .api.production_context import router as production_context_router
+from .api.predictions import router as predictions_router
+app.include_router(production_context_router)
+app.include_router(predictions_router)
 
 
 @app.get("/health", response_model=HealthResponse, tags=["system"])

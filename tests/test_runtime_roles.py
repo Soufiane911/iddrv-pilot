@@ -40,7 +40,7 @@ def test_worker_cannot_read_auth_tables_or_api_role_cannot_ingest():
     assert ingest_tables.isdisjoint({name for name, grants in API_TABLE_GRANTS.items()
                                      if grants & {"INSERT", "UPDATE", "DELETE"}})
     assert "incidents" in WORKER_TABLE_GRANTS
-    assert WORKER_TABLE_GRANTS["incidents"] == {"INSERT"}
+    assert WORKER_TABLE_GRANTS["incidents"] == {"SELECT", "INSERT", "UPDATE"}
 
 
 def test_runtime_role_setup_does_not_grant_all_tables_or_ddl():
@@ -60,3 +60,19 @@ def test_pilot_wires_distinct_runtime_urls():
     assert "APP_DATABASE_URL" not in compose
     assert "DATABASE_URL: ${API_DATABASE_URL:?API_DATABASE_URL is required}" in compose
     assert "DATABASE_URL: ${WORKER_DATABASE_URL:?WORKER_DATABASE_URL is required}" in compose
+
+
+def test_telemetry_grants_keep_api_out_of_ingestion_and_secrets_out_of_database():
+    for table in ('machine_source_events', 'machine_stream_offsets', 'hdt_scoring_jobs'):
+        assert API_TABLE_GRANTS[table] == {'SELECT'}
+        assert {'SELECT', 'INSERT', 'UPDATE'} <= WORKER_TABLE_GRANTS[table]
+    assert API_TABLE_GRANTS['machine_connections'] == {'SELECT', 'INSERT', 'UPDATE'}
+    assert WORKER_TABLE_GRANTS['machine_connections'] == {'SELECT', 'UPDATE'}
+    assert all('secret' not in table for table in API_TABLE_GRANTS)
+
+
+def test_hdt_history_is_read_only_to_api_and_append_only_to_worker():
+    assert API_TABLE_GRANTS['hdt_predictions'] == {'SELECT'}
+    assert WORKER_TABLE_GRANTS['hdt_predictions'] == {'SELECT','INSERT'}
+    assert API_TABLE_GRANTS['cycle_context_links'] == {'SELECT','INSERT'}
+    assert WORKER_TABLE_GRANTS['process_drift_episode_predictions'] == {'SELECT','INSERT'}

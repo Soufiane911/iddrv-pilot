@@ -1,7 +1,7 @@
 import { ArrowLeftIcon } from '@phosphor-icons/react/ArrowLeft';
 import { useQueries, useQuery } from '@tanstack/react-query';
 import { Component, lazy, Suspense, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useApi } from '../App';
 import type { Machine, MachineStatus } from '../lib/api';
 import { WorkshopMap } from '../components/WorkshopMap';
@@ -54,11 +54,14 @@ export function WorkshopPage() {
   const siteId = Number(siteIdParam);
   const api = useApi();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [selectedMachineId, setSelectedMachineId] = useState<number>();
   const [replayPercent, setReplayPercent] = useState(50);
   const feature3dEnabled = import.meta.env.VITE_ENABLE_3D === 'true';
   const [viewMode, setViewMode] = useState<WorkshopViewMode>(feature3dEnabled ? '3d' : '2d');
   const [threeDUnavailable, setThreeDUnavailable] = useState(false);
+  const [timeMode, setTimeMode] = useState<'direct' | 'replay'>(() => searchParams.get('mode') === 'direct' ? 'direct' : 'replay');
+  const [selectedAt, setSelectedAt] = useState<string>(() => searchParams.get('known_at') ?? new Date().toISOString());
 
   const siteQuery = useQuery({
     queryKey: ['site', siteId],
@@ -81,7 +84,14 @@ export function WorkshopPage() {
   });
   const machines = machinesQuery.data ?? EMPTY_MACHINES;
   const activeMachineId = selectedMachineId ?? machines[0]?.id;
+  const connectionQuery = useQuery({ queryKey: ['machine-connection', activeMachineId], queryFn: () => api.getMachineConnection(activeMachineId as number), enabled: activeMachineId !== undefined, retry: false });
 
+  useEffect(() => {
+    if (!searchParams.has('mode') && connectionQuery.data?.enabled) {
+      setTimeMode('direct');
+      setSearchParams((current) => { current.set('mode', 'direct'); return current; }, { replace: true });
+    }
+  }, [connectionQuery.data?.enabled, searchParams, setSearchParams]);
   useEffect(() => {
     if (selectedMachineId !== undefined && machinesQuery.isSuccess && !machines.some((machine) => machine.id === selectedMachineId)) {
       setSelectedMachineId(undefined);
@@ -141,6 +151,9 @@ export function WorkshopPage() {
   }, [range.end, range.start, rawTimeline]);
   const replayAt = isoAtPercent(range.start, range.end, replayPercent);
   const selectedReplayAt = replayAt;
+  useEffect(() => {
+    if (timeMode === 'replay' && !searchParams.has('known_at') && Number.isFinite(new Date(replayAt).getTime())) setSelectedAt(replayAt);
+  }, [replayAt, searchParams, timeMode]);
   const processDriftQuery = useQuery({
     queryKey: ['machine-cycles', activeMachineId, selectedReplayAt, 20],
     queryFn: () => api.getMachineCycles(activeMachineId as number, selectedReplayAt, 20),
@@ -150,6 +163,22 @@ export function WorkshopPage() {
   // Timeline points are aggregates and stay confined to the trend chart. HDT
   // receives only the raw-cycle response, or abstains when it is empty.
   const processDriftCycles = processDriftQuery.data ?? [];
+  const boundsKnownAt = timeMode === 'direct' ? new Date().toISOString() : selectedAt;
+  const productionContextQuery = useQuery({
+    queryKey: ['production-context', activeMachineId, range.start, range.end, boundsKnownAt],
+    queryFn: () => api.getProductionContext(activeMachineId as number, { from: range.start, to: range.end, knownAt: boundsKnownAt }),
+    enabled: activeMachineId !== undefined && replayReady,
+    refetchInterval: timeMode === 'direct' ? 2000 : false,
+    retry: false,
+  });
+  const hdtPredictionsQuery = useQuery({
+    queryKey: ['hdt-predictions', activeMachineId, range.start, range.end, boundsKnownAt],
+    queryFn: () => api.getHdtPredictions(activeMachineId as number, { from: range.start, to: range.end, knownAt: boundsKnownAt }),
+    enabled: activeMachineId !== undefined && replayReady,
+    refetchInterval: timeMode === 'direct' ? 2000 : false,
+    retry: false,
+  });
+  const persistedPrediction = hdtPredictionsQuery.data?.[0] ?? null;
   const [statusAt, setStatusAt] = useState(replayAt);
 
   useEffect(() => {
@@ -230,7 +259,7 @@ export function WorkshopPage() {
         </Suspense>
       </Workshop3DErrorBoundary>
     : map;
-  const workspaceReady = replayReady && siteQuery.isSuccess && machinesQuery.isSuccess && machines.length > 0;
+  const workspaceReady = siteQuery.isSuccess && machinesQuery.isSuccess && machines.length > 0;
 
   return <section className={`page page-wide workshop-page${workspaceReady ? ' workshop-page-ready' : ''}`}>
     {!workspaceReady ? <div className="page-intro workshop-intro"><div><Link className="back-link" to="/sites"><ArrowLeftIcon size={17} aria-hidden="true" />Tous les sites</Link><p className="eyebrow">ATELIER · {siteQuery.data?.timezone ?? 'UTC'}</p><h2>{siteQuery.data?.name ?? 'Chargement du site…'}</h2><p className="muted">Le plan, les statuts et le replay sont préparés à partir des dernières données source disponibles.</p></div></div> : null}
@@ -244,19 +273,21 @@ export function WorkshopPage() {
 
     {workspaceReady ? <WorkshopWorkspace
       site={siteQuery.data}
+      replayReady={replayReady}
+      connectionApi={api}
       machines={historicalMachines}
       activeMachine={replayMachine}
       machineIncidents={machineIncidents}
       timelineIncidents={machineTimelineIncidents}
       siteIncidentCount={visibleIncidents.length}
-      incidentsUnavailable={incidentsQuery.isError}
+      incidentsUnavailable={!replayReady || incidentsQuery.isError}
       statusUnavailable={statusUnavailable}
       statusLoading={statusLoading}
       statusDataInconsistent={statusDataInconsistent}
       sourceCutoffPartial={sourceStatusDiscoveryPartial}
       threeDUnavailable={threeDUnavailable}
       qualityUnavailable={qualityQuery.isError}
-      qualityLoading={qualityQuery.isPending}
+      qualityLoading={replayReady && qualityQuery.isPending}
       hasQualityWindow={hasQualityWindow}
       timelineUnavailable={timelineQuery.isError}
       timelineLoading={timelineQuery.isPending}
@@ -276,6 +307,14 @@ export function WorkshopPage() {
       processDriftCyclesLoading={processDriftQuery.isPending}
       processDriftCyclesError={processDriftQuery.isError ? (processDriftQuery.error instanceof Error ? processDriftQuery.error : new Error('Impossible de récupérer les cycles bruts.')) : null}
       onProcessDriftCyclesRetry={() => processDriftQuery.refetch()}
+      timeMode={timeMode}
+      onTimeModeChange={(mode) => { setTimeMode(mode); setSearchParams((current) => { current.set('mode', mode); return current; }, { replace: true }); }}
+      selectedAt={selectedAt}
+      onSelectedAtChange={(value) => { setSelectedAt(value); setSearchParams((current) => { current.set('known_at', value); return current; }, { replace: true }); }}
+      onRefresh={() => { void productionContextQuery.refetch(); void hdtPredictionsQuery.refetch(); if (timeMode !== 'direct') void processDriftQuery.refetch(); }}
+      productionContext={productionContextQuery.data}
+      persistedPrediction={persistedPrediction}
+      connectionState={connectionQuery.data?.state}
       viewMode={viewMode}
       feature3dEnabled={threeDReady}
       visualization={visualization}

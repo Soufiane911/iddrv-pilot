@@ -4,7 +4,7 @@ The API never exposes raw machine cycles. Time-series endpoints return bounded
 aggregates whose shape is shared by the 2D and optional 3D clients.
 """
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any, Literal
 from uuid import UUID
 
@@ -46,6 +46,13 @@ class Site(BaseModel):
     machine_count: int | None = None
     open_incident_count: int | None = None
     last_import_at: datetime | None = None
+
+
+class SiteCreateInput(BaseModel):
+    """Payload used to provision an empty production site."""
+
+    name: str = Field(min_length=1, max_length=100)
+    timezone: str = Field(default="Europe/Paris", min_length=1, max_length=50)
 
 
 class ProductionLine(BaseModel):
@@ -129,6 +136,8 @@ class ProcessDriftCycle(BaseModel):
 
 class RawMachineCycle(ProcessDriftCycle):
     """One unaggregated machine cycle suitable for causal HDT history."""
+    scrap_flag: bool | None = None
+    good_parts: int | None = None
 
 
 class RawMachineCyclePage(BaseModel):
@@ -250,13 +259,18 @@ class QualityResponse(BaseModel):
     to: datetime
     total_checks: int = 0
     total_defects: int = 0
-    scrap_count: int = 0
+    scrap_count: int | None = None
     scrap_rate: float | None = None
     by_defect: list[QualityDefectSummary] = []
     # Frontend-compatible aliases kept during the v1 pilot transition.
     total: int = 0
     good: int | None = None
-    scrap: int = 0
+    scrap: int | None = None
+    quality_coverage: float | None = None
+    cycle_count: int = 0
+    quality_known_cycles: int = 0
+    quality_checks_source: dict = Field(default_factory=dict)
+    quality_source: str = "unknown"
     defects: list[QualityDefectSummary] = []
 
     model_config = ConfigDict(populate_by_name=True)
@@ -384,6 +398,8 @@ class Incident(BaseModel):
     data_cutoff: datetime; confidence: Literal["low", "medium", "high"] | None = None
     # Additive read-only projection of the latest persisted human feedback.
     feedback_verdict: str | None = None
+    origin: str = "quality"
+    process_observations: list[dict[str, Any]] = Field(default_factory=list)
 
 class Evidence(BaseModel):
     id: UUID; source_kind: str; source_ref: str; metric: str
@@ -408,8 +424,73 @@ class IncidentPage(BaseModel):
     next_cursor: str | None = None
 
 class FeedbackRequest(BaseModel):
+    run_id: UUID | None = None
     verdict: str = Field(min_length=1, max_length=30)
     comment: str | None = Field(default=None, max_length=4000)
 
 class FeedbackResponse(BaseModel):
     id: UUID; incident_id: UUID; verdict: str; comment: str | None = None
+
+
+class MachineCreateInput(BaseModel):
+    model_config = ConfigDict(extra='forbid', str_strip_whitespace=True)
+    erp_ref: str = Field(min_length=1, max_length=50)
+    name: str = Field(min_length=1, max_length=100)
+
+
+class ShiftDefinition(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    number: int = Field(ge=1, le=32767)
+    start: str = Field(pattern=r'^([01]\d|2[0-3]):[0-5]\d$')
+    end: str = Field(pattern=r'^([01]\d|2[0-3]):[0-5]\d$')
+
+
+class ShiftCalendarInput(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    timezone: str
+    valid_from: date
+    valid_to: date | None = None
+    expected_version: int = Field(default=0, ge=0)
+    shifts: list[ShiftDefinition] = Field(min_length=1, max_length=64)
+
+    @model_validator(mode='after')
+    def validate_calendar(self):
+        from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+        try:
+            ZoneInfo(self.timezone)
+        except (ZoneInfoNotFoundError, ValueError):
+            raise ValueError('unknown_timezone') from None
+        if self.valid_to and self.valid_to < self.valid_from:
+            raise ValueError('invalid_calendar_period')
+        if len({shift.number for shift in self.shifts}) != len(self.shifts):
+            raise ValueError('duplicate_shift_number')
+        return self
+
+
+class ERPReplacement(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    source_row: int = Field(ge=1)
+    declaration_id: UUID
+    expected_revision: int = Field(ge=1)
+
+
+class ERPConfirmInput(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    preview_version: int = Field(ge=1)
+    create_machine_refs: list[str] = Field(default_factory=list, max_length=1000)
+    replacements: list[ERPReplacement] = Field(default_factory=list, max_length=10000)
+    new_identity_rows: list[int] = Field(default_factory=list, max_length=10000)
+
+
+class ERPPreviewInput(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    sheet_name: str | None = Field(default=None, max_length=100)
+    confirmed_order_fields: list[str] = Field(default_factory=list, max_length=6)
+    complete_order_refs: list[str] = Field(default_factory=list, max_length=10000)
+
+    @model_validator(mode='after')
+    def validate_fields(self):
+        from ingest.erp_reader import ORDER_FIELDS
+        if set(self.confirmed_order_fields) - ORDER_FIELDS:
+            raise ValueError('unknown_order_field')
+        return self

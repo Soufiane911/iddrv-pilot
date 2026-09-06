@@ -8,7 +8,8 @@ def test_erp_retry_never_deletes_existing_business_orders():
     source = inspect.getsource(ingest_erp_file)
     assert "DELETE FROM production_orders" not in source
     assert "DELETE FROM shifts" not in source
-    assert source.index("SET status='completed'") < source.index("conn.commit()")
+    assert "with conn, conn.cursor" in source
+    assert "persist_declarations(conn" in source
 
 
 def test_decided_action_proposal_is_immutable():

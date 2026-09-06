@@ -98,6 +98,22 @@ L'ancien point d'entrée reste compatible :
 `python -m ingest.ingest_pipeline --scenario <répertoire> <site_id>`.
 Accès à l'interface : http://localhost:8080
 
+### Parcours de l’interface
+
+Le menu principal regroupe **Vue d’ensemble**, **Atelier**, **Incidents** et
+**Imports** (journal des traitements). Le catalogue des sites sert à choisir
+l’atelier ; le dossier incident réunit les hypothèses, les preuves et le retour humain.
+
+L’entrée **Outils** donne accès à la santé des services, au suivi HDT et au profil
+avec ses permissions. **Démonstration** conserve la visite guidée sur scénario
+fictif. Dans les preuves et le panneau HDT, les détails techniques sont repliables ;
+les valeurs essentielles restent visibles.
+
+Les écrans de catalogue de métadonnées et de gains fictifs sont retirés du parcours
+actif : `/workspace` redirige vers `/imports`, et `/sites/:siteId/opportunities`
+vers `/incidents`. Leurs composants source restent conservés pour permettre un
+retour à la version précédente ; aucune session ni donnée historique n’est supprimée.
+
 ## 5. Formats de fichiers supportés
 
 ### 5.1 Protocole Arburg (`.txt`)
@@ -136,7 +152,14 @@ DosingTime    6,523     6,489     6,511
 
 ### 5.4 Export ERP/TRS (`.xlsx`)
 
-Export Excel issu des ERP (Divalto, SAP, Sylob, GPAO maison). Grain : 1 ligne = 1 Ordre de Fabrication. Colonnes : `Réf OF`, `Réf. Machine`, `T.R.S.`, `Cycle Moyen`, `Nb Cycles`, `Total Rebuts`.
+Export Excel issu des ERP (Divalto, SAP, Sylob, GPAO maison). Grain : 1 ligne = 1 déclaration de résultat d’équipe pour un OF. Un même OF conserve son identité sur plusieurs équipes, presses, clôtures et réouvertures. Les corrections créent des révisions ; un rejeu inchangé ne remplace pas le résultat courant. Colonnes : `Réf OF`, `Réf. Machine`, `T.R.S.`, `Cycle Moyen`, `Nb Cycles`, `Total Rebuts`.
+
+Dans **Imports**, sélectionnez le site et téléversez un XLSX (20 Mio compressés / 100 Mio décompressés). L’aperçu détecte les feuilles TRS et leur en-tête dans les trente premières lignes, puis présente les déclarations, erreurs, avertissements et presses proposées. Confirmez les créations et les mappings facultatifs de cible/statut ; le worker traite ensuite la demande durable. Le fichier est conservé sous `raw/uploads`, hors du dossier surveillé automatiquement, sur un volume partagé API/worker.
+
+`Nb Cycles` ne fournit jamais une cible. Sans qualité source, les pièces bonnes et rebuts restent inconnus. Des valeurs ERP signées ou des ratios hors plage sont conservés avec avertissement ; ils empêchent de certifier la progression. Le reste à produire exige une cible explicite et un historique complet confirmé. Une date de statut absente reste inconnue ; la date de réception indique seulement quand l’information est devenue disponible. Une ancienne version déjà vue est signalée et ignorée ; réappliquer volontairement d’anciennes valeurs exige un contexte source distinct, car un export sans version ne permet pas de distinguer cette intention d’un rejeu.
+
+Un superviseur/admin peut saisir un calendrier versionné des relais ou ajouter une presse sans ERP. Sans calendrier confirmé ni fin source, la période reste à vérifier : les heures disponibles ne sont pas une durée calendaire. Les anciens totaux OF restent accessibles via la synthèse `legacy`, avec connaissance historique non vérifiable, jusqu’à relecture des archives.
+
 
 ## 6. Modèle canonique EUROMAP 77/83
 

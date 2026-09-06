@@ -40,14 +40,18 @@ def normalize_bool_flag(value, default=False) -> bool:
     return str(value).strip().lower() in {"true", "1", "yes", "y", "oui"}
 
 
-def normalize_good_parts(value) -> int:
+def normalize_good_parts(value) -> int | None:
     """Retourne 0/1 pour la colonne SMALLINT good_parts."""
-    return 1 if normalize_bool_flag(value, default=True) else 0
+    if value is None or value == "":
+        return None
+    return 1 if normalize_bool_flag(value) else 0
 
 
-def derive_part_quality(raw_data, scrap_flag) -> tuple[str, str | None]:
+def derive_part_quality(raw_data, scrap_flag) -> tuple[str | None, str | None]:
     """Retourne le statut pièce et le défaut canonique depuis la source brute."""
-    source = str((raw_data or {}).get("quality_flag", "good")).strip()
+    source = str((raw_data or {}).get("quality_flag", "")).strip()
+    if scrap_flag is None:
+        return ("good", None) if source.lower() in {"good", "ok", "conforming"} else (None, None)
     return ("scrap" if scrap_flag else "good", None if source.lower() in {"", "good", "ok", "valid"} else source)
 
 
@@ -185,7 +189,7 @@ def count_overlapping_production_orders() -> int:
 
 
 def reconcile_existing_cycles(site_id: int | None = None) -> int:
-    """Rattache les cycles sans OF sans franchir la frontière d'un site."""
+    """Legacy-only repair; durable declarations use append-only context links."""
     conn = get_db_connection()
     cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
@@ -194,6 +198,8 @@ def reconcile_existing_cycles(site_id: int | None = None) -> int:
         FROM machine_cycles c
         JOIN machines m ON m.id = c.machine_id
         WHERE c.production_order_id IS NULL
+          AND c.source_event_id IS NULL
+          AND NOT EXISTS (SELECT 1 FROM erp_declarations d WHERE d.site_id=m.site_id AND d.machine_id=c.machine_id)
           AND (%s IS NULL OR m.site_id = %s)
         ORDER BY c.time, c.machine_id
     """, (site_id, site_id))
@@ -315,7 +321,7 @@ def insert_cycles(machine_cycles: list[dict], machine_id: int, passport_id: str,
         def source_value(name):
             value = cycle.get(name)
             return value if value is not None else (raw_data or {}).get(name)
-        scrap_flag = normalize_bool_flag(cycle.get("scrap_flag", False))
+        scrap_flag = normalize_bool_flag(cycle.get("scrap_flag"), default=None)
         part_quality_status, defect_type = derive_part_quality(raw_data, scrap_flag)
         source_row_hash = cycle.get("source_row_hash") or compute_source_row_hash(cycle)
 
@@ -363,7 +369,7 @@ def insert_cycles(machine_cycles: list[dict], machine_id: int, passport_id: str,
             source_value("peak_pressure_bar"),
             source_value("clamp_force_kn"),
             source_value("mold_open_time_s"),
-            normalize_good_parts(cycle.get("good_parts", cycle.get("good_part", 1))),
+            normalize_good_parts(cycle.get("good_parts", cycle.get("good_part"))),
             scrap_flag,
             source_value("barrel_temp_zone1_c"),
             source_value("barrel_temp_zone2_c"),

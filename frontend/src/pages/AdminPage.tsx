@@ -3,6 +3,7 @@ import { InfoIcon } from '@phosphor-icons/react/Info';
 import { ShieldCheckIcon } from '@phosphor-icons/react/ShieldCheck';
 import { UserIcon } from '@phosphor-icons/react/User';
 import { useApi } from '../App';
+import { ToolsNavigation } from '../components/ToolsNavigation';
 import { MetricCard, SectionTitle, StatePanel } from '../components/Ui';
 import { PermissionMatrix } from '../components/admin/PermissionMatrix';
 import { RoleBadge } from '../components/admin/RoleBadge';
@@ -19,6 +20,7 @@ export function AdminPage() {
 
   return (
     <section className="page page-wide">
+      <ToolsNavigation />
       <div className="page-intro">
         <div>
           <p className="eyebrow">GOUVERNANCE</p>

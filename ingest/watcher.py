@@ -970,6 +970,12 @@ class WatchedFolderWorker:
         try:
             self.recover_processing()
             outcomes = []
+            if isinstance(self.store, ImportJobStore):
+                try:
+                    from .erp_import_jobs import process_pending_erp_imports
+                    outcomes.extend(process_pending_erp_imports(database_url=self.config.db_url))
+                except Exception as exc:
+                    outcomes.append(f"erp_queue_error:{type(exc).__name__}")
             for source in self._scan():
                 try:
                     outcomes.append(self.process_file(source))

@@ -2,6 +2,8 @@
 
 Rows are mappings so this works with psycopg dictionaries and with fixtures;
 the SQL/API layer remains outside the diagnostic worker's ownership.
+PostgreSQL implementations retain context_snapshot (cycle identities, consulted
+link/revision IDs and knowledge cutoff) for persistence alongside engine output.
 """
 
 from collections.abc import Iterable, Mapping

@@ -13,3 +13,7 @@ data/scenarios/**/ground_truth.json
 tests/e2e/report.*
 *.pyc
 .env
+
+.superpowers
+.playwright-cli
+*.dump

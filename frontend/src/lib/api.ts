@@ -39,6 +39,11 @@ export interface Site {
   lastImportAt?: string | null;
 }
 
+export interface SiteCreateInput {
+  name: string;
+  timezone?: string;
+}
+
 export interface MachineMetrics {
   trs?: number | null;
   oee?: number | null;
@@ -344,10 +349,137 @@ export class ApiRequestError extends Error {
   }
 }
 
+export interface ERPImportRequest {
+  id: string; site_id: number; original_name: string;
+  state: 'uploaded' | 'profiling' | 'preview_ready' | 'queued' | 'processing' | 'completed' | 'failed';
+  preview_version: number; public_error?: string | null; created_at?: string;
+  result?: { created: number; revised: number; unchanged: number; awaiting_context: number; new_machine_ids: number[] } | null;
+}
+export interface ERPReplacement { source_row: number; declaration_id: string; expected_revision: number }
+export interface ERPPreviewChoices { sheet_name?: string | null; confirmed_order_fields?: string[]; complete_order_refs?: string[] }
+export interface ERPImportPreview extends ERPImportRequest {
+  items: { source_row: number; machine_ref: string; order_ref: string; shift_number: number; shift_started_at: string;
+    produced_parts?: number | null; good_parts?: number | null; scrap_parts?: number | null; cycle_count?: number | null;
+    bounds_origin: string; production_ended_at?: string | null; change: 'created' | 'revised' | 'unchanged';
+    order_target_quantity?: number | null; order_status?: string | null; warnings?: string[]; historical_replay?: boolean;
+    identity_candidates: { declaration_id: string; expected_revision: number }[] }[];
+  counts: { created: number; revised: number; unchanged: number };
+  new_machine_refs: string[]; issues: { source_row: number; code: string; field?: string | null; message: string; severity?: 'error' | 'warning' | 'info' }[];
+  sheets: string[]; sheet_name: string; order_fields_available: string[]; calendar_version?: number | null; choices?: ERPPreviewChoices;
+}
+export interface ShiftCalendarInput {
+  timezone: string; valid_from: string; valid_to?: string | null; expected_version: number;
+  shifts: { number: number; start: string; end: string }[];
+}
+export interface ShiftCalendar extends ShiftCalendarInput { version: number }
+
+export interface MachineConnectionInput {
+  base_url: string;
+  external_machine_id: string;
+  secret_ref: string | null;
+  poll_interval_s: number;
+  enabled: boolean;
+  mapping_profile: 'iddrv-cycle-v1';
+}
+export interface MachineConnection extends MachineConnectionInput {
+  id: string;
+  site_id: number;
+  machine_id: number;
+  state: string;
+  public_error?: string | null;
+  last_response_at?: string | null;
+  last_success_at?: string | null;
+  last_cycle_at?: string | null;
+  last_test_at?: string | null;
+  last_test_result?: MachineConnectionTest | null;
+}
+export interface MachineConnectionTest {
+  ok: boolean;
+  state: string;
+  public_error?: string;
+  source_state?: string;
+  oldest_available_at?: string | null;
+  sample_valid?: boolean;
+  sample_rejections?: string[];
+}
+export interface ContinuityReview {
+  machineId: number;
+  state: string;
+  publicError?: string | null;
+  lastValidated: { streamId?: string | null; cursor?: string | null; sequence?: number | null; at?: string | null };
+  availableHistory: { oldestAvailableAt?: string | null; fromSequence?: number | null };
+  sourceReference?: string | null;
+  automaticLatestJump: boolean;
+}
+export interface ContinuityRecoveryInput {
+  decision: 'resume_available' | 'initialize_new_stream';
+  expectedStreamId: string;
+  expectedCursor?: string | null;
+  newStreamId: string;
+  availableFromSequence?: number | null;
+  resumeCursor?: string | null;
+  confirmation: 'I understand the gap and retained history';
+}
+
+export interface ProductionContextDeclaration {
+  id: string;
+  orderRef: string;
+  team?: string | null;
+  producedParts?: number | null;
+  goodParts?: number | null;
+  scrapParts?: number | null;
+  status?: string | null;
+  reopenReason?: string | null;
+  history?: Array<{ status?: string | null; recordedAt?: string | null }>;
+  warnings?: string[];
+}
+
+export interface ProductionOrderSummary {
+  orderRef: string;
+  target?: number | null;
+  status?: string | null;
+  goodPartsNet?: number | null;
+  remainingQuantity?: number | null;
+  warnings: number;
+  statusHistory: Array<{ status?: string | null; recordedAt?: string | null; reason?: string | null }>;
+}
+
+export interface ProductionContext {
+  knownAt: string;
+  importedAt?: string | null;
+  declarations: ProductionContextDeclaration[];
+  orders?: ProductionOrderSummary[];
+  certified?: boolean;
+  target?: number | null;
+  erpStatus?: string | null;
+  qualityStatus?: string;
+  coverageStatus?: string;
+}
+
+export interface HdtPrediction {
+  id: string;
+  status: 'scored' | 'insufficient_history' | 'incompatible' | 'model_unavailable' | string;
+  score?: number | null;
+  threshold?: number | null;
+  modelVersion?: string;
+  evaluatedThrough?: string;
+  scoredAt?: string;
+  reason?: string | null;
+}
+
 export interface ApiClient {
+  getMachineConnection(machineId: number): Promise<MachineConnection | null>;
+  saveMachineConnection(machineId: number, input: MachineConnectionInput): Promise<MachineConnection>;
+  testMachineConnection(machineId: number, input: MachineConnectionInput): Promise<MachineConnectionTest>;
+  getContinuityReview(machineId: number): Promise<ContinuityReview>;
+  recoverContinuity(machineId: number, input: ContinuityRecoveryInput): Promise<{ ok: boolean; state: string; decision: string; history_gap_preserved: boolean; automatic_latest_jump: boolean }>;
+  getProductionContext(machineId: number, bounds: { from?: string; to?: string; knownAt?: string }): Promise<ProductionContext>;
+  getHdtPredictions(machineId: number, bounds: { from?: string; to?: string; knownAt?: string }): Promise<HdtPrediction[]>;
   getHealth(): Promise<Health>;
   getReadiness(): Promise<Readiness>;
   getSites(): Promise<Site[]>;
+  createSite(input: SiteCreateInput): Promise<Site>;
+  deleteSite(siteId: number): Promise<void>;
   getSite(siteId: number): Promise<Site>;
   getMachines(siteId: number, asOf?: string): Promise<Machine[]>;
   getMachine(machineId: number, asOf?: string): Promise<Machine>;
@@ -365,6 +497,14 @@ export interface ApiClient {
   predictProcessDrift(input: ProcessDriftInput): Promise<ProcessDriftPrediction>;
   submitFeedback(incidentId: string, verdict: string, comment?: string): Promise<Feedback>;
   getImports(): Promise<ImportPassport[]>;
+  uploadERP(siteId: number, file: File): Promise<ERPImportRequest>;
+  getERPImports(siteId: number): Promise<ERPImportRequest[]>;
+  getERPPreview(importId: string, refresh?: boolean): Promise<ERPImportPreview>;
+  configureERPPreview(importId: string, choices: ERPPreviewChoices): Promise<ERPImportPreview>;
+  confirmERP(importId: string, payload: { preview_version: number; create_machine_refs: string[]; replacements: ERPReplacement[]; new_identity_rows?: number[] }): Promise<ERPImportRequest>;
+  getShiftCalendar(siteId: number): Promise<ShiftCalendar | null>;
+  saveShiftCalendar(siteId: number, input: ShiftCalendarInput): Promise<ShiftCalendar>;
+  createMachine(siteId: number, input: { erp_ref: string; name: string }): Promise<Machine>;
   createImportSession(siteId: number, name: string): Promise<ImportSession>;
   getImportSession(sessionId: string): Promise<ImportSession>;
   registerImportFile(sessionId: string, file: { file_name: string; source_kind: ImportSourceKind; mime_type?: string; size_bytes: number; file_hash?: string }): Promise<ImportSession>;
@@ -619,6 +759,51 @@ function mapImportSession(value: unknown): ImportSession {
     created_at: String(record.created_at ?? record.createdAt ?? ''), updated_at: String(record.updated_at ?? record.updatedAt ?? '') };
 }
 
+function mapProductionContext(value: unknown): ProductionContext {
+  const payload = (value && typeof value === 'object' ? value : {}) as Record<string, unknown>;
+  const rawDeclarations = listPayload<Record<string, unknown>>(payload.declarations ?? payload.items);
+  const rawOrders = listPayload<Record<string, unknown>>(payload.orders);
+  const orders = rawOrders.map((order) => ({
+    orderRef: String(order.order_ref ?? order.orderRef ?? ''),
+    target: numberOrNull(order.order_target_quantity ?? order.target),
+    status: (order.order_status ?? order.status ?? null) as string | null,
+    goodPartsNet: numberOrNull(order.good_parts_net ?? order.goodPartsNet),
+    remainingQuantity: numberOrNull(order.remaining_quantity ?? order.remainingQuantity),
+    warnings: Number((order.coverage as Record<string, unknown> | undefined)?.warnings ?? order.warnings_count ?? 0),
+    statusHistory: listPayload<Record<string, unknown>>(order.status_history ?? order.statusHistory).map((history) => ({ status: history.status as string | null | undefined, recordedAt: history.recorded_at as string | null | undefined, reason: (history.values as Record<string, unknown> | undefined)?.order_status_reason as string | null | undefined })),
+  }));
+  return {
+    knownAt: String(payload.known_at ?? payload.knownAt ?? ''),
+    importedAt: (payload.imported_at ?? payload.importedAt ?? null) as string | null,
+    target: numberOrNull(payload.target ?? payload.order_target_quantity),
+    erpStatus: (payload.erp_status ?? payload.erpStatus ?? null) as string | null,
+    qualityStatus: String(payload.quality_status ?? payload.qualityStatus ?? 'unknown'),
+    coverageStatus: String((payload.coverage as Record<string, unknown> | undefined)?.status ?? payload.coverage_status ?? 'incomplete'),
+    orders,
+    certified: orders.every((order) => order.warnings === 0) && orders.length > 0,
+    declarations: rawDeclarations.map((item) => {
+      const order = orders.find((candidate) => candidate.orderRef === String(item.production_order_id ?? item.order_ref ?? item.orderRef ?? ''));
+      return {
+      id: String(item.id ?? item.declaration_id ?? ''),
+      orderRef: String(item.production_order_id ?? item.order_ref ?? item.orderRef ?? 'OF inconnu'),
+      team: item.team != null || item.shift_number != null ? String(item.team ?? item.shift_number) : null,
+      producedParts: numberOrNull(item.produced_parts ?? item.producedParts),
+      goodParts: numberOrNull(item.good_parts ?? item.goodParts),
+      scrapParts: numberOrNull(item.scrap_parts ?? item.scrapParts),
+      status: (item.status ?? item.order_status ?? order?.status ?? null) as string | null,
+      reopenReason: (item.reopen_reason ?? item.reopenReason ?? null) as string | null,
+      warnings: listPayload<unknown>(item.warnings).map(String),
+      history: (order?.statusHistory ?? listPayload<Record<string, unknown>>(item.history ?? item.status_history).map((history) => ({ status: history.status as string | null | undefined, recordedAt: history.recorded_at as string | null | undefined }))),
+    };
+    }),
+  };
+}
+
+function mapHdtPrediction(value: unknown): HdtPrediction {
+  const item = (value && typeof value === 'object' ? value : {}) as Record<string, unknown>;
+  return { id: String(item.id ?? ''), status: String(item.status ?? 'model_unavailable'), score: numberOrNull(item.score ?? item.anomaly_score), threshold: numberOrNull(item.threshold), modelVersion: (item.model_version ?? item.modelVersion) as string | undefined, evaluatedThrough: (item.evaluated_through ?? item.evaluatedThrough) as string | undefined, scoredAt: (item.scored_at ?? item.scoredAt) as string | undefined, reason: (item.reason ?? null) as string | null };
+}
+
 async function readPayload(response: Response): Promise<unknown> {
   if (response.status === 204) return null;
   const text = await response.text();
@@ -642,8 +827,8 @@ export function createApiClient(baseUrl = import.meta.env.VITE_API_URL ?? '/api/
   async function request<T>(path: string, options: RequestOptions = {}, root = apiBase): Promise<T> {
     const response = await fetch(url(path, root), {
       method: options.method ?? 'GET',
-      headers: options.body === undefined ? undefined : { 'Content-Type': 'application/json' },
-      body: options.body === undefined ? undefined : JSON.stringify(options.body),
+      headers: options.body === undefined || options.body instanceof FormData ? undefined : { 'Content-Type': 'application/json' },
+      body: options.body === undefined ? undefined : options.body instanceof FormData ? options.body : JSON.stringify(options.body),
       signal: options.signal,
       credentials: 'include',
       cache: 'no-store',
@@ -728,6 +913,12 @@ export function createApiClient(baseUrl = import.meta.env.VITE_API_URL ?? '/api/
     },
     async getSites() {
       return (await requestAllPages('/sites')).map(mapSite);
+    },
+    async createSite(input) {
+      return mapSite(await request('/sites', { method: 'POST', body: input }));
+    },
+    async deleteSite(siteId) {
+      await request<void>(`/sites/${siteId}`, { method: 'DELETE' });
     },
     async getSite(siteId) {
       return mapSite(await requestWithLegacyFallback(`/sites/${siteId}`));
@@ -849,6 +1040,44 @@ export function createApiClient(baseUrl = import.meta.env.VITE_API_URL ?? '/api/
     async getImports() {
       return (await requestAllPages('/imports')).map(mapImport);
     },
+    async uploadERP(siteId, file) {
+      const body = new FormData(); body.append('file', file);
+      return request<ERPImportRequest>(`/sites/${siteId}/erp-imports`, { method: 'POST', body });
+    },
+    async getERPImports(siteId) { return listPayload<ERPImportRequest>(await request(`/sites/${siteId}/erp-imports`)); },
+    async getERPPreview(importId, refresh = false) { return request<ERPImportPreview>(`/erp-imports/${encodeURIComponent(importId)}/preview${refresh ? '/refresh' : ''}`, refresh ? { method: 'POST' } : {}); },
+    async configureERPPreview(importId, body) { return request<ERPImportPreview>(`/erp-imports/${encodeURIComponent(importId)}/preview`, { method: 'PUT', body }); },
+    async confirmERP(importId, body) { return request<ERPImportRequest>(`/erp-imports/${encodeURIComponent(importId)}/confirm`, { method: 'POST', body }); },
+    async getShiftCalendar(siteId) { return request<ShiftCalendar | null>(`/sites/${siteId}/shift-calendar`); },
+    async saveShiftCalendar(siteId, body) { return request<ShiftCalendar>(`/sites/${siteId}/shift-calendar`, { method: 'PUT', body }); },
+    async getMachineConnection(machineId) { return request<MachineConnection | null>(`/machines/${machineId}/connection`); },
+    async saveMachineConnection(machineId, body) { return request<MachineConnection>(`/machines/${machineId}/connection`, { method: 'PUT', body }); },
+    async testMachineConnection(machineId, body) { return request<MachineConnectionTest>(`/machines/${machineId}/connection/test`, { method: 'POST', body }); },
+    async getContinuityReview(machineId) {
+      const payload = await request<Record<string, unknown>>(`/machines/${machineId}/connection/continuity`);
+      const last = (payload.last_validated ?? {}) as Record<string, unknown>;
+      const available = (payload.available_history ?? {}) as Record<string, unknown>;
+      return { machineId, state: String(payload.state ?? 'unknown'), publicError: payload.public_error as string | null | undefined, lastValidated: { streamId: last.stream_id as string | null | undefined, cursor: last.cursor as string | null | undefined, sequence: numberOrNull(last.sequence), at: last.at as string | null | undefined }, availableHistory: { oldestAvailableAt: available.oldest_available_at as string | null | undefined, fromSequence: numberOrNull(available.from_sequence) }, sourceReference: payload.source_reference as string | null | undefined, automaticLatestJump: payload.automatic_latest_jump === true };
+    },
+    async recoverContinuity(machineId, body) {
+      const payload = await request<Record<string, unknown>>(`/machines/${machineId}/connection/continuity/recover`, { method: 'POST', body: { decision: body.decision, expected_stream_id: body.expectedStreamId, expected_cursor: body.expectedCursor, new_stream_id: body.newStreamId, available_from_sequence: body.availableFromSequence, resume_cursor: body.resumeCursor, confirmation: body.confirmation } });
+      return { ok: payload.ok === true, state: String(payload.state ?? ''), decision: String(payload.decision ?? body.decision), history_gap_preserved: payload.history_gap_preserved === true, automatic_latest_jump: payload.automatic_latest_jump === true };
+    },
+    async getProductionContext(machineId, bounds) {
+      const params = new URLSearchParams();
+      if (bounds.from) params.set('from', bounds.from);
+      if (bounds.to) params.set('to', bounds.to);
+      if (bounds.knownAt) params.set('known_at', bounds.knownAt);
+      return mapProductionContext(await requestWithLegacyFallback(`/machines/${machineId}/production-context?${params.toString()}`));
+    },
+    async getHdtPredictions(machineId, bounds) {
+      const params = new URLSearchParams();
+      if (bounds.from) params.set('from', bounds.from);
+      if (bounds.to) params.set('to', bounds.to);
+      if (bounds.knownAt) params.set('known_at', bounds.knownAt);
+      return listPayload<unknown>(await requestWithLegacyFallback(`/machines/${machineId}/hdt-predictions?${params.toString()}`)).map(mapHdtPrediction);
+    },
+    async createMachine(siteId, body) { return mapMachine(await request(`/sites/${siteId}/machines`, { method: 'POST', body })); },
     async createImportSession(siteId, name) {
       return mapImportSession(await request(`/sites/${siteId}/import-sessions`, { method: 'POST', body: { name } }));
     },
@@ -926,6 +1155,16 @@ export const mockApiClient: ApiClient = {
   getHealth: async () => ({ status: 'ok', service: 'iddrv-demo', database: 'ok', checkedAt: DEMO_DATE, message: 'API de démonstration connectée.' }),
   getReadiness: async () => ({ status: 'ready', service: 'iddrv-demo', database: 'ok', redis: 'ok', model: 'ok', checkedAt: DEMO_DATE }),
   getSites: async () => DEMO_SITES,
+  createSite: async (input) => {
+    const id = Math.max(...DEMO_SITES.map((site) => site.id)) + 1;
+    const site = { id, name: input.name, timezone: input.timezone ?? 'Europe/Paris', status: 'offline' as const, machineCount: 0, openIncidentCount: 0, lastImportAt: null };
+    DEMO_SITES.push(site);
+    return site;
+  },
+  deleteSite: async (siteId) => {
+    const index = DEMO_SITES.findIndex((site) => site.id === siteId);
+    if (index >= 0) DEMO_SITES.splice(index, 1);
+  },
   getSite: async (id) => DEMO_SITES.find((site) => site.id === id) ?? DEMO_SITES[0],
   getMachines: async () => DEMO_MACHINES,
   getMachine: async (id) => DEMO_MACHINES.find((machine) => machine.id === id) ?? DEMO_MACHINES[0],
@@ -978,6 +1217,21 @@ export const mockApiClient: ApiClient = {
   },
   submitFeedback: async (incidentId, verdict, comment) => ({ id: 'feedback-demo', incident_id: incidentId, verdict, comment }),
   getImports: async () => [{ id: 'import-demo', fileName: 'machine_cycles_152.csv', parserType: 'csv_machine_cycles', status: 'completed', importedAt: DEMO_DATE, rowCountTotal: 12500, rowCountAccepted: 12500, rowCountRejected: 0 }],
+  uploadERP: async () => { throw new Error('Le téléversement nécessite une API connectée.'); },
+  getERPImports: async () => [],
+  getERPPreview: async () => { throw new Error('Import indisponible en démonstration.'); },
+  configureERPPreview: async () => { throw new Error('Import indisponible en démonstration.'); },
+  confirmERP: async () => { throw new Error('Import indisponible en démonstration.'); },
+  getShiftCalendar: async () => null,
+  saveShiftCalendar: async () => { throw new Error('Le calendrier nécessite une API connectée.'); },
+  getMachineConnection: async () => null,
+  saveMachineConnection: async () => { throw new Error('La connexion nécessite une API connectée.'); },
+  testMachineConnection: async () => { throw new Error('Le test nécessite une API connectée.'); },
+  getContinuityReview: async (machineId) => ({ machineId, state: 'disabled', lastValidated: {}, availableHistory: {}, automaticLatestJump: false }),
+  recoverContinuity: async () => { throw new Error('La reprise nécessite une API connectée.'); },
+  getProductionContext: async (_machineId, bounds) => ({ knownAt: bounds.knownAt ?? DEMO_DATE, declarations: [{ id: 'demo-declaration', orderRef: 'OF-2025-0012', team: 'A', producedParts: 1200, goodParts: 1166, scrapParts: 34, status: 'open', history: [] }], target: null, erpStatus: null, qualityStatus: 'unknown', coverageStatus: 'incomplete' }),
+  getHdtPredictions: async () => [],
+  createMachine: async () => { throw new Error('La création nécessite une API connectée.'); },
   createImportSession: async (siteId, name) => ({ id: 'session-demo', site_id: siteId, name, status: 'collecting', summary: {}, files: [], created_at: DEMO_DATE, updated_at: DEMO_DATE }),
   getImportSession: async () => ({ id: 'session-demo', site_id: 1, name: 'Projet usine pilote', status: 'profiling', summary: { recognizedColumns: 18, unknownColumns: 2, confidence: .91 }, files: [], created_at: DEMO_DATE, updated_at: DEMO_DATE }),
   registerImportFile: async (sessionId, file) => ({ id: sessionId, site_id: 1, name: 'Projet usine pilote', status: 'profiling', summary: { recognizedColumns: 6, unknownColumns: 1, confidence: .84 }, files: [{ id: `file-${file.file_name}`, ...file, status: 'needs_review', profile: { columns: ['machine_id', 'timestamp', 'cycle_time_s'], recognized: ['machine_id', 'timestamp'], unknown: ['cycle_time_s'], confidence: .84 } }], created_at: DEMO_DATE, updated_at: DEMO_DATE }),

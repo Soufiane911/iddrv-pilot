@@ -71,7 +71,8 @@ describe('ProcessDriftPanel', () => {
     renderPanel(drift);
     expect(await screen.findByText('Dérive détectée')).toBeInTheDocument();
     expect(screen.getByText('0,73')).toBeInTheDocument();
-    expect(screen.getByText(/cycle time s · variabilité 20 cycles/i)).toBeInTheDocument();
+    expect(screen.getByText(/Temps de cycle · variabilité sur 20 cycles/i)).toBeInTheDocument();
+    expect(screen.getByText('Signaux contributifs et modèle').closest('details')).not.toHaveAttribute('open');
   });
 
   it('affiche une erreur récupérable', async () => {

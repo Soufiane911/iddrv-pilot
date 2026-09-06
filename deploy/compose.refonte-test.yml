@@ -1,0 +1,85 @@
+name: iddrv-refonte-test
+
+services:
+  timescaledb:
+    image: timescale/timescaledb:2.28.2-pg16
+    environment:
+      POSTGRES_DB: iddrv_test
+      POSTGRES_USER: iddrv_owner
+      POSTGRES_PASSWORD: ${REFONTE_TEST_DB_PASSWORD:?REFONTE_TEST_DB_PASSWORD is required}
+      TIMESCALEDB_TELEMETRY: 'off'
+    volumes:
+      - iddrv_refonte_test_db:/var/lib/postgresql/data
+      - ../db/init.sql:/docker-entrypoint-initdb.d/01_init.sql:ro
+      - ../db/seed_data.sql:/docker-entrypoint-initdb.d/02_seed.sql:ro
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U iddrv_owner -d iddrv_test']
+  redis:
+    image: redis:7-alpine
+    volumes: [iddrv_refonte_test_redis:/data]
+    healthcheck: { test: [CMD, redis-cli, ping] }
+  migrate:
+    build: { context: .., dockerfile: backend/Dockerfile }
+    environment:
+      OWNER_DATABASE_URL: postgresql://iddrv_owner:${REFONTE_TEST_DB_PASSWORD}@timescaledb:5432/iddrv_test
+      APP_ENV: test
+    depends_on: { timescaledb: { condition: service_healthy } }
+    command: [sh, -c, 'export DATABASE_URL="$$OWNER_DATABASE_URL"; python db/setup_db.py']
+  api:
+    build: { context: .., dockerfile: backend/Dockerfile }
+    environment:
+      DATABASE_URL: postgresql://iddrv_owner:${REFONTE_TEST_DB_PASSWORD}@timescaledb:5432/iddrv_test
+      REDIS_URL: redis://redis:6379/0
+      APP_ENV: test
+      SESSION_SECRET: ${REFONTE_TEST_SESSION_SECRET:?REFONTE_TEST_SESSION_SECRET is required}
+      ALLOW_ANONYMOUS_READS: 'false'
+      TELEMETRY_ALLOWED_ORIGINS: http://press-api:8090
+      TELEMETRY_ALLOW_HTTP: 'true'
+      ERP_UPLOAD_ROOT: /var/lib/iddrv/uploads
+    volumes: [iddrv_refonte_test_files:/var/lib/iddrv]
+    depends_on: { migrate: { condition: service_completed_successfully }, redis: { condition: service_healthy } }
+    command: [uvicorn, backend.app.main:app, --host, 0.0.0.0, --port, '8000']
+  worker:
+    build: { context: .., dockerfile: backend/Dockerfile }
+    environment:
+      WORKER_DATABASE_URL: postgresql://iddrv_owner:${REFONTE_TEST_DB_PASSWORD}@timescaledb:5432/iddrv_test
+      DATABASE_URL: postgresql://iddrv_owner:${REFONTE_TEST_DB_PASSWORD}@timescaledb:5432/iddrv_test
+      REDIS_URL: redis://redis:6379/0
+      APP_ENV: test
+    depends_on: { api: { condition: service_started } }
+    command: [python, -m, ingest.watcher, --root, /var/lib/iddrv, --poll-seconds, '1', --stable-seconds, '1']
+    volumes: [iddrv_refonte_test_files:/var/lib/iddrv]
+  collector:
+    build: { context: .., dockerfile: backend/Dockerfile }
+    environment:
+      WORKER_DATABASE_URL: postgresql://iddrv_owner:${REFONTE_TEST_DB_PASSWORD}@timescaledb:5432/iddrv_test
+      TELEMETRY_ALLOWED_ORIGINS: http://press-api:8090
+      TELEMETRY_ALLOW_HTTP: 'true'
+    depends_on: { migrate: { condition: service_completed_successfully } }
+    command: [python, -m, ingest.telemetry.collector]
+  scorer:
+    build: { context: .., dockerfile: backend/Dockerfile }
+    environment:
+      WORKER_DATABASE_URL: postgresql://iddrv_owner:${REFONTE_TEST_DB_PASSWORD}@timescaledb:5432/iddrv_test
+      PROCESS_DRIFT_MODEL_PATH: /app/models/process_drift_hdt_v1.joblib
+    depends_on: { migrate: { condition: service_completed_successfully } }
+    command: [python, -m, ingest.telemetry.scorer]
+  web:
+    build:
+      context: ..
+      dockerfile: frontend/Dockerfile
+      args: { VITE_DEMO_MODE: 'false', VITE_SKIP_AUTH: 'false', VITE_ENABLE_3D: 'false' }
+    ports: ['127.0.0.1:8088:80']
+    depends_on: { api: { condition: service_started } }
+  press-api:
+    build: { context: .., dockerfile: tests/fixtures/press_api/Dockerfile }
+    environment: { PRESS_FIXTURE_DB: /var/lib/press/press.sqlite, PRESS_FIXTURE_CONTROL_TOKEN: synthetic-refonte-control }
+    command: [uvicorn, tests.fixtures.press_api.app:app, --host, 0.0.0.0, --port, '8090']
+    ports: ['127.0.0.1:8091:8090']
+    volumes: [iddrv_refonte_test_press:/var/lib/press]
+
+volumes:
+  iddrv_refonte_test_db:
+  iddrv_refonte_test_redis:
+  iddrv_refonte_test_files:
+  iddrv_refonte_test_press:

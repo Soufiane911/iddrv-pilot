@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useApi } from '../App';
+import { ToolsNavigation } from '../components/ToolsNavigation';
 import { formatDate, formatNumber, MetricCard, SectionTitle, StatePanel } from '../components/Ui';
 import { HdtScoreHistory } from '../components/monitoring/HdtScoreHistory';
 import { HdtSimulator } from '../components/monitoring/HdtSimulator';
@@ -59,6 +60,7 @@ export function ModelMonitoringPage() {
 
   return (
     <section className="page page-wide">
+      <ToolsNavigation />
       <div className="page-intro">
         <div>
           <p className="eyebrow">INTELLIGENCE ARTIFICIELLE</p>

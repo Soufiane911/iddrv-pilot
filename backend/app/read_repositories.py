@@ -202,8 +202,16 @@ def machine_status(machine_id: int, as_of: datetime):
             cur.execute(
                 f"""WITH params AS (SELECT %s::timestamptz AS as_of),
                    latest AS (
-                     SELECT c.time,c.production_order_id,c.data_quality_status
+                     SELECT c.time,
+                            CASE WHEN c.source_event_id IS NULL THEN c.production_order_id ELSE d.production_order_id END AS production_order_id,
+                            c.data_quality_status
                      FROM machine_cycles c CROSS JOIN params
+                     JOIN machines m ON m.id=c.machine_id
+                     LEFT JOIN LATERAL (SELECT l.declaration_id FROM cycle_context_links l
+                         WHERE l.site_id=m.site_id AND l.machine_id=c.machine_id AND l.cycle_time=c.time
+                           AND l.cycle_key=coalesce(c.source_event_id::text,'legacy:'||c.context_cycle_id::text)
+                           AND l.created_at<=params.as_of ORDER BY l.created_at DESC LIMIT 1) context ON true
+                     LEFT JOIN erp_declarations d ON d.id=context.declaration_id AND d.site_id=m.site_id
                      WHERE c.machine_id=%s AND c.time<=params.as_of
                      ORDER BY c.time DESC, c.cycle_counter DESC NULLS LAST,
                               c.source_row_hash DESC NULLS LAST LIMIT 1
@@ -267,7 +275,7 @@ def raw_cycles(machine_id: int, as_of: datetime, limit: int = 20):
                             c.barrel_temp_zone2_c,
                             c.barrel_temp_zone3_c,
                             c.oil_temperature_c,
-                            c.energy_kwh
+                            c.energy_kwh,c.scrap_flag,c.good_parts
                      FROM machine_cycles c
                      JOIN machines m ON m.id=c.machine_id
                      WHERE c.machine_id=%s AND c.time<=%s
@@ -279,7 +287,7 @@ def raw_cycles(machine_id: int, as_of: datetime, limit: int = 20):
                           switchover_position_mm,switchover_pressure_bar,
                           peak_pressure_bar,clamp_force_kn,mold_temperature_c,
                           barrel_temp_zone1_c,barrel_temp_zone2_c,
-                          barrel_temp_zone3_c,oil_temperature_c,energy_kwh
+                          barrel_temp_zone3_c,oil_temperature_c,energy_kwh,scrap_flag,good_parts
                    FROM bounded_cycles
                    ORDER BY time ASC, cycle_counter ASC NULLS LAST, source_row_hash ASC NULLS LAST""",
                 (machine_id, as_of, limit),
@@ -304,6 +312,8 @@ def raw_cycles(machine_id: int, as_of: datetime, limit: int = 20):
             "barrel_temp_zone3_c": _numeric(row[14]),
             "oil_temperature_c": _numeric(row[15]),
             "energy_kwh": _numeric(row[16]),
+            "scrap_flag": row[17],
+            "good_parts": row[18],
         }
         for row in rows
     ]
@@ -348,60 +358,27 @@ def timeline(machine_id: int, start: datetime, end: datetime, bucket: str):
 
 
 def quality(machine_id: int, start: datetime, end: datetime):
-    with get_connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                """SELECT COUNT(*)::int,COALESCE(SUM(q.defect_count),0)::int,
-                          COALESCE(SUM(CASE WHEN lower(COALESCE(q.part_quality_status,''))='scrap' OR q.defect_count>0 THEN 1 ELSE 0 END),0)::int
-                   FROM quality_checks q WHERE q.machine_id=%s AND q.time>=%s AND q.time<=%s""",
-                (machine_id, start, end),
-            )
-            total, defects, scrap = cur.fetchone()
-            cur.execute(
-                """SELECT COUNT(*)::int,COALESCE(SUM(c.scrap_flag::int),0)::int,
-                          COUNT(*) FILTER (WHERE c.defect_type IS NOT NULL)::int
-                   FROM machine_cycles c WHERE c.machine_id=%s AND c.time>=%s AND c.time<=%s""",
-                (machine_id, start, end),
-            )
-            cycle_total, cycle_scrap, cycle_defects = cur.fetchone()
-            cur.execute(
-                """SELECT COALESCE(q.defect_type,'unknown'),COUNT(*)::int
-                   FROM quality_checks q WHERE q.machine_id=%s AND q.time>=%s AND q.time<=%s
-                   GROUP BY COALESCE(q.defect_type,'unknown') ORDER BY COUNT(*) DESC""",
-                (machine_id, start, end),
-            )
-            defect_rows = cur.fetchall()
-            cur.execute(
-                """SELECT COALESCE(c.defect_type,'unknown'),COUNT(*)::int
-                   FROM machine_cycles c WHERE c.machine_id=%s AND c.time>=%s AND c.time<=%s
-                   GROUP BY COALESCE(c.defect_type,'unknown') ORDER BY COUNT(*) DESC LIMIT 100""",
-                (machine_id, start, end),
-            )
-            cycle_defect_rows = cur.fetchall()
-    total = total or 0
-    defects = defects or 0
-    scrap = scrap or 0
-    cycle_total = cycle_total or 0
-    cycle_scrap = cycle_scrap or 0
-    cycle_defects = cycle_defects or 0
-    if cycle_total:
-        # Cycle aggregates are the denominator for a rate; quality samples
-        # are sparse and must not make a scrap count exceed 100 percent.
-        total = cycle_total
-        scrap = cycle_scrap
-        defects = max(defects, cycle_defects or cycle_scrap)
-    elif total == 0:
-        total = cycle_total
-        defects = cycle_defects or cycle_scrap
-    if not defect_rows and cycle_defects:
-        # Keep this aggregate bounded and useful even when no dedicated
-        # quality-check export was supplied for a machine.
-        defect_rows = cycle_defect_rows
-    summaries = [{"defect_type": r[0], "type": r[0], "count": r[1]} for r in defect_rows]
-    return {"machine_id": machine_id, "from": start, "to": end, "total_checks": total,
-            "total_defects": defects, "scrap_count": scrap, "scrap_rate": scrap / total if total else None,
-            "by_defect": summaries, "total": total, "good": max(0, total - scrap), "scrap": scrap,
-            "defects": summaries}
+    with get_connection() as conn, conn.cursor() as cur:
+        cur.execute("""SELECT COUNT(*)::int,COUNT(c.scrap_flag)::int,SUM(c.scrap_flag::int)::int
+                       FROM machine_cycles c WHERE c.machine_id=%s AND c.time>=%s AND c.time<=%s""", (machine_id, start, end))
+        cycle_count, known, scrap = cur.fetchone()
+        cur.execute("""SELECT COUNT(*)::int,SUM(q.defect_count) FILTER (WHERE q.sample_size>0)::int,
+                              SUM(q.sample_size) FILTER (WHERE q.defect_count IS NOT NULL AND q.sample_size>0)::int FROM quality_checks q
+                       WHERE q.machine_id=%s AND q.time>=%s AND q.time<=%s""", (machine_id, start, end))
+        check_count, check_defects, sample_size = cur.fetchone()
+        cur.execute("""SELECT c.defect_type,COUNT(*)::int FROM machine_cycles c
+                       WHERE c.machine_id=%s AND c.time>=%s AND c.time<=%s AND c.scrap_flag IS TRUE
+                       GROUP BY c.defect_type ORDER BY COUNT(*) DESC LIMIT 100""", (machine_id, start, end))
+        summaries = [{"defect_type": row[0] or 'unknown', "type": row[0] or 'unknown', "count": row[1]} for row in cur.fetchall()]
+    quality_source = 'cycle' if known else 'quality_checks' if sample_size else 'unknown'
+    measured_total = known if known else sample_size or 0
+    measured_scrap = scrap if known else check_defects if sample_size else None
+    return {"machine_id": machine_id, "from": start, "to": end, "total_checks": check_count,
+            "total_defects": check_defects or 0, "scrap_count": measured_scrap, "scrap_rate": measured_scrap / measured_total if measured_total else None,
+            "by_defect": summaries, "total": measured_total, "good": measured_total - measured_scrap if measured_total else None, "scrap": measured_scrap,
+            "defects": summaries, "quality_coverage": known / cycle_count if cycle_count else None,
+            "cycle_count": cycle_count, "quality_known_cycles": known,
+            "quality_source": quality_source, "quality_checks_source": {"observations": check_count, "defects": check_defects, "sample_size": sample_size}}
 
 
 def list_imports(*, site_ids: tuple[int, ...] | None = None, site_id: int | None = None, limit: int = 100, cursor: str | None = None):

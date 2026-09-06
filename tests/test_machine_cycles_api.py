@@ -222,3 +222,39 @@ def test_machine_cycles_never_use_ground_truth_json():
         Path("backend/app/read_repositories.py").read_text(encoding="utf-8"),
     ]
     assert all("ground_truth.json" not in source for source in sources)
+
+
+def test_quality_rate_uses_only_known_cycles(monkeypatch):
+    from contextlib import contextmanager
+    from backend.app.read_repositories import quality
+    class Cursor:
+        def __init__(self):
+            self.rows = iter([(10, 2, 1), (0, None, None)])
+        def __enter__(self): return self
+        def __exit__(self, *args): pass
+        def execute(self, sql, params):
+            if 'machine_cycles c' in sql and 'SELECT COUNT' in sql:
+                assert 'COUNT(c.scrap_flag)' in sql
+        def fetchone(self): return next(self.rows)
+        def fetchall(self): return [('unknown', 1)]
+    class Connection:
+        def cursor(self): return Cursor()
+    @contextmanager
+    def connection(): yield Connection()
+    monkeypatch.setattr('backend.app.read_repositories.get_connection', connection)
+    result = quality(7, AS_OF - timedelta(hours=1), AS_OF)
+    assert result['scrap_rate'] == .5
+    assert result['quality_coverage'] == .2
+    assert result['total'] == 2 and result['good'] == 1
+
+
+@pytest.mark.parametrize('flag', [None, False, True])
+def test_cycle_response_preserves_three_quality_states(monkeypatch, flag):
+    _install_machine(monkeypatch, _machine())
+    cycle = _cycle(0)
+    cycle.update(scrap_flag=flag, good_parts=None if flag is None else int(not flag))
+    _install_memory_reader(monkeypatch, [cycle], [])
+    response = client.get(f'/api/v1/machines/{MACHINE_ID}/cycles?to={AS_OF_QUERY}')
+    assert response.status_code == 200
+    assert response.json()['items'][0]['scrap_flag'] is flag
+    assert response.json()['items'][0]['good_parts'] == cycle['good_parts']

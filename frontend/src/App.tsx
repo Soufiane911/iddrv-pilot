@@ -12,11 +12,9 @@ import { IncidentDetailPage } from './pages/IncidentDetailPage';
 import { IncidentsPage } from './pages/IncidentsPage';
 import { LoginPage } from './pages/LoginPage';
 import { ModelMonitoringPage } from './pages/ModelMonitoringPage';
-import { OpportunitiesPage } from './pages/OpportunitiesPage';
 import { OverviewPage } from './pages/OverviewPage';
 import { ShowroomPage } from './pages/ShowroomPage';
 import { SitesPage } from './pages/SitesPage';
-import { WorkspacePage } from './pages/WorkspacePage';
 import './styles.css';
 
 const WorkshopPage = lazy(() => import('./pages/WorkshopPage').then((module) => ({ default: module.WorkshopPage })));
@@ -34,7 +32,6 @@ function createQueryClient() {
   });
 }
 
-const testQueryClient = createQueryClient();
 const ApiContext = createContext<ApiClient>(apiClient);
 
 export function useApi(): ApiClient {
@@ -92,10 +89,10 @@ export function App({ api = apiClient }: { api?: ApiClient }) {
             <Route index element={<Navigate to="/overview" replace />} />
             <Route path="overview" element={<OverviewPage />} />
             <Route path="showroom" element={<ShowroomPage />} />
-            <Route path="workspace" element={<WorkspacePage />} />
+            <Route path="workspace" element={<Navigate to="/imports" replace />} />
             <Route path="sites" element={<SitesPage />} />
             <Route path="sites/:siteId/workshop" element={<Suspense fallback={<section className="page"><StatePanel tone="loading" title="Chargement de l’atelier" text="Préparation du plan 2D." /></section>}><WorkshopPage /></Suspense>} />
-            <Route path="sites/:siteId/opportunities" element={<OpportunitiesPage />} />
+            <Route path="sites/:siteId/opportunities" element={<Navigate to="/incidents" replace />} />
             <Route path="incidents" element={<IncidentsPage />} />
             <Route path="incidents/:incidentId" element={<IncidentDetailPage />} />
             <Route path="imports" element={<ImportsPage />} />
@@ -111,7 +108,8 @@ export function App({ api = apiClient }: { api?: ApiClient }) {
 }
 
 export function AppTestShell({ children, api = apiClient }: { children: ReactNode; api?: ApiClient }) {
-  return <QueryClientProvider client={testQueryClient}>
+  const [queryClient] = useState(createQueryClient);
+  return <QueryClientProvider client={queryClient}>
     <ApiContext.Provider value={api}>{children}</ApiContext.Provider>
   </QueryClientProvider>;
 }

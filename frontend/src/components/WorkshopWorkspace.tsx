@@ -4,7 +4,11 @@ import { SkipBackIcon } from '@phosphor-icons/react/SkipBack';
 import { SkipForwardIcon } from '@phosphor-icons/react/SkipForward';
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import type { ApiClient, Incident, Machine, ProcessDriftCycle, Site, TimelinePoint } from '../lib/api';
+import type { ApiClient, HdtPrediction, Incident, Machine, ProcessDriftCycle, ProductionContext, Site, TimelinePoint } from '../lib/api';
+import { MachineConnectionPanel } from './workshop/MachineConnectionPanel';
+import { MachineSourceStatus, type CycleState, type ErpState, type HdtState, type SourceState } from './workshop/MachineSourceStatus';
+import { ProductionContextPanel } from './workshop/ProductionContextPanel';
+import { WorkshopTimeControls, type WorkshopTimeMode } from './workshop/WorkshopTimeControls';
 import { ProcessDriftPanel } from './ProcessDriftPanel';
 import {
   formatNumber,
@@ -14,6 +18,12 @@ import {
   StatusBadge,
 } from './Ui';
 export type WorkshopViewMode = '2d' | '3d';
+
+export function workshopSourceState(connectionApiPresent: boolean, machinePresent: boolean, connectionState?: string | null): SourceState {
+  if (!connectionApiPresent || !machinePresent || !connectionState || connectionState === 'disabled') return 'disconnected';
+  if (['retrying', 'gap_detected', 'access_error', 'configuration_error', 'contract_error'].includes(connectionState)) return 'interrupted';
+  return 'reachable';
+}
 
 export function formatWorkshopDate(value?: string | null, timeZone?: string, withTime = true): string {
   if (!value) return 'N/D';
@@ -29,6 +39,8 @@ export function formatWorkshopDate(value?: string | null, timeZone?: string, wit
 
 interface Props {
   site?: Site;
+  replayReady?: boolean;
+  connectionApi?: ApiClient;
   machines: Machine[];
   activeMachine?: Machine;
   machineIncidents: Incident[];
@@ -66,6 +78,14 @@ interface Props {
   visualization: ReactNode;
   onReplayChange: (value: number) => void;
   onViewModeChange: (mode: WorkshopViewMode) => void;
+  timeMode?: WorkshopTimeMode;
+  onTimeModeChange?: (mode: WorkshopTimeMode) => void;
+  selectedAt?: string;
+  onSelectedAtChange?: (value: string) => void;
+  onRefresh?: () => void;
+  productionContext?: ProductionContext | null;
+  persistedPrediction?: HdtPrediction | null;
+  connectionState?: string | null;
 }
 
 interface TrendSeries {
@@ -147,13 +167,17 @@ function WorkshopTrend({ points, incidents, range, replayPercent, unavailable, l
   </div>;
 }
 
-export function WorkshopWorkspace({ site, machines, activeMachine, machineIncidents, timelineIncidents, siteIncidentCount, incidentsUnavailable = false, statusUnavailable = false, statusLoading = false, statusDataInconsistent = false, sourceCutoffPartial = false, threeDUnavailable = false, qualityUnavailable = false, qualityLoading = false, hasQualityWindow = false, timelineUnavailable = false, timelineLoading = false, status, scrapRate, scrap, qualityTotal, replayAt, selectedReplayAt, replayPending = false, range, replayPercent, timeline, processDriftApi, processDriftSiteId, processDriftCycles, processDriftCyclesLoading = false, processDriftCyclesError = null, onProcessDriftCyclesRetry, viewMode, feature3dEnabled, visualization, onReplayChange, onViewModeChange }: Props) {
+export function WorkshopWorkspace({ site, replayReady = true, connectionApi, machines, activeMachine, machineIncidents, timelineIncidents, siteIncidentCount, incidentsUnavailable = false, statusUnavailable = false, statusLoading = false, statusDataInconsistent = false, sourceCutoffPartial = false, threeDUnavailable = false, qualityUnavailable = false, qualityLoading = false, hasQualityWindow = false, timelineUnavailable = false, timelineLoading = false, status, scrapRate, scrap, qualityTotal, replayAt, selectedReplayAt, replayPending = false, range, replayPercent, timeline, processDriftApi, processDriftSiteId, processDriftCycles, processDriftCyclesLoading = false, processDriftCyclesError = null, onProcessDriftCyclesRetry, viewMode, feature3dEnabled, visualization, onReplayChange, onViewModeChange, timeMode = 'replay', onTimeModeChange, selectedAt = selectedReplayAt, onSelectedAtChange, onRefresh, productionContext, persistedPrediction, connectionState }: Props) {
   const statusCoverageComplete = machines.every((machine) => machine.status !== undefined && machine.status !== null);
   const summaryUnavailable = statusUnavailable || statusLoading || !statusCoverageComplete;
   const running = machines.filter((machine) => machine.status === 'running').length;
   const warning = machines.filter((machine) => machine.status === 'warning').length;
   const cyclesAvailable = typeof activeMachine?.metrics?.cycleCount24h === 'number';
   const displayDate = (value?: string | null, withTime = true) => formatWorkshopDate(value, site?.timezone, withTime);
+  const sourceState = workshopSourceState(Boolean(connectionApi), Boolean(activeMachine), connectionState);
+  const cycleState: CycleState = cyclesAvailable ? 'received' : 'waiting';
+  const erpState: ErpState = productionContext?.declarations?.length ? 'available' : 'pending';
+  const hdtState: HdtState = persistedPrediction?.status === 'scored' ? 'scored' : processDriftCycles.length >= 20 ? 'building' : 'unknown';
 
   return <section className="workshop-console" aria-label="Poste de supervision de l’atelier">
     <header className="workshop-console-bar">
@@ -162,13 +186,15 @@ export function WorkshopWorkspace({ site, machines, activeMachine, machineIncide
         <div><span>ATELIER · {site?.timezone ?? 'UTC'}</span><h2>{site?.name ?? 'Atelier'}</h2></div>
       </div>
       <div className="workshop-console-context">
-        <span><small>HORODATAGE SÉLECTIONNÉ</small><strong>{displayDate(selectedReplayAt)}</strong></span>
+        <span><small>HORODATAGE SÉLECTIONNÉ</small><strong>{replayReady ? displayDate(selectedReplayAt) : 'Aucune donnée source'}</strong></span>
       </div>
       {feature3dEnabled ? <div className="workshop-console-modes" role="group" aria-label="Mode de visualisation">
         <button type="button" aria-pressed={viewMode === '2d'} className={viewMode === '2d' ? 'active' : ''} onClick={() => onViewModeChange('2d')}>2D</button>
         <button type="button" aria-pressed={viewMode === '3d'} className={viewMode === '3d' ? 'active' : ''} onClick={() => onViewModeChange('3d')}>3D</button>
       </div> : <span className="workshop-console-mode-static">Plan 2D</span>}
     </header>
+    {onTimeModeChange && onSelectedAtChange ? <WorkshopTimeControls mode={timeMode} selectedAt={selectedAt} onModeChange={onTimeModeChange} onSelectedAtChange={onSelectedAtChange} onRefresh={onRefresh} /> : null}
+    <MachineSourceStatus sourceState={sourceState} cycleState={cycleState} erpState={erpState} hdtState={hdtState} />
 
     <section className="workshop-console-summary" aria-label="Résumé du parc à l’horodatage choisi">
       <div><span>EN PRODUCTION</span><strong>{summaryUnavailable ? 'N/D' : <>{running}<small> / {machines.length}</small></>}</strong><i className="summary-bar summary-bar-running" aria-hidden="true" /></div>
@@ -180,9 +206,9 @@ export function WorkshopWorkspace({ site, machines, activeMachine, machineIncide
       <section className="workshop-console-scene" aria-labelledby="workshop-scene-title">
         <div className="workshop-scene-heading">
           <div><span>VUE SPATIALE DU PARC</span><h3 id="workshop-scene-title">État des presses</h3></div>
-          <div className={`workshop-scene-state${replayPending ? ' pending' : ''}`}><i aria-hidden="true" />{replayPending ? 'Mise à jour' : 'Lecture historique'}<strong>{displayDate(replayAt)}</strong></div>
+          <div className={`workshop-scene-state${replayPending ? ' pending' : ''}`}><i aria-hidden="true" />{!replayReady ? 'Mesures inconnues' : replayPending ? 'Mise à jour' : 'Lecture historique'}<strong>{replayReady ? displayDate(replayAt) : 'En attente de cycles'}</strong></div>
         </div>
-        <p className="visually-hidden" role="status" aria-live="polite">{replayPending ? 'Mise à jour de la borne historique.' : `Données chargées au ${displayDate(replayAt)}.`}</p>
+        <p className="visually-hidden" role="status" aria-live="polite">{!replayReady ? 'Aucune donnée source disponible.' : replayPending ? 'Mise à jour de la borne historique.' : `Données chargées au ${displayDate(replayAt)}.`}</p>
         {sourceCutoffPartial ? <p className="workshop-inline-alert">Borne partielle : certaines presses n’ont pas fourni leur dernier cycle.</p> : null}
         {statusDataInconsistent ? <p className="workshop-inline-alert">Réponse temporelle incohérente pour une ou plusieurs presses. Les valeurs concernées restent inconnues.</p> : null}
         {threeDUnavailable ? <p className="workshop-inline-alert">Vue 3D indisponible. Le plan 2D reste actif avec la même sélection et la même borne.</p> : null}
@@ -193,9 +219,11 @@ export function WorkshopWorkspace({ site, machines, activeMachine, machineIncide
       <aside className="workshop-console-inspector" aria-label="Détail de la presse sélectionnée">
         <div className="workshop-inspector-kicker"><span>ÉQUIPEMENT SÉLECTIONNÉ</span><StatusBadge value={status ?? activeMachine?.status} /></div>
         <div className="workshop-inspector-title"><small>{activeMachine?.brand ?? 'Presse industrielle'}</small><h3>{activeMachine?.name ?? 'Aucune sélection'}</h3><p>{activeMachine?.erpRef ? `ERP · ${activeMachine.erpRef}` : 'Sélectionnez une presse sur le plan'}</p></div>
+        {activeMachine ? <Link className="button-ghost workshop-manual-machine-link" to={`/imports?site=${site?.id ?? ''}`}>Ajouter une presse manuellement</Link> : null}
         {statusLoading ? <p className="helper-status">Lecture des statuts historiques…</p> : null}
         {statusUnavailable ? <p className="helper-error">Statut historique indisponible pour une partie du parc.</p> : null}
         {activeMachine ? <>
+          {connectionApi && <MachineConnectionPanel key={activeMachine.id} api={connectionApi} machine={activeMachine} />}
           <dl className="workshop-inspector-metrics">
             <div><dt>{cyclesAvailable ? 'Cycles sur 24 h' : 'TRS'}</dt><dd>{cyclesAvailable ? formatNumber(activeMachine.metrics?.cycleCount24h, 0) : formatPercent(activeMachine.metrics?.trs)}</dd><small>au point sélectionné</small></div>
             <div><dt>Rebuts</dt><dd>{formatPercent(scrapRate)}</dd><small>{scrap ?? 'N/D'} pièces · période</small></div>
@@ -210,12 +238,13 @@ export function WorkshopWorkspace({ site, machines, activeMachine, machineIncide
             <header><span>QUALITÉ SUR LA PÉRIODE</span></header>
             {replayPending ? <p className="helper-status">Mise à jour de la borne qualité…</p> : !hasQualityWindow ? <p>Déplacez le replay pour ouvrir une période de calcul.</p> : qualityUnavailable ? <p className="helper-error">Métriques qualité indisponibles.</p> : qualityLoading ? <p className="helper-status">Lecture de la qualité…</p> : typeof qualityTotal !== 'number' || qualityTotal <= 0 ? <p>Aucune observation qualité dans cette période.</p> : typeof scrapRate !== 'number' ? <p className="helper-error">Réponse qualité incomplète pour cette période.</p> : <div className={`workshop-quality ${scrapRate > .1 ? 'danger' : ''}`}><strong>{formatPercent(scrapRate)}</strong><span>{formatNumber(qualityTotal, 0)} observations</span></div>}
           </section>
-          <ProcessDriftPanel api={processDriftApi} siteId={processDriftSiteId} cycles={processDriftCycles} cyclesLoading={processDriftCyclesLoading} cyclesError={processDriftCyclesError} onRetryCycles={onProcessDriftCyclesRetry} machineName={activeMachine.name} />
+          {replayReady && <ProcessDriftPanel api={processDriftApi} siteId={processDriftSiteId} cycles={processDriftCycles} cyclesLoading={processDriftCyclesLoading} cyclesError={processDriftCyclesError} onRetryCycles={onProcessDriftCyclesRetry} machineName={activeMachine.name} persistedPrediction={persistedPrediction} readOnly={timeMode === 'direct'} />}
+          <ProductionContextPanel context={productionContext} />
         </> : null}
       </aside>
     </div>
 
-    <footer className="workshop-console-timeline">
+    {replayReady && <footer className="workshop-console-timeline">
       <div className="workshop-timeline-heading"><div><span>REPLAY TEMPOREL</span><strong>{displayDate(selectedReplayAt)}</strong></div><p>{replayPending ? `Données encore affichées au ${displayDate(replayAt)}.` : 'La carte, l’inspecteur et les anomalies partagent la borne chargée.'}</p></div>
       <WorkshopTrend points={timeline} incidents={timelineIncidents} range={range} replayPercent={replayPercent} unavailable={timelineUnavailable} loading={timelineLoading} />
       <p id="workshop-replay-description" className="visually-hidden">Période du {displayDate(range.start)} au {displayDate(range.end)}.</p>
@@ -226,6 +255,6 @@ export function WorkshopWorkspace({ site, machines, activeMachine, machineIncide
         <time>{displayDate(range.end)}</time>
         <button type="button" aria-label="Aller à la fin de la période" onClick={() => onReplayChange(100)}><SkipForwardIcon size={18} aria-hidden="true" /></button>
       </div>
-    </footer>
+    </footer>}
   </section>;
 }

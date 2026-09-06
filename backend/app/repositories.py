@@ -75,12 +75,12 @@ def validate_import_session(session_id: UUID, user_id: str):
     return get_import_session(session_id)
 
 def _incident(row):
-    keys = ("id","site_id","machine_id","machine_erp_ref","production_order_id","status","severity","symptom","defect_type","started_at","ended_at","created_at","data_cutoff","confidence","feedback_verdict")
+    keys = ("id","site_id","machine_id","machine_erp_ref","production_order_id","status","severity","symptom","defect_type","started_at","ended_at","created_at","data_cutoff","confidence","feedback_verdict","origin")
     return dict(zip(keys, row))
 
 _INCIDENT_SELECT = """SELECT i.id,i.site_id,i.machine_id,m.erp_ref,i.production_order_id,i.status,
        i.severity,i.symptom,i.defect_type,i.started_at,i.ended_at,i.created_at,
-       i.data_cutoff,i.confidence,latest_feedback.verdict
+       i.data_cutoff,i.confidence,latest_feedback.verdict,i.origin
        FROM incidents i
        LEFT JOIN machines m ON m.id=i.machine_id
        LEFT JOIN LATERAL (
@@ -131,7 +131,16 @@ def get_incident(incident_id: UUID, allowed_site_ids=None):
         with conn.cursor() as cur:
             cur.execute(_INCIDENT_SELECT + where, args)
             row = cur.fetchone()
-    return _incident(row) if row is not None else None
+            result = _incident(row) if row is not None else None
+            if result and result.get('origin') == 'process_drift':
+                cur.execute('''SELECT p.id,p.score,p.threshold,p.signals,p.status,p.evaluated_through,p.scored_at,p.model_scope,p.reason
+                    FROM process_drift_episode_predictions ep JOIN hdt_predictions p ON p.id=ep.prediction_id
+                      AND p.site_id=ep.site_id AND p.machine_id=ep.machine_id
+                    WHERE ep.incident_id=%s AND ep.site_id=%s AND ep.machine_id=%s
+                    ORDER BY p.evaluated_through DESC LIMIT 100''',(str(incident_id),result['site_id'],result['machine_id']))
+                names=('prediction_id','score','threshold','signals','status','evaluated_through','scored_at','model_scope','reason')
+                result['process_observations'] = [dict(zip(names,item)) for item in cur.fetchall()]
+    return result
 
 def get_evidence(incident_id: UUID):
     sql = """SELECT e.id,e.source_kind,e.source_ref,e.metric,e.window_start,e.window_end,
@@ -152,11 +161,11 @@ def get_evidence(incident_id: UUID):
                 rows.append(dict(id=r[0],source_kind=r[1],source_ref=r[2],metric=r[3],window={"start":r[4],"end":r[5]},observation=r[6],baseline=r[7],delta=float(r[8]) if r[8] is not None else None,supports=r[9],excerpt=r[10]))
             return rows
 
-def save_feedback(incident_id: UUID, verdict: str, comment: str | None):
-    sql="INSERT INTO feedback (incident_id,verdict,comment) VALUES (%s,%s,%s) RETURNING id,incident_id,verdict,comment"
+def save_feedback(incident_id: UUID, verdict: str, comment: str | None, run_id=None):
+    sql="INSERT INTO feedback (incident_id,verdict,comment,run_id) VALUES (%s,%s,%s,%s) RETURNING id,incident_id,verdict,comment"
     with get_connection() as conn:
         with conn.cursor() as cur:
-            cur.execute(sql,(str(incident_id),verdict,comment)); row=cur.fetchone(); conn.commit()
+            cur.execute(sql,(str(incident_id),verdict,comment,str(run_id) if run_id else None)); row=cur.fetchone(); conn.commit()
             return dict(id=row[0],incident_id=row[1],verdict=row[2],comment=row[3])
 
 
@@ -240,18 +249,18 @@ def get_investigation(run_id: UUID, allowed_site_ids=None):
     where = " AND ".join(clauses)
     with get_connection() as conn:
         with conn.cursor() as cur:
-            cur.execute("SELECT r.id,r.incident_id,r.engine,r.status,r.started_at,r.completed_at,r.data_cutoff,r.result FROM diagnostic_runs r JOIN incidents i ON i.id=r.incident_id WHERE " + where, args)
+            cur.execute("SELECT r.id,r.incident_id,r.engine,r.status,r.started_at,r.completed_at,r.data_cutoff,r.result,r.context_snapshot FROM diagnostic_runs r JOIN incidents i ON i.id=r.incident_id WHERE " + where, args)
             row = cur.fetchone()
     if row is None:
         return None
-    return dict(id=row[0], incident_id=row[1], engine=row[2], status=row[3], started_at=row[4], completed_at=row[5], data_cutoff=row[6], result=row[7])
+    return dict(id=row[0], incident_id=row[1], engine=row[2], status=row[3], started_at=row[4], completed_at=row[5], data_cutoff=row[6], result=row[7], context_snapshot=row[8])
 
-def persist_investigation(incident_id, result, as_of):
+def persist_investigation(incident_id, result, as_of, context_snapshot=None):
     """Persist engine output and return its run id (JSONB values are adapted by psycopg)."""
     import json
     with get_connection() as conn:
         with conn.cursor() as cur:
-            cur.execute("INSERT INTO diagnostic_runs (incident_id,engine,status,completed_at,data_cutoff,result) VALUES (%s,'deterministic_local','completed',NOW(),%s,%s) RETURNING id", (str(incident_id), as_of, json.dumps(result.to_dict())))
+            cur.execute("INSERT INTO diagnostic_runs (incident_id,engine,status,completed_at,data_cutoff,result,context_snapshot) VALUES (%s,'deterministic_local','completed',NOW(),%s,%s,%s) RETURNING id", (str(incident_id), as_of, json.dumps(result.to_dict()), json.dumps(context_snapshot,default=str) if context_snapshot is not None else None))
             run_id = cur.fetchone()[0]
             for ev in result.evidence:
                 cur.execute("INSERT INTO diagnostic_evidence (id,run_id,source_kind,source_ref,metric,window_start,window_end,observation,baseline,delta,supports,excerpt) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)", (ev.id,run_id,ev.source_kind,ev.source_ref,ev.metric,ev.window.get('start'),ev.window.get('end'),json.dumps(ev.observation),json.dumps(ev.baseline) if ev.baseline is not None else None,ev.delta,ev.supports,ev.excerpt))

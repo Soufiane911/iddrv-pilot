@@ -141,7 +141,7 @@ def prepare_frame(frame: pd.DataFrame) -> pd.DataFrame:
 
 def prepare_inference_frame(frame: pd.DataFrame) -> pd.DataFrame:
     """Build the same causal features for runtime without a future label."""
-    required = set(RAW_NUMERIC_FEATURES) | {"timestamp", "machine_erp_ref"}
+    required = set(DRIFT_NUMERIC_FEATURES) | {"timestamp", "machine_erp_ref"}
     missing = sorted(required.difference(frame.columns))
     if missing:
         raise ValueError(f"Inference data is missing columns: {', '.join(missing)}")

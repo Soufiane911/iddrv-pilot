@@ -80,6 +80,14 @@ def _scrap(row: Mapping) -> bool:
     }
 
 
+def observed_scrap_rate(rows):
+    """Unknown part quality does not enter a quality-rate denominator."""
+    known = [row for row in rows if row.get('scrap_flag') is not None or
+             str(row.get('part_quality_status','')).lower() in
+             {'good','ok','conforming','scrap','reject','non_conforme','non-conforme'}]
+    return (sum(_scrap(row) for row in known)/len(known),len(known)) if known else (None,0)
+
+
 def _timestamp(row: Mapping) -> datetime | None:
     value = row.get("timestamp", row.get("time"))
     if value is None:
@@ -352,10 +360,8 @@ class DeterministicInvestigator:
 
         # Shared observations make every diagnosis auditable without repeating
         # SQL queries or creating duplicate evidence rows in a run.
-        event_scrap = sum(1 for row in event_cycles if _scrap(row))
-        base_scrap = sum(1 for row in baseline_cycles if _scrap(row))
-        event_rate = event_scrap / len(event_cycles) if event_cycles else None
-        base_rate = base_scrap / len(baseline_cycles) if baseline_cycles else None
+        event_rate, event_quality_count = observed_scrap_rate(event_cycles)
+        base_rate, baseline_quality_count = observed_scrap_rate(baseline_cycles)
         scrap_ev = self._evidence(
             evidence,
             source_kind="cycle_aggregate",
@@ -363,8 +369,8 @@ class DeterministicInvestigator:
             metric="scrap_rate",
             start=start,
             end=end,
-            observation={"stat": "rate", "value": event_rate, "unit": "fraction", "n": len(event_cycles)},
-            baseline={"value": base_rate, "unit": "fraction", "n": len(baseline_cycles)} if base_rate is not None else None,
+            observation={"stat": "rate", "value": event_rate, "unit": "fraction", "n": event_quality_count},
+            baseline={"value": base_rate, "unit": "fraction", "n": baseline_quality_count} if base_rate is not None else None,
             delta=event_rate - base_rate if event_rate is not None and base_rate is not None else None,
             supports=event_rate is not None and (base_rate is None or event_rate > base_rate),
         )
@@ -660,8 +666,8 @@ class DeterministicInvestigator:
         ]
         first_half = event_cycles[: max(1, len(event_cycles) // 2)]
         second_half = event_cycles[len(event_cycles) // 2 :]
-        first_scrap = sum(1 for row in first_half if _scrap(row)) / len(first_half) if first_half else None
-        second_scrap = sum(1 for row in second_half if _scrap(row)) / len(second_half) if second_half else None
+        first_scrap,first_quality_count = observed_scrap_rate(first_half)
+        second_scrap,second_quality_count = observed_scrap_rate(second_half)
         early_rate_ev = self._evidence(
             evidence,
             source_kind="cycle_aggregate",
@@ -669,8 +675,8 @@ class DeterministicInvestigator:
             metric="early_scrap_rate",
             start=start,
             end=end,
-            observation={"stat": "first_half_rate", "value": first_scrap, "unit": "fraction", "n": len(first_half)},
-            baseline={"value": second_scrap, "unit": "fraction", "n": len(second_half)} if second_scrap is not None else None,
+            observation={"stat": "first_half_rate", "value": first_scrap, "unit": "fraction", "n": first_quality_count},
+            baseline={"value": second_scrap, "unit": "fraction", "n": second_quality_count} if second_scrap is not None else None,
             delta=first_scrap - second_scrap if first_scrap is not None and second_scrap is not None else None,
             supports=first_scrap is not None and second_scrap is not None and first_scrap > second_scrap + 0.05,
         )

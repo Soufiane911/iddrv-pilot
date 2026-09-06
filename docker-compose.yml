@@ -54,6 +54,9 @@ services:
     environment:
       OWNER_DATABASE_URL: ${OWNER_DATABASE_URL:-${DOCKER_DATABASE_URL:?DOCKER_DATABASE_URL must be set with URL-encoded credentials}}
       API_DATABASE_URL: ${API_DATABASE_URL:-}
+      TELEMETRY_ALLOWED_ORIGINS: ${TELEMETRY_ALLOWED_ORIGINS:-}
+      TELEMETRY_ALLOW_HTTP: ${TELEMETRY_ALLOW_HTTP:-false}
+      ERP_UPLOAD_ROOT: /var/lib/iddrv/raw/uploads
       WORKER_DATABASE_URL: ${WORKER_DATABASE_URL:-}
       APP_ENV: ${APP_ENV:-pilot}
     depends_on:
@@ -70,6 +73,9 @@ services:
       # Development may use the owner URL; pilot/production use the dedicated API role.
       DATABASE_URL: ${API_DATABASE_URL:-${DOCKER_DATABASE_URL:?DOCKER_DATABASE_URL must be set with URL-encoded credentials}}
       API_DATABASE_URL: ${API_DATABASE_URL:-}
+      TELEMETRY_ALLOWED_ORIGINS: ${TELEMETRY_ALLOWED_ORIGINS:-}
+      TELEMETRY_ALLOW_HTTP: ${TELEMETRY_ALLOW_HTTP:-false}
+      ERP_UPLOAD_ROOT: /var/lib/iddrv/raw/uploads
       REDIS_URL: redis://redis:6379/0
       APP_ENV: ${APP_ENV:-pilot}
       ALLOW_ANONYMOUS_READS: ${ALLOW_ANONYMOUS_READS:-false}
@@ -89,6 +95,8 @@ services:
       redis:
         condition: service_healthy
     command: ["sh", "-c", "if [ \"$$APP_ENV\" = pilot ] || [ \"$$APP_ENV\" = prod ] || [ \"$$APP_ENV\" = production ]; then if [ -z \"$$API_DATABASE_URL\" ]; then echo 'API_DATABASE_URL is required in pilot/production' >&2; exit 1; fi; fi; export DATABASE_URL=\"$${API_DATABASE_URL:-$$DATABASE_URL}\"; exec uvicorn backend.app.main:app --host 0.0.0.0 --port 8000"]
+    volumes:
+      - ./data/raw:/var/lib/iddrv/raw
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/ready', timeout=3)"]
       interval: 10s
@@ -140,6 +148,48 @@ services:
       timeout: 5s
       retries: 5
       start_period: 45s
+
+  collector:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    restart: unless-stopped
+    environment:
+      WORKER_DATABASE_URL: ${WORKER_DATABASE_URL:?WORKER_DATABASE_URL is required}
+      TELEMETRY_ALLOWED_ORIGINS: ${TELEMETRY_ALLOWED_ORIGINS:-}
+      TELEMETRY_ALLOW_HTTP: ${TELEMETRY_ALLOW_HTTP:-false}
+      TELEMETRY_MODEL_VERSION: ${TELEMETRY_MODEL_VERSION:-hdt-process-drift-iforest-v1}
+      COLLECTOR_HEARTBEAT_PATH: /tmp/iddrv-collector-heartbeat
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    command: ["python", "-m", "ingest.telemetry.collector"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "from ingest.telemetry.collector import heartbeat_is_fresh; raise SystemExit(0 if heartbeat_is_fresh() else 1)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  scorer:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    restart: unless-stopped
+    environment:
+      WORKER_DATABASE_URL: ${WORKER_DATABASE_URL:?WORKER_DATABASE_URL is required}
+      PROCESS_DRIFT_MODEL_PATH: /app/models/process_drift_hdt_v1.joblib
+      SCORER_HEARTBEAT_PATH: /tmp/iddrv-scorer-heartbeat
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    command: ["python", "-m", "ingest.telemetry.scorer"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "from ingest.telemetry.scorer import heartbeat_is_fresh; raise SystemExit(0 if heartbeat_is_fresh() else 1)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   web:
     build:

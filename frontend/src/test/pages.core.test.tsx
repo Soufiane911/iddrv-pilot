@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { App } from '../App';
 import { mockApiClient, ApiRequestError } from '../lib/api';
 
@@ -271,8 +271,8 @@ describe('ImportsPage', () => {
   it('affiche un panel vide quand il n’y a aucun import', async () => {
     renderApp({ ...mockApiClient, getImports: async () => [] }, '/imports');
 
-    expect(await screen.findByText(/Aucun import enregistré/i)).toBeInTheDocument();
-    expect(screen.getByText(/Le worker d’ingestion publiera ici/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Aucun bilan téléversé pour ce site/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Téléverser et prévisualiser' })).toBeInTheDocument();
   });
 
   it('permet de rafraîchir la liste des imports', async () => {
@@ -284,154 +284,5 @@ describe('ImportsPage', () => {
     const refreshButton = await screen.findByRole('button', { name: /Actualiser/i });
     fireEvent.click(refreshButton);
     await waitFor(() => expect(getImports).toHaveBeenCalledTimes(2));
-  });
-});
-
-/* ------------------------------------------------------------------ */
-/*  WorkspacePage                                                      */
-/* ------------------------------------------------------------------ */
-
-describe('WorkspacePage', () => {
-  it('affiche le formulaire de création quand aucune session n’est active', async () => {
-    renderApp({ ...mockApiClient, getSites: async () => [mockSite] }, '/workspace');
-
-    expect(await screen.findByText(/NOUVEAU PROJET/i)).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: /Commencer par un périmètre usine/i })).toBeInTheDocument();
-    expect(screen.getByLabelText(/Nom du projet/i)).toHaveValue('Projet usine pilote');
-    expect(screen.getByRole('button', { name: /Ouvrir le workspace/i })).toBeInTheDocument();
-  });
-
-  it('crée une nouvelle session après sélection du site et validation', async () => {
-    const createImportSession = vi.fn().mockResolvedValue({
-      id: 'session-new',
-      site_id: 1,
-      name: 'Projet usine pilote',
-      status: 'collecting' as const,
-      summary: {},
-      files: [],
-      created_at: '2025-02-12T10:00:00Z',
-      updated_at: '2025-02-12T10:00:00Z',
-    });
-
-    renderApp({ ...mockApiClient, getSites: async () => [mockSite], createImportSession }, '/workspace');
-
-    await screen.findByRole('heading', { name: /Commencer par un périmètre usine/i });
-    const button = screen.getByRole('button', { name: /Ouvrir le workspace/i });
-    await waitFor(() => expect(button).toBeEnabled());
-    fireEvent.click(button);
-
-    await waitFor(() => expect(createImportSession).toHaveBeenCalledWith(1, 'Projet usine pilote'));
-  });
-
-  it('affiche une erreur quand les sites sont indisponibles', async () => {
-    renderApp({
-      ...mockApiClient,
-      getSites: async () => { throw new ApiRequestError(500, 'Sites indisponibles', 'server_error'); },
-    }, '/workspace');
-
-    const alert = await screen.findByRole('alert', {}, { timeout: 3000 });
-    expect(alert).toHaveTextContent(/Sites indisponibles/i);
-    expect(screen.getByRole('button', { name: /Réessayer/i })).toBeInTheDocument();
-  });
-
-  it('reprend une session existante depuis l’URL', async () => {
-    const getImportSession = vi.fn().mockResolvedValue({
-      id: 'session-url',
-      site_id: 1,
-      name: 'Projet repris',
-      status: 'profiling' as const,
-      summary: { recognizedColumns: 10, unknownColumns: 2, confidence: 0.88 },
-      files: [],
-      created_at: '2025-02-12T10:00:00Z',
-      updated_at: '2025-02-12T10:00:00Z',
-    });
-
-    renderApp({ ...mockApiClient, getSites: async () => [mockSite], getImportSession }, '/workspace?session=session-url');
-
-    await waitFor(() => expect(getImportSession).toHaveBeenCalledWith('session-url'));
-    expect(await screen.findByText(/Session reprise par l’URL/i)).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Référencer les exports' })).toBeInTheDocument();
-  });
-
-  it('permet de référencer un fichier dans la session', async () => {
-    const registerImportFile = vi.fn().mockResolvedValue({
-      id: 'session-file',
-      site_id: 1,
-      name: 'Projet fichier',
-      status: 'profiling' as const,
-      summary: { recognizedColumns: 3, unknownColumns: 1, confidence: 0.8 },
-      files: [{
-        id: 'file-1',
-        file_name: 'data.csv',
-        source_kind: 'machines' as const,
-        mime_type: 'text/csv',
-        size_bytes: 2048,
-        status: 'needs_review',
-        profile: { columns: ['a'], recognized: ['a'], unknown: [], confidence: 1 },
-      }],
-      created_at: '2025-02-12T10:00:00Z',
-      updated_at: '2025-02-12T10:00:00Z',
-    });
-
-    const getImportSession = vi.fn().mockResolvedValue({
-      id: 'session-file',
-      site_id: 1,
-      name: 'Projet fichier',
-      status: 'collecting' as const,
-      summary: {},
-      files: [],
-      created_at: '2025-02-12T10:00:00Z',
-      updated_at: '2025-02-12T10:00:00Z',
-    });
-
-    renderApp({ ...mockApiClient, getSites: async () => [mockSite], getImportSession, registerImportFile }, '/workspace?session=session-file');
-
-    await screen.findByText(/Session reprise par l’URL/i);
-    const fileInput = screen.getByLabelText(/Fichiers industriels/i);
-    const file = new File(['content'], 'data.csv', { type: 'text/csv' });
-    await act(async () => {
-      fireEvent.change(fileInput, { target: { files: [file] } });
-    });
-    await waitFor(() => expect(registerImportFile).toHaveBeenCalled());
-  });
-
-  it('valide la compréhension quand les fichiers sont prêts', async () => {
-    const validateImportSession = vi.fn().mockResolvedValue({
-      id: 'session-val',
-      site_id: 1,
-      name: 'Projet validé',
-      status: 'validated' as const,
-      summary: { recognizedColumns: 5, unknownColumns: 0, confidence: 0.96 },
-      files: [],
-      created_at: '2025-02-12T10:00:00Z',
-      updated_at: '2025-02-12T10:00:00Z',
-    });
-
-    const getImportSession = vi.fn().mockResolvedValue({
-      id: 'session-val',
-      site_id: 1,
-      name: 'Projet validé',
-      status: 'profiling' as const,
-      summary: { recognizedColumns: 5, unknownColumns: 0, confidence: 0.96 },
-      files: [{
-        id: 'file-1',
-        file_name: 'ready.csv',
-        source_kind: 'machines' as const,
-        mime_type: 'text/csv',
-        size_bytes: 1024,
-        file_hash: 'hash123',
-        status: 'needs_review',
-        profile: { columns: ['a', 'b'], recognized: ['a'], unknown: ['b'], confidence: 0.9 },
-      }],
-      created_at: '2025-02-12T10:00:00Z',
-      updated_at: '2025-02-12T10:00:00Z',
-    });
-
-    renderApp({ ...mockApiClient, getSites: async () => [mockSite], getImportSession, validateImportSession }, '/workspace?session=session-val');
-
-    await screen.findByText(/Session reprise par l’URL/i);
-    await waitFor(() => expect(screen.getByRole('button', { name: /Valider la compréhension/i })).toBeEnabled());
-    fireEvent.click(screen.getByRole('button', { name: /Valider la compréhension/i }));
-    await waitFor(() => expect(validateImportSession).toHaveBeenCalledWith('session-val'));
   });
 });

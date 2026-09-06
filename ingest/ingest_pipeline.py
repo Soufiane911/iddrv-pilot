@@ -350,234 +350,46 @@ def ingest_machine_file(
     }
 
 
-def ingest_erp_file(
-    file_path: str,
-    site_id: int | None = None,
-    source_timezone: str | None = None,
-):
-    """
-    Ingestion ERP/TRS : alimente production_orders et shifts avant reconciliation.
-    """
+def ingest_erp_file(file_path: str, site_id: int | None = None, source_timezone: str | None = None):
+    """Archive TRS and persist team revisions. Unknown machines require UI approval."""
+    from ingest.erp_reader import read_trs_declarations, ORDER_FIELDS
+    from ingest.erp_repository import persist_declarations, lock_site
+    from ingest.erp_import_jobs import apply_calendar, current_calendar, create_passport
+    from dataclasses import asdict
     site_id = _validate_site_id(site_id, f"fichier ERP {Path(file_path).name}")
     path = Path(file_path)
-    if not path.exists():
-        raise FileNotFoundError(f"Fichier introuvable: {file_path}")
-
-    print(f"\n{'='*60}")
-    print(f" INGESTION ERP: {path.name} (site {site_id})")
-    print(f"{'='*60}")
-
     raw_file_hash = compute_file_hash(file_path)
-    orders = read_erp_trs_xlsx(file_path)
-    if not orders:
-        raise ValueError("Aucun ordre ERP valide dans le fichier")
-    file_hash = raw_file_hash
     conn = get_db_connection()
-    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-
-    cursor.execute(
-        "SELECT id, status FROM import_passports WHERE site_id = %s AND file_hash = %s",
-        (site_id, file_hash),
-    )
-    existing = cursor.fetchone()
-    if existing:
-        if existing['status'] == 'completed':
-            print(f"[SKIP] Fichier ERP déjà importé (passport_id: {existing['id']})")
-            cursor.close()
-            conn.close()
-            try:
-                reconciled_cycles = reconcile_existing_cycles(site_id=site_id)
-                post_commit_error = None
-            except Exception as exc:
-                reconciled_cycles = 0
-                post_commit_error = f"erp_reconciliation_failed:{exc}"
-            return {
-                "transaction_committed": True,
-                "passport_id": str(existing["id"]),
-                "duplicate": True,
-                "site_id": site_id,
-                "reconciled_cycles": reconciled_cycles,
-                "post_commit_error": post_commit_error,
-            }
-        else:
-            print(f"[RETRY] Rejeu idempotent du fichier ERP (statut '{existing['status']}')")
-            # Never delete existing business OFs on retry. The passport and its
-            # staging rows are replaced inside the same transaction as upserts.
-            cursor.execute("DELETE FROM import_passports WHERE id = %s", (existing['id'],))
-
-    cursor.execute("SELECT timezone FROM sites WHERE id=%s", (site_id,))
-    site_row = cursor.fetchone()
-    if site_row is None:
-        cursor.close()
-        conn.close()
-        raise ValueError(f"Site inconnu: {site_id}")
-    source_tz = source_timezone or str(site_row["timezone"])
-
-    RAW_STORE.mkdir(parents=True, exist_ok=True)
-    raw_dest = RAW_STORE / f"{raw_file_hash[:12]}_{path.name}"
-    if not raw_dest.exists():
-        shutil.copy2(file_path, raw_dest)
-
-    profile = SimpleNamespace(
-        brand_detected="erp",
-        is_transposed=False,
-        encoding="xlsx",
-        delimiter="",
-    )
-    passport_id = create_import_passport(
-        cursor, file_path, file_hash, profile, {}, orders,
-        len([o for o in orders if o.get("id") and o.get("machine_erp_ref")]),
-        len([o for o in orders if not (o.get("id") and o.get("machine_erp_ref"))]),
-        site_id=site_id
-    )
-    stage_rows(cursor, passport_id, orders, "erp_order")
-
-    inserted_orders = 0
-    inserted_shifts = 0
-    rejected = 0
- 
-    # Shifts are upserted in place so existing cycle.shift_id references stay
-    # stable across ERP retries and refreshed exports.
-
-    for order in orders:
-        machine_ref = str(order.get("machine_erp_ref", "")).strip()
-        machine_id = resolve_machine_id(cursor, machine_ref, site_id)
-        started_at = _source_datetime(order.get("started_at"), source_tz)
-        ended_at = _source_datetime(order.get("ended_at"), source_tz)
-        if not ended_at and started_at and order.get("erp_available_time_h"):
-            ended_at = started_at + timedelta(hours=float(order["erp_available_time_h"]))
-
-        if not order.get("id") or not machine_id or not started_at:
-            rejected += 1
-            cursor.execute("""
-                INSERT INTO import_rejections (
-                    passport_id, severity, error_code, field_name, raw_value, message
-                ) VALUES (%s, %s, %s, %s, %s, %s)
-            """, (
-                passport_id,
-                "error",
-                "invalid_erp_order",
-                "machine_erp_ref",
-                machine_ref,
-                "OF ERP impossible à insérer : id, machine ou date de début manquante"
-            ))
-            continue
-
-        cursor.execute("""
-            INSERT INTO production_orders (
-                id, site_id, machine_id, product_ref, product_name, tool_ref, material_ref,
-                target_quantity, started_at, ended_at, erp_cycle_time_s, erp_trs,
-                erp_scrap_count, erp_good_parts, erp_available_time_h, erp_running_time_h
-            ) VALUES (
-                %s, %s, %s, %s, %s, %s, %s,
-                %s, %s, %s, %s, %s,
-                %s, %s, %s, %s
-            )
-            ON CONFLICT (site_id, id) DO UPDATE SET
-                machine_id = EXCLUDED.machine_id,
-                product_ref = EXCLUDED.product_ref,
-                product_name = EXCLUDED.product_name,
-                tool_ref = EXCLUDED.tool_ref,
-                material_ref = EXCLUDED.material_ref,
-                target_quantity = EXCLUDED.target_quantity,
-                started_at = EXCLUDED.started_at,
-                ended_at = EXCLUDED.ended_at,
-                erp_cycle_time_s = EXCLUDED.erp_cycle_time_s,
-                erp_trs = EXCLUDED.erp_trs,
-                erp_scrap_count = EXCLUDED.erp_scrap_count,
-                erp_good_parts = EXCLUDED.erp_good_parts,
-                erp_available_time_h = EXCLUDED.erp_available_time_h,
-                erp_running_time_h = EXCLUDED.erp_running_time_h
-        """, (
-            str(order["id"]),
-            site_id,
-            machine_id,
-            order.get("product_ref"),
-            order.get("product_name"),
-            order.get("tool_ref"),
-            order.get("material_ref"),
-            int(order["nb_cycles"]) if order.get("nb_cycles") is not None else None,
-            started_at,
-            ended_at,
-            order.get("erp_cycle_time_s"),
-            order.get("erp_trs"),
-            int(order.get("erp_scrap_count", 0)),
-            int(order.get("erp_good_parts", 0)),
-            order.get("erp_available_time_h"),
-            order.get("erp_running_time_h")
-        ))
-        inserted_orders += 1
-
-        if order.get("shift_number") and ended_at:
-            cursor.execute("""
-                INSERT INTO shifts (
-                    machine_id, production_order_id, order_site_id, shift_number, shift_date,
-                    started_at, ended_at, planned_duration_h
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                ON CONFLICT (machine_id, shift_date, shift_number) DO UPDATE SET
-                    production_order_id = EXCLUDED.production_order_id,
-                    order_site_id = EXCLUDED.order_site_id,
-                    started_at = EXCLUDED.started_at,
-                    ended_at = EXCLUDED.ended_at,
-                    planned_duration_h = EXCLUDED.planned_duration_h
-            """, (
-                machine_id,
-                str(order["id"]),
-                site_id,
-                int(order["shift_number"]),
-                started_at.date(),
-                started_at,
-                ended_at,
-                order.get("erp_available_time_h")
-            ))
-            inserted_shifts += 1
-
     try:
-        # Passport, OFs and shifts become visible atomically.
-        cursor.execute(
-            "UPDATE import_passports SET status='completed',row_count_rejected=%s WHERE id=%s",
-            (rejected, passport_id),
-        )
-        conn.commit()
-    except Exception:
-        conn.rollback()
-        raise
+        with conn, conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            lock_site(cur, site_id)
+            cur.execute('SELECT timezone FROM sites WHERE id=%s', (site_id,))
+            site = cur.fetchone()
+            if not site:
+                raise ValueError('site_not_found')
+            result = read_trs_declarations(path, source_timezone=source_timezone or site['timezone'])
+            if any(issue.severity == 'error' for issue in result.issues) or not result.declarations:
+                raise ValueError(result.issues[0].code if result.issues else 'no_declarations')
+            calendar = current_calendar(cur, site_id)
+            for declaration in result.declarations:
+                # Optional order mappings are confirmed only through the upload preview.
+                declaration.provided_order_fields.clear()
+                for field in ORDER_FIELDS:
+                    setattr(declaration, field, None)
+                apply_calendar(declaration, calendar)
+            RAW_STORE.mkdir(parents=True, exist_ok=True)
+            raw_dest = RAW_STORE / f"{raw_file_hash}_{path.name}"
+            if not raw_dest.exists():
+                shutil.copy2(file_path, raw_dest)
+            request = {'site_id': site_id, 'original_name': path.name, 'file_hash': raw_file_hash, 'raw_path': str(raw_dest), 'id': 'watched-file'}
+            passport_id = create_passport(cur, request, len(result.declarations))
+            committed = persist_declarations(conn, site_id=site_id, passport_id=passport_id, declarations=result.declarations, recorded_at=datetime.now(timezone.utc))
+            return {'transaction_committed': True, 'passport_id': str(passport_id), 'site_id': site_id,
+                    'duplicate': committed.created == committed.revised == 0, **asdict(committed),
+                    'inserted_orders': committed.created, 'inserted_shifts': 0, 'rejected': 0,
+                    'reconciled_cycles': 0, 'post_commit_error': None}
     finally:
-        cursor.close()
         conn.close()
-
-    try:
-        reconciled_cycles = reconcile_existing_cycles(site_id=site_id)
-        post_commit_error = None
-    except Exception as exc:
-        # Business rows are committed; the watcher must retry this idempotent
-        # phase without consuming the import/quarantine attempt budget.
-        reconciled_cycles = 0
-        post_commit_error = f"erp_reconciliation_failed:{exc}"
-        conn_pending = get_db_connection()
-        with conn_pending.cursor() as cur_pending:
-            cur_pending.execute(
-                "UPDATE import_passports SET error_log=%s WHERE id=%s",
-                (post_commit_error, passport_id),
-            )
-            conn_pending.commit()
-        conn_pending.close()
-
-    print(
-        f"[ERP] {inserted_orders} OF insérés/mis à jour, "
-        f"{inserted_shifts} équipes, {rejected} rejets, "
-        f"{reconciled_cycles} cycles rattachés"
-    )
-    return {
-        "transaction_committed": True,
-        "passport_id": passport_id,
-        "site_id": site_id,
-        "inserted_orders": inserted_orders,
-        "inserted_shifts": inserted_shifts,
-        "rejected": rejected,
-        "reconciled_cycles": reconciled_cycles,
-        "post_commit_error": post_commit_error,
-    }
 
 
 def ingest_context_file(

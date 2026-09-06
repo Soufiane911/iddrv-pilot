@@ -22,6 +22,8 @@ class Settings:
     allow_anonymous_reads: bool = False
     metrics_token: str = ""
     metrics_public: bool = True
+    telemetry_allowed_origins: tuple[str, ...] = ()
+    telemetry_allow_http: bool = False
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -74,6 +76,8 @@ class Settings:
             # Local DX keeps /metrics open; pilot/production require token or admin.
             metrics_public = environment in {"development", "test"} and not metrics_token
         return cls(
+            telemetry_allowed_origins=tuple(v.strip() for v in os.getenv('TELEMETRY_ALLOWED_ORIGINS', '').split(',') if v.strip()),
+            telemetry_allow_http=os.getenv('TELEMETRY_ALLOW_HTTP', 'false').lower() == 'true',
             app_name=os.getenv("APP_NAME", "IDDVR API"),
             app_version=os.getenv("APP_VERSION", "0.1.0"),
             # DATABASE_URL remains a local-development fallback. The API

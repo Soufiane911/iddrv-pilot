@@ -11,3 +11,7 @@ redis>=5.0,<7
 # Pinned to the versions used to train models/*.joblib (pickle compatibility).
 scikit-learn==1.7.2
 joblib==1.5.2
+
+python-multipart>=0.0.20,<1
+
+httpx>=0.28,<0.29
