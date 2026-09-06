@@ -29,6 +29,27 @@ DB_URL = worker_database_url()
 OVERLAP_WINDOW = timedelta(minutes=30)
 
 
+def _lock_active_site(cursor, site_id: int) -> None:
+    cursor.execute("SELECT status FROM sites WHERE id=%s FOR UPDATE", (site_id,))
+    site = cursor.fetchone()
+    if not site:
+        raise ValueError("site_not_found")
+    if site["status"] == "archived":
+        raise ValueError("site_archived")
+
+
+def _lock_active_machine(cursor, site_id: int, machine_id: int) -> None:
+    cursor.execute(
+        "SELECT status FROM machines WHERE site_id=%s AND id=%s FOR UPDATE",
+        (site_id, machine_id),
+    )
+    machine = cursor.fetchone()
+    if not machine:
+        raise ValueError("machine_not_found")
+    if machine["status"] == "archived":
+        raise ValueError("machine_archived")
+
+
 def normalize_bool_flag(value, default=False) -> bool:
     """Normalise les booléens des CSV (True/False, 1/0) sans envoyer du texte SQL."""
     if value is None or value == "":
@@ -261,6 +282,23 @@ def insert_cycles(machine_cycles: list[dict], machine_id: int, passport_id: str,
     """
     conn = get_db_connection()
     cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    # Keep the lifecycle rows locked for the complete materialisation
+    # transaction. All callers use the same explicit site-then-machine order;
+    # a JOIN with FOR UPDATE would leave that order to the query planner.
+    if site_id is None:
+        cursor.execute("SELECT site_id FROM machines WHERE id=%s", (machine_id,))
+        identity = cursor.fetchone()
+        if not identity:
+            cursor.close(); conn.close()
+            raise ValueError("machine_not_found")
+        site_id = int(identity["site_id"])
+    try:
+        _lock_active_site(cursor, site_id)
+        _lock_active_machine(cursor, site_id, machine_id)
+    except Exception:
+        cursor.close()
+        conn.close()
+        raise
 
     inserted = 0
     skipped = 0

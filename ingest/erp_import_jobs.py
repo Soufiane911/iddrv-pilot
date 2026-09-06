@@ -91,7 +91,7 @@ def read_request(cur, request, choices):
 def build_preview(cur, request, choices):
     # caller holds the per-site lock so this snapshot is internally consistent.
     result, calendar = read_request(cur, request, choices)
-    cur.execute('SELECT id,erp_ref FROM machines WHERE site_id=%s', (request['site_id'],))
+    cur.execute("SELECT id,erp_ref FROM machines WHERE site_id=%s AND status <> 'archived'", (request['site_id'],))
     machines = {row['erp_ref']: row['id'] for row in cur.fetchall()}
     cur.execute('''SELECT d.id,d.declaration_key,d.machine_id,d.production_order_id,d.superseded_by,
                           r.revision_number,r.content_hash,r.shift_started_at,r.shift_number
@@ -183,6 +183,10 @@ def commit_request(conn, request):
         for ref in latest['new_machine_refs']:
             if ref not in choices.get('create_machine_refs', []):
                 raise ValueError('machine_creation_not_confirmed')
+            cur.execute('SELECT status FROM sites WHERE id=%s FOR SHARE', (site_id,))
+            site = cur.fetchone()
+            if not site or site['status'] == 'archived':
+                raise ERPConflict('site_archived')
             cur.execute('INSERT INTO machines(site_id,erp_ref,name) VALUES (%s,%s,%s) RETURNING id', (site_id, ref, f'Presse {ref}'))
             new_ids.append(cur.fetchone()['id'])
         result, _ = read_request(cur, request, choices)
@@ -226,7 +230,8 @@ def process_approved_erp_import(import_id: UUID, *, database_url: str | None = N
         # Do not expose exception text, workbook cells or filesystem paths.
         if str(error) not in {'job_busy_or_missing', 'job_not_queued'}:
             with conn, conn.cursor() as cur:
-                cur.execute("UPDATE erp_import_requests SET state='failed',public_error=%s WHERE id=%s AND state IN ('queued','processing')", ('preview_stale' if isinstance(error, ERPConflict) else 'import_processing_failed', str(import_id)))
+                public_error = 'site_archived' if str(error) == 'site_archived' else 'preview_stale' if isinstance(error, ERPConflict) else 'import_processing_failed'
+                cur.execute("UPDATE erp_import_requests SET state='failed',public_error=%s WHERE id=%s AND state IN ('queued','processing')", (public_error, str(import_id)))
         raise
     finally:
         conn.close()

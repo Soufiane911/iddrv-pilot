@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { ErpImportWizard } from '../components/imports/ErpImportWizard';
 import { useQuery } from '@tanstack/react-query';
@@ -26,12 +26,34 @@ function importStatusTone(status: string): 'completed' | 'pending' | 'failed' {
 
 export function ImportsPage() {
   const api = useApi();
-  const [searchParams] = useSearchParams();
-  const requestedSite = Number(searchParams.get('site'));
-  const [selectedSite, setSelectedSite] = useState<number | null>(Number.isFinite(requestedSite) ? requestedSite : null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedSiteValue = searchParams.get('siteId') ?? searchParams.get('site');
+  const requestedSite = requestedSiteValue === null ? null : Number(requestedSiteValue);
+  const [selectedSite, setSelectedSite] = useState<number | null>(requestedSite !== null && Number.isInteger(requestedSite) && requestedSite > 0 ? requestedSite : null);
   const sites = useQuery({ queryKey: ['sites'], queryFn: () => api.getSites() });
   const auth = useQuery({ queryKey: ['auth-me'], queryFn: () => api.getCurrentUser() });
-  const site = sites.data?.find(item => item.id === selectedSite) ?? sites.data?.[0];
+  const activeSites = (sites.data ?? []).filter(item => item.status !== 'archived');
+  const requestedSiteIsInvalid = sites.isSuccess && requestedSiteValue !== null && (requestedSite === null || !Number.isInteger(requestedSite) || requestedSite <= 0 || !activeSites.some(item => item.id === requestedSite));
+  const site = activeSites.find(item => item.id === selectedSite);
+  useEffect(() => {
+    if (!sites.isSuccess) return;
+    const target = requestedSiteValue === null ? activeSites[0] : activeSites.find(item => item.id === requestedSite);
+    if (!target) return;
+    if (selectedSite !== target.id) setSelectedSite(target.id);
+    if (searchParams.get('siteId') !== String(target.id) || searchParams.has('site')) {
+      const next = new URLSearchParams(searchParams);
+      next.set('siteId', String(target.id));
+      next.delete('site');
+      setSearchParams(next, { replace: true });
+    }
+  }, [activeSites, requestedSite, requestedSiteValue, searchParams, selectedSite, setSearchParams, sites.isSuccess]);
+  function selectSite(value: number) {
+    setSelectedSite(value);
+    const next = new URLSearchParams(searchParams);
+    next.set('siteId', String(value));
+    next.delete('site');
+    setSearchParams(next, { replace: true });
+  }
   const role = site ? auth.data?.siteRoles?.[site.id] ?? auth.data?.role : undefined;
   const query = useQuery({ queryKey: ['imports'], queryFn: () => api.getImports() });
   const imports = query.data ?? [];
@@ -47,8 +69,10 @@ export function ImportsPage() {
     </div>
 
     {sites.isError && <StatePanel tone="error" title="Sites indisponibles" text="Impossible de choisir un site pour l’import." />}
-    {site && <>
-      <label className="erp-import-site">Site de l’import<select value={site.id} onChange={event => setSelectedSite(Number(event.target.value))}>{sites.data?.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+    {requestedSiteIsInvalid && <StatePanel tone="error" title="Site d’import invalide" text="Le site demandé n’existe pas, est archivé ou n’est pas accessible. Sélectionnez un site actif depuis la liste des sites." />}
+    {!requestedSiteIsInvalid && !sites.isPending && activeSites.length === 0 && <StatePanel tone="warning" title="Aucun site actif" text="Les imports ne sont pas disponibles pour un site archivé." />}
+    {!requestedSiteIsInvalid && site && <>
+      <label className="erp-import-site">Site de l’import<select value={site.id} onChange={event => selectSite(Number(event.target.value))}>{activeSites.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
       <ErpImportWizard key={site.id} siteId={site.id} timezone={site.timezone ?? 'UTC'} canImport={role === 'analyst' || role === 'supervisor' || role === 'admin'} canConfigure={role === 'supervisor' || role === 'admin'} />
     </>}
 

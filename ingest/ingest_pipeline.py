@@ -221,6 +221,31 @@ def _validate_site_id(site_id: int | None, context: str = "") -> int:
     return site_id
 
 
+def _lock_active_site(cursor, site_id: int) -> dict:
+    """Lock the lifecycle row before any import read or write."""
+    cursor.execute("SELECT id,status,timezone FROM sites WHERE id=%s FOR UPDATE", (site_id,))
+    site = cursor.fetchone()
+    if not site:
+        raise ValueError("site_not_found")
+    status = site["status"] if isinstance(site, dict) else site[1]
+    if status == "archived":
+        raise ValueError("site_archived")
+    return site
+
+
+def _lock_active_machine(cursor, site_id: int, machine_id: int) -> None:
+    cursor.execute(
+        "SELECT status FROM machines WHERE id=%s AND site_id=%s FOR UPDATE",
+        (machine_id, site_id),
+    )
+    machine = cursor.fetchone()
+    if not machine:
+        raise ValueError("machine_not_found")
+    status = machine["status"] if isinstance(machine, dict) else machine[0]
+    if status == "archived":
+        raise ValueError("machine_archived")
+
+
 def ingest_machine_file(
     file_path: str,
     machine_erp_ref: str,
@@ -251,6 +276,7 @@ def ingest_machine_file(
     # 2. Connexion DB
     conn = get_db_connection()
     cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    _lock_active_site(cursor, site_id)
 
     # 3. Vérification déduplication (le fichier a déjà été importé ?)
     cursor.execute(
@@ -270,7 +296,8 @@ def ingest_machine_file(
             cursor.execute("DELETE FROM data_quality_issues WHERE passport_id = %s", (existing['id'],))
             cursor.execute("DELETE FROM evidence_vault WHERE passport_id = %s", (existing['id'],))
             cursor.execute("DELETE FROM import_passports WHERE id = %s", (existing['id'],))
-            conn.commit()
+            # Keep the site lock until the replacement machine lock and staged
+            # rows are complete; committing here would release it mid-import.
 
     # 4. Résolution machine_id
     machine_id = resolve_machine_id(cursor, machine_erp_ref, site_id)
@@ -278,6 +305,7 @@ def ingest_machine_file(
         cursor.close()
         conn.close()
         raise ValueError(f"Machine ERP '{machine_erp_ref}' introuvable sur le site {site_id}")
+    _lock_active_machine(cursor, site_id, machine_id)
 
     # 5. Chargement et mapping avec le mapping versionné et le fuseau du site.
     cursor.execute("SELECT timezone FROM sites WHERE id=%s", (site_id,))
@@ -362,6 +390,8 @@ def ingest_erp_file(file_path: str, site_id: int | None = None, source_timezone:
     conn = get_db_connection()
     try:
         with conn, conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            # lock_site also rejects archived sites and serializes the whole
+            # ERP transaction with the lifecycle archive operation.
             lock_site(cur, site_id)
             cur.execute('SELECT timezone FROM sites WHERE id=%s', (site_id,))
             site = cur.fetchone()
@@ -407,6 +437,7 @@ def ingest_context_file(
     if not rows:
         raise ValueError("Aucune ligne de contexte valide dans le fichier")
     conn = get_db_connection(); cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    _lock_active_site(cur, site_id)
     file_hash = compute_file_hash(file_path)
     cur.execute(
         "SELECT id FROM import_passports WHERE site_id=%s AND file_hash=%s AND status='completed'",
@@ -436,6 +467,8 @@ def ingest_context_file(
                 (site_id, oid),
             )
             order_valid = cur.fetchone() is not None
+        if mid is not None:
+            _lock_active_machine(cur, site_id, mid)
         if mid is None or ts is None or not order_valid:
             rejected += 1
             cur.execute(

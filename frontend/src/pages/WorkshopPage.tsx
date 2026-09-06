@@ -1,12 +1,16 @@
 import { ArrowLeftIcon } from '@phosphor-icons/react/ArrowLeft';
-import { useQueries, useQuery } from '@tanstack/react-query';
+import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Component, lazy, Suspense, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useApi } from '../App';
-import type { Machine, MachineStatus } from '../lib/api';
+import { authRoleForSite, type Machine, type MachineStatus } from '../lib/api';
 import { WorkshopMap } from '../components/WorkshopMap';
 import { WorkshopWorkspace, type WorkshopViewMode } from '../components/WorkshopWorkspace';
-import { EmptyPanel, StatePanel } from '../components/Ui';
+import { StatePanel } from '../components/Ui';
+import { GatewayCard } from '../components/workshop/GatewayCard';
+import { PressCatalogTable } from '../components/workshop/PressCatalogTable';
+import { PressFormDrawer } from '../components/workshop/PressFormDrawer';
+import { SiteSetupChecklist } from '../components/workshop/SiteSetupChecklist';
 
 const EMPTY_REPLAY_END = '1970-01-01T04:00:00Z';
 const SOURCE_DISCOVERY_AS_OF = '9999-12-31T23:59:59Z';
@@ -54,6 +58,7 @@ export function WorkshopPage() {
   const siteId = Number(siteIdParam);
   const api = useApi();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedMachineId, setSelectedMachineId] = useState<number>();
   const [replayPercent, setReplayPercent] = useState(50);
@@ -83,7 +88,15 @@ export function WorkshopPage() {
     enabled: Number.isFinite(siteId),
   });
   const machines = machinesQuery.data ?? EMPTY_MACHINES;
-  const activeMachineId = selectedMachineId ?? machines[0]?.id;
+  const activeMachines = useMemo(() => machines.filter((machine) => machine.lifecycleStatus !== 'archived'), [machines]);
+  const authQuery = useQuery({ queryKey: ['auth-me'], queryFn: api.getCurrentUser });
+  const siteRole = authRoleForSite(authQuery.data, Number.isFinite(siteId) ? siteId : undefined);
+  const canConfigure = siteRole === 'supervisor' || siteRole === 'admin';
+  const canImport = siteRole === 'analyst' || canConfigure;
+  const [pressFormOpen, setPressFormOpen] = useState(false);
+  const [editingMachine, setEditingMachine] = useState<Machine | null>(null);
+  const [gatewayCardOpen, setGatewayCardOpen] = useState(false);
+  const activeMachineId = selectedMachineId ?? activeMachines[0]?.id;
   const connectionQuery = useQuery({ queryKey: ['machine-connection', activeMachineId], queryFn: () => api.getMachineConnection(activeMachineId as number), enabled: activeMachineId !== undefined, retry: false });
 
   useEffect(() => {
@@ -93,10 +106,10 @@ export function WorkshopPage() {
     }
   }, [connectionQuery.data?.enabled, searchParams, setSearchParams]);
   useEffect(() => {
-    if (selectedMachineId !== undefined && machinesQuery.isSuccess && !machines.some((machine) => machine.id === selectedMachineId)) {
+    if (selectedMachineId !== undefined && machinesQuery.isSuccess && !activeMachines.some((machine) => machine.id === selectedMachineId)) {
       setSelectedMachineId(undefined);
     }
-  }, [machines, machinesQuery.isSuccess, selectedMachineId]);
+  }, [activeMachines, machinesQuery.isSuccess, selectedMachineId]);
 
   const incidentsQuery = useQuery({
     queryKey: ['site-incidents', siteId],
@@ -106,7 +119,7 @@ export function WorkshopPage() {
   });
   const discoveryAsOf = siteQuery.data?.lastImportAt ?? SOURCE_DISCOVERY_AS_OF;
   const sourceCutoffQueries = useQueries({
-    queries: machines.map((machine) => ({
+    queries: activeMachines.map((machine) => ({
       queryKey: ['machine-source-cutoff', machine.id, discoveryAsOf],
       queryFn: () => api.getMachineStatus(machine.id, discoveryAsOf),
       enabled: machinesQuery.isSuccess,
@@ -115,14 +128,14 @@ export function WorkshopPage() {
     })),
   });
   const sourceCandidates = [
-    ...sourceCutoffQueries.flatMap((query, index) => query.data && statusResponseIsConsistent(query.data, machines[index].id, discoveryAsOf) && query.data.lastCycleAt ? [query.data.lastCycleAt] : []),
+    ...sourceCutoffQueries.flatMap((query, index) => query.data && statusResponseIsConsistent(query.data, activeMachines[index].id, discoveryAsOf) && query.data.lastCycleAt ? [query.data.lastCycleAt] : []),
     ...(incidentsQuery.data ?? []).map((incident) => incident.data_cutoff ?? incident.ended_at ?? incident.started_at),
   ].filter((value): value is string => typeof value === 'string' && Number.isFinite(new Date(value).getTime()));
   sourceCandidates.sort((left, right) => new Date(left).getTime() - new Date(right).getTime());
   const sourceAnchor = sourceCandidates[sourceCandidates.length - 1];
-  const sourceDiscoveryLoading = machines.length > 0 && (sourceCutoffQueries.some((query) => query.isPending) || incidentsQuery.isPending);
-  const sourceStatusDiscoveryPartial = sourceCutoffQueries.some((query, index) => query.isError || Boolean(query.data && !statusResponseIsConsistent(query.data, machines[index].id, discoveryAsOf)));
-  const sourceDiscoveryUnavailable = machines.length > 0 && !sourceDiscoveryLoading && !sourceAnchor;
+  const sourceDiscoveryLoading = activeMachines.length > 0 && (sourceCutoffQueries.some((query) => query.isPending) || incidentsQuery.isPending);
+  const sourceStatusDiscoveryPartial = sourceCutoffQueries.some((query, index) => query.isError || Boolean(query.data && !statusResponseIsConsistent(query.data, activeMachines[index].id, discoveryAsOf)));
+  const sourceDiscoveryUnavailable = activeMachines.length > 0 && !sourceDiscoveryLoading && !sourceAnchor;
   const replayReady = Boolean(sourceAnchor) && !sourceDiscoveryLoading;
   const requestedRange = useMemo(() => replayWindow(sourceAnchor), [sourceAnchor]);
 
@@ -189,15 +202,15 @@ export function WorkshopPage() {
   const statusAtMs = new Date(statusAt).getTime();
   const statusInsideRange = statusAtMs >= new Date(range.start).getTime() && statusAtMs <= new Date(range.end).getTime();
   const statusQueries = useQueries({
-    queries: machines.map((machine) => ({
+    queries: activeMachines.map((machine) => ({
       queryKey: ['machine-status', machine.id, statusAt],
       queryFn: () => api.getMachineStatus(machine.id, statusAt),
       enabled: replayReady && statusInsideRange,
       retry: false,
     })),
   });
-  const statusDataInconsistent = replayReady && statusQueries.some((query, index) => query.data && !statusResponseIsConsistent(query.data, machines[index].id, statusAt));
-  const historicalMachines = machines.map((machine, index) => {
+  const statusDataInconsistent = replayReady && statusQueries.some((query, index) => query.data && !statusResponseIsConsistent(query.data, activeMachines[index].id, statusAt));
+  const historicalMachines = activeMachines.map((machine, index) => {
     const query = statusQueries[index];
     if (query?.data && statusResponseIsConsistent(query.data, machine.id, statusAt)) {
       return { ...machine, status: query.data.status, metrics: query.data.metrics, asOf: query.data.asOf, freshnessS: query.data.freshnessS, lastCycleAt: query.data.lastCycleAt };
@@ -259,7 +272,16 @@ export function WorkshopPage() {
         </Suspense>
       </Workshop3DErrorBoundary>
     : map;
-  const workspaceReady = siteQuery.isSuccess && machinesQuery.isSuccess && machines.length > 0;
+  const workspaceReady = siteQuery.isSuccess && machinesQuery.isSuccess && activeMachines.length > 0;
+  const setupReady = siteQuery.isSuccess && machinesQuery.isSuccess;
+  const setup = setupReady ? <>
+    {!workspaceReady && <SiteSetupChecklist hasPresses={activeMachines.length > 0} canConfigure={canConfigure} canImport={canImport} onAddPress={() => { setEditingMachine(null); setPressFormOpen(true); }} onConfigureGateway={() => setGatewayCardOpen(true)} onImportErp={() => navigate(`/imports?siteId=${siteId}`)} />}
+    {workspaceReady && <section className="workshop-configuration-access" aria-label="Configuration de l’atelier"><div><p className="eyebrow">CONFIGURATION ATELIER</p><strong>Passerelle et mapping des presses</strong><p className="muted">Retrouvez la configuration source et associez les identifiants détectés sans quitter cet atelier.</p></div><button className="button-secondary" type="button" aria-expanded={gatewayCardOpen} aria-controls="workshop-gateway-panel" onClick={() => setGatewayCardOpen(open => !open)}>{gatewayCardOpen ? 'Masquer la configuration' : 'Configurer passerelle et mapping'}</button></section>}
+    {gatewayCardOpen && <div id="workshop-gateway-panel"><GatewayCard siteId={siteId} machines={activeMachines} canConfigure={canConfigure} /></div>}
+    <PressCatalogTable machines={machines} canConfigure={canConfigure} onAddPress={() => { setEditingMachine(null); setPressFormOpen(true); }} onEditPress={(machine) => { setEditingMachine(machine); setPressFormOpen(true); }} />
+    <div className="workshop-setup-actions"><Link className="button-secondary" to={`/sites/${siteId}/planning`}>Ouvrir le planning hebdomadaire</Link></div>
+    <PressFormDrawer api={api} siteId={siteId} machine={editingMachine} open={pressFormOpen} onClose={() => { setPressFormOpen(false); setEditingMachine(null); }} onSaved={() => { setPressFormOpen(false); setEditingMachine(null); void queryClient.invalidateQueries({ queryKey: ['machines', siteId] }); }} />
+  </> : null;
 
   return <section className={`page page-wide workshop-page${workspaceReady ? ' workshop-page-ready' : ''}`}>
     {!workspaceReady ? <div className="page-intro workshop-intro"><div><Link className="back-link" to="/sites"><ArrowLeftIcon size={17} aria-hidden="true" />Tous les sites</Link><p className="eyebrow">ATELIER · {siteQuery.data?.timezone ?? 'UTC'}</p><h2>{siteQuery.data?.name ?? 'Chargement du site…'}</h2><p className="muted">Le plan, les statuts et le replay sont préparés à partir des dernières données source disponibles.</p></div></div> : null}
@@ -269,9 +291,10 @@ export function WorkshopPage() {
     {machinesQuery.isError ? <StatePanel tone="error" title="Machines indisponibles" text={machinesQuery.error instanceof Error ? machinesQuery.error.message : 'Impossible de récupérer les machines.'} action="Réessayer" onAction={() => machinesQuery.refetch()} /> : null}
     {sourceDiscoveryLoading ? <StatePanel tone="loading" title="Recherche de la borne source" text="Le dernier horodatage des cycles et incidents est en cours de lecture." /> : null}
     {sourceDiscoveryUnavailable ? <StatePanel tone="warning" title="Replay indisponible" text="Aucun horodatage de donnée source n’est disponible. L’heure d’import n’est pas utilisée comme substitut." action="Réessayer" onAction={() => { sourceCutoffQueries.forEach((query) => query.refetch()); incidentsQuery.refetch(); }} /> : null}
-    {!machinesQuery.isPending && !machinesQuery.isError && machines.length === 0 ? <EmptyPanel title="Aucune presse sur ce site" text="Le catalogue machine est vide pour ce périmètre." /> : null}
-
-    {workspaceReady ? <WorkshopWorkspace
+    {!machinesQuery.isPending && !machinesQuery.isError && activeMachines.length === 0 ? setup : null}
+    {workspaceReady ? <>
+      {setup}
+      <WorkshopWorkspace
       site={siteQuery.data}
       replayReady={replayReady}
       connectionApi={api}
@@ -320,6 +343,7 @@ export function WorkshopPage() {
       visualization={visualization}
       onReplayChange={setReplayPercent}
       onViewModeChange={setViewMode}
-    /> : null}
+      />
+    </> : null}
   </section>;
 }

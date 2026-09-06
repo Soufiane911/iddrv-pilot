@@ -314,6 +314,12 @@ if __name__ == "__main__":
             conn = psycopg2.connect(db_url)
             cursor = conn.cursor()
             try:
+                cursor.execute("SELECT status FROM sites WHERE id=%s FOR UPDATE", (args.site_id,))
+                site_row = cursor.fetchone()
+                if not site_row:
+                    raise ValueError("site_not_found")
+                if site_row[0] == "archived":
+                    raise ValueError("site_archived")
                 digest = hashlib.sha256(Path(input_path).read_bytes()).hexdigest()
                 cursor.execute(
                     "SELECT id FROM import_passports WHERE site_id=%s AND file_hash=%s AND status='completed'",
@@ -337,12 +343,14 @@ if __name__ == "__main__":
                     machine_key = str(m_ref)
                     if machine_key not in machine_ids:
                         cursor.execute(
-                            "SELECT id FROM machines WHERE site_id=%s AND erp_ref=%s",
+                            "SELECT id,status FROM machines WHERE site_id=%s AND erp_ref=%s FOR UPDATE",
                             (args.site_id, machine_key),
                         )
                         m_row = cursor.fetchone()
                         if not m_row:
                             raise psycopg2.Error(f"Foreign key violation: machine {m_ref} does not exist")
+                        if m_row[1] == "archived":
+                            raise ValueError("machine_archived")
                         machine_ids[machine_key] = m_row[0]
                     machine_id = machine_ids[machine_key]
                     from datetime import datetime

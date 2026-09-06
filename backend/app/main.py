@@ -27,6 +27,9 @@ from .api.machine_management import router as machine_management_router
 from .api.machine_connections import router as machine_connections_router
 from .api.shift_calendars import router as shift_calendars_router
 from .api.site_management import router as site_management_router
+from .api.production_planning import router as production_planning_router
+from .api.site_sources import router as site_sources_router
+from .api.cycle_ingestion import router as cycle_ingestion_router
 
 
 app = FastAPI(title=settings.app_name, version=settings.app_version)
@@ -50,6 +53,9 @@ app.include_router(machine_management_router)
 app.include_router(machine_connections_router)
 app.include_router(shift_calendars_router)
 app.include_router(site_management_router)
+app.include_router(production_planning_router)
+app.include_router(site_sources_router)
+app.include_router(cycle_ingestion_router)
 from .api.production_context import router as production_context_router
 from .api.predictions import router as predictions_router
 app.include_router(production_context_router)

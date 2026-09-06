@@ -4,6 +4,20 @@ from uuid import UUID
 from .db import get_connection
 
 
+class ImportLifecycleConflict(ValueError):
+    pass
+
+
+def _lock_active_site(cur, site_id: int) -> None:
+    cur.execute("SELECT status FROM sites WHERE id=%s FOR UPDATE", (site_id,))
+    site = cur.fetchone()
+    if site is None:
+        raise ImportLifecycleConflict("site_not_found")
+    status = site["status"] if isinstance(site, dict) else site[0]
+    if status == "archived":
+        raise ImportLifecycleConflict("site_archived")
+
+
 def _import_session(row, files):
     return {"id": row[0], "site_id": row[1], "name": row[2], "status": row[3], "summary": row[4] or {},
             "files": files, "created_at": row[5], "updated_at": row[6]}
@@ -12,6 +26,7 @@ def _import_session(row, files):
 def create_import_session(site_id: int, name: str, user_id: str):
     with get_connection() as conn:
         with conn.cursor() as cur:
+            _lock_active_site(cur, site_id)
             cur.execute("""INSERT INTO import_sessions(site_id,name,created_by)
                            VALUES (%s,%s,%s) RETURNING id,site_id,name,status,summary,created_at,updated_at""", (site_id, name, user_id))
             row = cur.fetchone(); conn.commit()
@@ -38,6 +53,11 @@ def add_import_file(session_id: UUID, payload: dict):
                "message": "Profilage en attente du worker d’ingestion."}
     with get_connection() as conn:
         with conn.cursor() as cur:
+            cur.execute("SELECT site_id FROM import_sessions WHERE id=%s FOR UPDATE", (str(session_id),))
+            session = cur.fetchone()
+            if session is None:
+                raise ImportLifecycleConflict("import_session_not_found")
+            _lock_active_site(cur, session[0])
             cur.execute("""INSERT INTO import_session_files(session_id,file_name,source_kind,mime_type,size_bytes,file_hash,profile)
                            VALUES (%s,%s,%s,%s,%s,%s,%s)
                            ON CONFLICT (session_id,file_name,file_hash) DO NOTHING""",
@@ -50,6 +70,11 @@ def add_import_file(session_id: UUID, payload: dict):
 def validate_import_session(session_id: UUID, user_id: str):
     with get_connection() as conn:
         with conn.cursor() as cur:
+            cur.execute("SELECT site_id FROM import_sessions WHERE id=%s FOR UPDATE", (str(session_id),))
+            session = cur.fetchone()
+            if session is None:
+                raise ImportLifecycleConflict("import_session_not_found")
+            _lock_active_site(cur, session[0])
             cur.execute(
                 """SELECT COUNT(*)::int,
                           COUNT(*) FILTER (

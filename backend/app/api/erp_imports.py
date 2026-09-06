@@ -55,7 +55,10 @@ async def upload(site_id: int, file: UploadFile = File(...), identity: Identity 
                     raise HTTPException(415, 'encrypted_xlsx_unsupported')
         except BadZipFile:
             raise HTTPException(415, 'invalid_xlsx') from None
-        return create_request(site_id=site_id, creator_id=identity.user_id, raw_path=str(path.resolve()), original_name=name[:255], file_hash=digest.hexdigest())
+        try:
+            return create_request(site_id=site_id, creator_id=identity.user_id, raw_path=str(path.resolve()), original_name=name[:255], file_hash=digest.hexdigest())
+        except ERPConflict as error:
+            raise HTTPException(409, str(error)) from None
     except Exception:
         path.unlink(missing_ok=True)
         raise

@@ -29,10 +29,28 @@ def store_page(conn, *, connection_id: UUID, page: CyclePage, received_at: datet
     inserted_dates = []
     with conn:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            # Use the same lock order as ERP and archive transactions:
+            # advisory site lock first, then the lifecycle row lock. Acquiring
+            # the row first would deadlock with lock_site().
+            cur.execute('SELECT site_id FROM machine_connections WHERE id=%s', (str(connection_id),))
+            source = cur.fetchone()
+            if not source:
+                raise SourceError('connection_not_found')
+            from ingest.erp_repository import ERPConflict, lock_site
+            try:
+                lock_site(cur, source['site_id'])
+            except ERPConflict as exc:
+                raise SourceError(str(exc)) from None
             cur.execute('SELECT * FROM machine_connections WHERE id=%s FOR UPDATE', (str(connection_id),))
             connection = cur.fetchone()
             if not connection or page.machine_id != connection['external_machine_id']:
                 raise SourceError('machine_identity_mismatch')
+            cur.execute('SELECT status FROM machines WHERE id=%s AND site_id=%s FOR SHARE', (connection['machine_id'], connection['site_id']))
+            machine = cur.fetchone()
+            if not machine:
+                raise SourceError('machine_not_found')
+            if machine['status'] == 'archived':
+                raise SourceError('machine_archived')
             cur.execute('SELECT * FROM machine_stream_offsets WHERE connection_id=%s FOR UPDATE', (str(connection_id),))
             offset = cur.fetchone()
             if offset and offset['stream_id'] != page.stream_id:
@@ -86,10 +104,8 @@ def store_page(conn, *, connection_id: UUID, page: CyclePage, received_at: datet
                             (str(connection_id), page.stream_id, cursor, sequence, received_at))
             if inserted_dates:
                 from ingest.context_repository import reconcile_period
-                from ingest.erp_repository import lock_site
-                # Reception belongs to the transport journal. Context knowledge
-                # starts after preceding ERP/calendar transactions release this lock.
-                lock_site(cur, connection['site_id'])
+                # Reception and context reconciliation already hold the site
+                # lock acquired before any event was written.
                 cur.execute('SELECT clock_timestamp() AS known_at')
                 context_known_at = cur.fetchone()['known_at']
                 reconcile_period(conn, site_id=connection['site_id'], machine_id=connection['machine_id'],

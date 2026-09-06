@@ -1,4 +1,9 @@
 .erp-import-card, .erp-site-preparation { margin-bottom: 20px; }
+.erp-machine-association { display: grid; gap: 10px; margin: 16px 0; padding: 16px; border: 1px solid var(--color-border); background: var(--color-muted); }
+.erp-machine-association h4, .erp-machine-association p { margin: 0; }
+.erp-machine-association-row { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.erp-machine-association-row strong { min-width: 150px; }
+.erp-machine-association-row select { flex: 1 1 240px; }
 .erp-site-preparation { padding: 20px; }
 .erp-site-preparation summary, .erp-import-card summary { cursor: pointer; font-weight: 600; padding: 10px 0; }
 .erp-import-card .form-grid, .erp-site-preparation .form-grid { display: grid; gap: 12px; max-width: 740px; margin: 18px 0; }

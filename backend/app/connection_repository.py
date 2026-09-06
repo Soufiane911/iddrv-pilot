@@ -11,7 +11,10 @@ class ConnectionConflict(ValueError):
 
 def local_machine(machine_id):
     with get_connection() as conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
-        cur.execute('SELECT id,site_id FROM machines WHERE id=%s', (machine_id,))
+        cur.execute('''SELECT m.id,m.site_id,m.status AS machine_lifecycle_status,
+                              s.status AS site_lifecycle_status
+                       FROM machines m JOIN sites s ON s.id=m.site_id
+                       WHERE m.id=%s''', (machine_id,))
         return cur.fetchone()
 
 
@@ -22,8 +25,32 @@ def get_connection_config(machine_id):
 
 
 def save_connection(machine, payload):
+    """Save a connection only after a fresh, ordered lifecycle check.
+
+    ``machine`` is an authorization snapshot from the API and can be stale.
+    The site and press are therefore re-read and locked in this transaction
+    before the connection row is locked or the UPSERT is attempted.
+    """
     with get_connection() as conn, conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
-        cur.execute('SELECT id,base_url,external_machine_id,state FROM machine_connections WHERE machine_id=%s FOR UPDATE', (machine['id'],))
+        site_id = int(machine['site_id'])
+        machine_id = int(machine['id'])
+        cur.execute('SELECT id,status FROM sites WHERE id=%s FOR UPDATE', (site_id,))
+        site = cur.fetchone()
+        if site is None:
+            raise ConnectionConflict('site_not_found')
+        if site['status'] == 'archived':
+            raise ConnectionConflict('site_archived')
+        cur.execute(
+            'SELECT id,site_id,status FROM machines WHERE id=%s AND site_id=%s FOR UPDATE',
+            (machine_id, site_id),
+        )
+        current_machine = cur.fetchone()
+        if current_machine is None:
+            raise ConnectionConflict('machine_not_found')
+        if current_machine['status'] == 'archived':
+            raise ConnectionConflict('machine_archived')
+
+        cur.execute('SELECT id,base_url,external_machine_id,state FROM machine_connections WHERE machine_id=%s FOR UPDATE', (machine_id,))
         current = cur.fetchone()
         if current:
             cur.execute('SELECT pg_try_advisory_xact_lock(hashtextextended(%s,14)) AS locked', (str(current['id']),))
@@ -41,7 +68,7 @@ def save_connection(machine, payload):
                     poll_interval_s=EXCLUDED.poll_interval_s,enabled=EXCLUDED.enabled,mapping_profile=EXCLUDED.mapping_profile,
                     state=CASE WHEN machine_connections.state IN ('gap_detected','contract_error') THEN machine_connections.state ELSE EXCLUDED.state END,
                     next_poll_at=now(),updated_at=now() RETURNING {PUBLIC_COLUMNS}''',
-                    (machine['site_id'], machine['id'], payload['base_url'], payload['external_machine_id'], payload['secret_ref'],
+                    (site_id, machine_id, payload['base_url'], payload['external_machine_id'], payload['secret_ref'],
                      payload['poll_interval_s'], payload['enabled'], payload['mapping_profile'], 'configured' if payload['enabled'] else 'disabled'))
         return cur.fetchone()
 

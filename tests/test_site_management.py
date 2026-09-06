@@ -49,3 +49,21 @@ def test_site_deletion_is_admin_only_and_protects_last_site(monkeypatch):
     response = client.delete("/api/v1/sites/1", headers=headers("admin"))
     assert response.status_code == 409
     assert response.json()["error"]["message"] == "last_site_cannot_be_deleted"
+
+
+def test_explicit_site_archive_has_rbac_and_stable_errors(monkeypatch):
+    calls = []
+    monkeypatch.setattr(site_management, "archive_site", lambda site_id: calls.append(site_id))
+    assert client.post("/api/v1/sites/2/archive", headers=headers("supervisor")).status_code == 403
+    assert client.post("/api/v1/sites/2/archive", headers=headers("admin")).status_code == 204
+    assert calls == [2]
+
+    monkeypatch.setattr(site_management, "archive_site", lambda site_id: (_ for _ in ()).throw(site_management.SiteNotFound("site_not_found")))
+    missing = client.post("/api/v1/sites/404/archive", headers=headers("admin"))
+    assert missing.status_code == 404
+    assert missing.json()["error"]["message"] == "site_not_found"
+
+    monkeypatch.setattr(site_management, "archive_site", lambda site_id: (_ for _ in ()).throw(site_management.SiteConflict("site_already_archived")))
+    conflict = client.post("/api/v1/sites/2/archive", headers=headers("admin"))
+    assert conflict.status_code == 409
+    assert conflict.json()["error"]["message"] == "site_already_archived"

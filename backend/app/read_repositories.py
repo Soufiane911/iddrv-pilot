@@ -59,14 +59,15 @@ def list_sites(*, site_ids: tuple[int, ...] | None = None, limit: int = 100, cur
     where = " WHERE " + " AND ".join(clauses) if clauses else ""
     sql = f"""SELECT s.id,s.name,s.timezone,COUNT(DISTINCT m.id) AS machine_count,
                      COUNT(DISTINCT i.id) FILTER (WHERE i.status='open') AS open_incident_count,
-                     MAX(COALESCE(j.completed_at, p.imported_at)) AS last_import_at
+                     MAX(COALESCE(j.completed_at, p.imported_at)) AS last_import_at,
+                     s.status
               FROM sites s
               LEFT JOIN machines m ON m.site_id=s.id
               LEFT JOIN incidents i ON i.site_id=s.id
               LEFT JOIN import_passports p ON p.site_id=s.id AND p.status='completed'
               LEFT JOIN import_jobs j ON j.site_id=s.id AND j.status='completed'
               {where}
-              GROUP BY s.id,s.name,s.timezone ORDER BY s.id ASC LIMIT %s OFFSET %s"""
+              GROUP BY s.id,s.name,s.timezone,s.status ORDER BY s.id ASC LIMIT %s OFFSET %s"""
     args.extend([limit + 1, offset])
     with get_connection() as conn:
         with conn.cursor() as cur:
@@ -75,7 +76,7 @@ def list_sites(*, site_ids: tuple[int, ...] | None = None, limit: int = 100, cur
     items = [
         {
             "id": r[0], "name": r[1], "timezone": r[2],
-            "machine_count": r[3], "open_incident_count": r[4], "last_import_at": r[5],
+            "machine_count": r[3], "open_incident_count": r[4], "last_import_at": r[5], "status": r[6],
         }
         for r in rows[:limit]
     ]
@@ -128,7 +129,8 @@ def list_machines(site_id: int, *, limit: int = 100, cursor: str | None = None,
     effective_as_of = _as_of(as_of)
     where, filter_args = _machine_query(site_id=site_id)
     sql = f"""WITH params AS (SELECT %s::timestamptz AS as_of)
-              SELECT m.id,m.site_id,m.line_id,m.erp_ref,m.name,m.brand,m.model,
+              SELECT m.id,m.site_id,m.line_id,m.workshop_code,m.erp_ref,m.name,m.brand,m.model,
+                     m.status AS lifecycle_status,
                      ml.x,ml.y,ml.z,ml.rotation_deg,ml.display_order,
                      {_machine_status_sql()} AS status
               FROM machines m CROSS JOIN params
@@ -152,10 +154,10 @@ def list_machines(site_id: int, *, limit: int = 100, cursor: str | None = None,
     items = []
     for row in rows[:limit]:
         items.append({
-            "id": row[0], "site_id": row[1], "line_id": row[2], "erp_ref": row[3], "name": row[4],
-            "brand": row[5], "model": row[6], "status": row[12], "as_of": effective_as_of,
-            "layout": {"x": _numeric(row[7]) or 0, "y": _numeric(row[8]) or 0, "z": _numeric(row[9]) or 0,
-                       "rotation_deg": _numeric(row[10]) or 0, "display_order": row[11]} if row[7] is not None else None,
+            "id": row[0], "site_id": row[1], "line_id": row[2], "workshop_code": row[3], "erp_ref": row[4], "name": row[5],
+            "brand": row[6], "model": row[7], "lifecycle_status": row[8], "status": row[14], "as_of": effective_as_of,
+            "layout": {"x": _numeric(row[9]) or 0, "y": _numeric(row[10]) or 0, "z": _numeric(row[11]) or 0,
+                       "rotation_deg": _numeric(row[12]) or 0, "display_order": row[13]} if row[9] is not None else None,
         })
     return items, next_cursor(offset, limit, len(rows))
 
@@ -164,7 +166,8 @@ def get_machine(machine_id: int, as_of: datetime | None = None):
     effective_as_of = _as_of(as_of)
     where, filter_args = _machine_query(machine_id=machine_id)
     sql = f"""WITH params AS (SELECT %s::timestamptz AS as_of)
-                   SELECT m.id,m.site_id,m.line_id,m.erp_ref,m.name,m.brand,m.model,
+                   SELECT m.id,m.site_id,m.line_id,m.workshop_code,m.erp_ref,m.name,m.brand,m.model,
+                          m.status AS lifecycle_status,
                           ml.x,ml.y,ml.z,ml.rotation_deg,ml.display_order,
                           {_machine_status_sql()} AS status
                    FROM machines m CROSS JOIN params
@@ -188,10 +191,10 @@ def get_machine(machine_id: int, as_of: datetime | None = None):
     if row is None:
         return None
     return {
-        "id": row[0], "site_id": row[1], "line_id": row[2], "erp_ref": row[3], "name": row[4],
-        "brand": row[5], "model": row[6], "status": row[12], "as_of": effective_as_of,
-        "layout": {"x": _numeric(row[7]) or 0, "y": _numeric(row[8]) or 0, "z": _numeric(row[9]) or 0,
-                    "rotation_deg": _numeric(row[10]) or 0, "display_order": row[11]} if row[7] is not None else None,
+        "id": row[0], "site_id": row[1], "line_id": row[2], "workshop_code": row[3], "erp_ref": row[4], "name": row[5],
+        "brand": row[6], "model": row[7], "lifecycle_status": row[8], "status": row[14], "as_of": effective_as_of,
+        "layout": {"x": _numeric(row[9]) or 0, "y": _numeric(row[10]) or 0, "z": _numeric(row[11]) or 0,
+                    "rotation_deg": _numeric(row[12]) or 0, "display_order": row[13]} if row[9] is not None else None,
     }
 
 

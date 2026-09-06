@@ -33,7 +33,7 @@ export interface Site {
   id: number;
   name: string;
   timezone?: string;
-  status?: 'online' | 'degraded' | 'offline';
+  status?: 'online' | 'degraded' | 'offline' | 'active' | 'archived';
   machineCount?: number;
   openIncidentCount?: number;
   lastImportAt?: string | null;
@@ -42,6 +42,27 @@ export interface Site {
 export interface SiteCreateInput {
   name: string;
   timezone?: string;
+}
+
+/**
+ * The workshop contract is intentionally wider than the legacy ERP-only
+ * creation flow. The API remains the source of truth: unsupported fields are
+ * returned as an API error rather than being silently discarded by the client.
+ */
+export interface MachineCreateInput {
+  name: string;
+  workshop_code: string;
+  erp_ref?: string | null;
+  brand?: string | null;
+  model?: string | null;
+}
+
+export interface MachinePatchInput {
+  name?: string;
+  workshop_code?: string;
+  erp_ref?: string | null;
+  brand?: string | null;
+  model?: string | null;
 }
 
 export interface MachineMetrics {
@@ -71,10 +92,12 @@ export interface Machine {
   siteId?: number | null;
   lineId?: number | null;
   erpRef?: string | null;
+  workshopCode?: string | null;
   name: string;
   brand?: string | null;
   model?: string | null;
   status?: MachineState | null;
+  lifecycleStatus?: 'active' | 'inactive' | 'archived' | null;
   asOf?: string | null;
   freshnessS?: number | null;
   lastCycleAt?: string | null;
@@ -373,6 +396,130 @@ export interface ShiftCalendarInput {
 }
 export interface ShiftCalendar extends ShiftCalendarInput { version: number }
 
+export interface SiteSource {
+  id: string;
+  siteId: number;
+  kind: 'gateway_push' | string;
+  name: string;
+  status: 'active' | 'disabled' | 'archived' | string;
+  lastSeenAt?: string | null;
+  createdAt?: string | null;
+  /** Present only in the response that creates or rotates a credential. */
+  secret?: string;
+}
+
+export interface SourceCredential {
+  id: string;
+  sourceId: string;
+  createdAt?: string | null;
+  secret: string;
+}
+
+export interface SourceMachineMapping {
+  id: string;
+  sourceId: string;
+  siteId: number;
+  externalMachineId: string;
+  machineId: number;
+  validFrom?: string | null;
+  validTo?: string | null;
+  replayedCount?: number;
+}
+
+export interface DetectedMachine {
+  externalMachineId: string;
+  firstDetectedAt?: string | null;
+  lastDetectedAt?: string | null;
+  lastOrderNumber?: string | null;
+  lastCycleCounter?: number | null;
+  pendingEvents: number;
+  machineId?: number | null;
+  mappingStatus?: 'mapped' | 'pending' | string;
+}
+
+export interface PlanningSlot {
+  id: string;
+  siteId: number;
+  allocationId: string;
+  machineId: number;
+  machineName?: string | null;
+  machineErpRef?: string | null;
+  workOrderId: string;
+  orderNumber: string;
+  startsAt: string;
+  endsAt: string;
+  note?: string | null;
+  status: 'planned' | 'in_progress' | 'completed' | 'cancelled' | string;
+  rowVersion: number;
+  collectionStatus: 'no_cycle' | 'receiving' | 'interrupted' | 'partial' | string;
+  planningStatus: string;
+  erpStatus: 'pending' | 'matched' | 'incomplete' | 'conflict' | string;
+  sourceState?: string | null;
+  sourceLastSuccessAt?: string | null;
+  cyclesReceived?: number | null;
+  firstCycleAt?: string | null;
+  lastCycleAt?: string | null;
+  lastCycleCounter?: number | null;
+  observedOrderNumber?: string | null;
+  averageCycleTimeS?: number | null;
+  lastCycleTimeS?: number | null;
+  parameterCoverage?: number | null;
+  processParameters?: Record<string, number | string | null> | null;
+  erpImportedAt?: string | null;
+  erpVersion?: string | number | null;
+  producedPartsErp?: number | null;
+  goodPartsErp?: number | null;
+  scrapPartsErp?: number | null;
+  cyclesErp?: number | null;
+  orderProducedPartsErp?: number | null;
+  orderGoodPartsErp?: number | null;
+  orderScrapPartsErp?: number | null;
+  orderCyclesErp?: number | null;
+  orderErpStatus?: string | null;
+}
+
+export interface PlanningWeek {
+  siteId: number;
+  timezone: string;
+  weekStart: string;
+  weekEnd: string;
+  items: PlanningSlot[];
+}
+
+export interface WorkOrderAllocationInput {
+  machine_id: number;
+  starts_at: string;
+  ends_at: string;
+  note?: string | null;
+}
+
+export interface WorkOrderCreateInput {
+  order_number: string;
+  allocations: WorkOrderAllocationInput[];
+  note?: string | null;
+}
+
+export interface WorkOrder {
+  id: string;
+  siteId: number;
+  orderNumber: string;
+  allocations: Array<{ id: string; machineId: number; slot?: PlanningSlot }>;
+}
+
+export interface PlanningSlotCreateInput {
+  allocation_id: string;
+  starts_at: string;
+  ends_at: string;
+  note?: string | null;
+}
+
+export interface PlanningSlotPatchInput {
+  row_version: number;
+  starts_at?: string;
+  ends_at?: string;
+  note?: string | null;
+}
+
 export interface MachineConnectionInput {
   base_url: string;
   external_machine_id: string;
@@ -479,6 +626,9 @@ export interface ApiClient {
   getReadiness(): Promise<Readiness>;
   getSites(): Promise<Site[]>;
   createSite(input: SiteCreateInput): Promise<Site>;
+  /** Archive in place; history and dependent identities are retained. */
+  archiveSite(siteId: number): Promise<void>;
+  /** @deprecated kept for integrations; the backend treats it as archive. */
   deleteSite(siteId: number): Promise<void>;
   getSite(siteId: number): Promise<Site>;
   getMachines(siteId: number, asOf?: string): Promise<Machine[]>;
@@ -504,7 +654,20 @@ export interface ApiClient {
   confirmERP(importId: string, payload: { preview_version: number; create_machine_refs: string[]; replacements: ERPReplacement[]; new_identity_rows?: number[] }): Promise<ERPImportRequest>;
   getShiftCalendar(siteId: number): Promise<ShiftCalendar | null>;
   saveShiftCalendar(siteId: number, input: ShiftCalendarInput): Promise<ShiftCalendar>;
-  createMachine(siteId: number, input: { erp_ref: string; name: string }): Promise<Machine>;
+  createMachine(siteId: number, input: MachineCreateInput): Promise<Machine>;
+  updateMachine(machineId: number, input: MachinePatchInput): Promise<Machine>;
+  archiveMachine(machineId: number): Promise<void>;
+  getSources(siteId: number): Promise<SiteSource[]>;
+  createSource(siteId: number, input?: { name?: string }): Promise<SiteSource>;
+  createSourceCredential(sourceId: string): Promise<SourceCredential>;
+  createSourceMachineMapping(sourceId: string, input: { external_machine_id: string; machine_id: number; effective_at?: string }): Promise<SourceMachineMapping>;
+  getDetectedMachines(sourceId: string): Promise<DetectedMachine[]>;
+  getPlanning(siteId: number, input: { weekStart?: string; week?: string }): Promise<PlanningWeek>;
+  createWorkOrder(siteId: number, input: WorkOrderCreateInput): Promise<WorkOrder>;
+  addWorkOrderAllocation(workOrderId: string, input: { machine_id: number; slots?: Array<{ starts_at: string; ends_at: string; note?: string | null }> }): Promise<unknown>;
+  createPlanningSlot(input: PlanningSlotCreateInput): Promise<PlanningSlot>;
+  updatePlanningSlot(slotId: string, input: PlanningSlotPatchInput): Promise<PlanningSlot>;
+  cancelPlanningSlot(slotId: string, rowVersion: number): Promise<PlanningSlot>;
   createImportSession(siteId: number, name: string): Promise<ImportSession>;
   getImportSession(sessionId: string): Promise<ImportSession>;
   registerImportFile(sessionId: string, file: { file_name: string; source_kind: ImportSourceKind; mime_type?: string; size_bytes: number; file_hash?: string }): Promise<ImportSession>;
@@ -562,6 +725,71 @@ function mapSite(value: unknown): Site {
   };
 }
 
+function mapSource(value: unknown): SiteSource {
+  const record = (value ?? {}) as Record<string, unknown>;
+  return {
+    id: String(record.id ?? ''), siteId: Number(record.site_id ?? record.siteId),
+    kind: String(record.kind ?? 'gateway_push'), name: String(record.name ?? 'Passerelle du site'),
+    status: String(record.status ?? 'unknown'), lastSeenAt: (record.last_seen_at ?? record.lastSeenAt) as string | null | undefined,
+    createdAt: (record.created_at ?? record.createdAt) as string | null | undefined,
+    secret: typeof record.secret === 'string' ? record.secret : undefined,
+  };
+}
+
+function mapDetectedMachine(value: unknown): DetectedMachine {
+  const record = (value ?? {}) as Record<string, unknown>;
+  return {
+    externalMachineId: String(record.external_machine_id ?? record.externalMachineId ?? record.machine_id ?? ''),
+    firstDetectedAt: (record.first_detected_at ?? record.firstDetectedAt ?? record.first_seen_at ?? record.firstSeenAt) as string | null | undefined,
+    lastDetectedAt: (record.last_detected_at ?? record.lastDetectedAt ?? record.last_seen_at ?? record.lastSeenAt) as string | null | undefined,
+    lastOrderNumber: (record.last_order_number ?? record.lastOrderNumber ?? record.last_work_order ?? record.lastWorkOrder ?? record.order_number) as string | null | undefined,
+    lastCycleCounter: numberOrNull(record.last_cycle_counter ?? record.lastCycleCounter),
+    pendingEvents: Number(record.pending_events ?? record.pendingEvents ?? record.pending_count ?? 0),
+    machineId: numberOrNull(record.machine_id ?? record.machineId),
+    mappingStatus: (record.mapping_status ?? record.mappingStatus) as DetectedMachine['mappingStatus'],
+  };
+}
+
+function mapPlanningSlot(value: unknown): PlanningSlot {
+  const record = (value ?? {}) as Record<string, unknown>;
+  const params = pick(record, 'process_parameters', 'processParameters', 'parameters');
+  const rawErpStatus = pick(record, 'erp_status', 'erpStatus');
+  const erpStatusDetails = isRecord(rawErpStatus) ? rawErpStatus : {};
+  const erp = isRecord(pick(record, 'erp', 'erp_data', 'erpData')) ? pick(record, 'erp', 'erp_data', 'erpData') as Record<string, unknown> : erpStatusDetails;
+  const orderErp = isRecord(pick(record, 'order_erp', 'orderErp', 'order_totals', 'orderTotals')) ? pick(record, 'order_erp', 'orderErp', 'order_totals', 'orderTotals') as Record<string, unknown> : {};
+  const erpValue = (...keys: string[]) => pick(record, ...keys) ?? pick(erp, ...keys) ?? pick(erpStatusDetails, ...keys);
+  // The planning endpoint returns these five OF-level fields as flat keys.
+  // Keep the nested aliases only for older API responses; never derive an OF
+  // total from the per-press ERP quantities.
+  const orderErpValue = (...keys: string[]) => {
+    const exactKey = keys.find((key) => Object.prototype.hasOwnProperty.call(record, key));
+    return exactKey ? record[exactKey] : pick(orderErp, ...keys);
+  };
+  return {
+    id: String(record.id ?? ''), siteId: Number(record.site_id ?? record.siteId), allocationId: String(record.allocation_id ?? record.allocationId ?? ''), machineId: Number(record.machine_id ?? record.machineId),
+    machineName: (record.machine_name ?? record.machineName) as string | null | undefined, machineErpRef: (record.erp_ref ?? record.machine_erp_ref ?? record.machineErpRef) as string | null | undefined,
+    workOrderId: String(record.work_order_id ?? record.workOrderId ?? ''), orderNumber: String(record.order_number ?? record.orderNumber ?? record.production_order_id ?? ''),
+    startsAt: String(record.starts_at ?? record.startsAt ?? record.start_at ?? ''), endsAt: String(record.ends_at ?? record.endsAt ?? record.end_at ?? ''), note: (record.note as string | null | undefined) ?? null,
+    status: String(record.status ?? 'planned') as PlanningSlot['status'], rowVersion: Number(record.row_version ?? record.rowVersion ?? 1),
+    collectionStatus: String(record.collection_status ?? record.collectionStatus ?? 'no_cycle'), planningStatus: String(record.planning_status ?? record.planningStatus ?? record.status ?? 'planned'), erpStatus: String(typeof rawErpStatus === 'string' ? rawErpStatus : erpStatusDetails.status ?? record.erp_state ?? 'pending'),
+    sourceState: (record.source_state ?? record.sourceState) as string | null | undefined, sourceLastSuccessAt: (record.source_last_success_at ?? record.sourceLastSuccessAt) as string | null | undefined,
+    cyclesReceived: numberOrNull(record.cycles_received ?? record.cyclesReceived), firstCycleAt: (record.first_cycle_at ?? record.firstCycleAt) as string | null | undefined, lastCycleAt: (record.last_cycle_at ?? record.lastCycleAt) as string | null | undefined,
+    lastCycleCounter: numberOrNull(record.last_cycle_counter ?? record.lastCycleCounter), observedOrderNumber: (record.observed_order_number ?? record.observedOrderNumber) as string | null | undefined,
+    averageCycleTimeS: numberOrNull(record.average_cycle_time_s ?? record.averageCycleTimeS ?? record.avg_cycle_time_s), lastCycleTimeS: numberOrNull(record.last_cycle_time_s ?? record.lastCycleTimeS), parameterCoverage: numberOrNull(record.parameter_coverage ?? record.parameterCoverage),
+    processParameters: isRecord(params) ? params as PlanningSlot['processParameters'] : null,
+    erpImportedAt: (record.erp_imported_at ?? record.erpImportedAt) as string | null | undefined, erpVersion: (record.erp_version ?? record.erpVersion) as string | number | null | undefined,
+    producedPartsErp: numberOrNull(erpValue('produced_parts_erp', 'producedPartsErp', 'erp_produced_parts', 'produced_parts')),
+    goodPartsErp: numberOrNull(erpValue('good_parts_erp', 'goodPartsErp', 'erp_good_parts', 'good_parts')),
+    scrapPartsErp: numberOrNull(erpValue('scrap_parts_erp', 'scrapPartsErp', 'erp_scrap_parts', 'scrap_parts')),
+    cyclesErp: numberOrNull(erpValue('cycles_erp', 'cyclesErp', 'erp_cycles', 'cycle_count', 'cycles')),
+    orderProducedPartsErp: numberOrNull(orderErpValue('order_total_produced_parts', 'order_produced_parts_erp', 'orderProducedPartsErp', 'total_produced_parts', 'totalProducedParts', 'produced_parts_total')),
+    orderGoodPartsErp: numberOrNull(orderErpValue('order_total_good_parts', 'order_good_parts_erp', 'orderGoodPartsErp', 'total_good_parts', 'totalGoodParts', 'good_parts_total')),
+    orderScrapPartsErp: numberOrNull(orderErpValue('order_total_scrap_parts', 'order_scrap_parts_erp', 'orderScrapPartsErp', 'total_scrap_parts', 'totalScrapParts', 'scrap_parts_total')),
+    orderCyclesErp: numberOrNull(orderErpValue('order_total_cycles', 'order_cycles_erp', 'orderCyclesErp', 'total_cycles', 'totalCycles', 'cycles_total')),
+    orderErpStatus: (Object.prototype.hasOwnProperty.call(record, 'erp_order_status') ? record.erp_order_status : pick(record, 'order_erp_status', 'orderErpStatus') ?? pick(orderErp, 'status', 'erp_order_status', 'erp_status', 'erpStatus') ?? null) as string | null,
+  };
+}
+
 function mapMachine(value: unknown): Machine {
   const record = (value ?? {}) as Record<string, unknown>;
   const metrics = isRecord(pick(record, 'metrics')) ? pick(record, 'metrics') as Record<string, unknown> : {};
@@ -573,10 +801,12 @@ function mapMachine(value: unknown): Machine {
     siteId: numberOrNull(pick(record, 'siteId', 'site_id')),
     lineId: numberOrNull(pick(record, 'lineId', 'line_id')),
     erpRef: (pick(record, 'erpRef', 'erp_ref') as string | null | undefined) ?? null,
+    workshopCode: (pick(record, 'workshopCode', 'workshop_code', 'code') as string | null | undefined) ?? null,
     name: String(record.name ?? record.erpRef ?? record.erp_ref ?? `Machine ${record.id ?? ''}`).trim(),
     brand: (record.brand as string | null | undefined) ?? null,
     model: (record.model as string | null | undefined) ?? null,
-    status: (record.status as MachineState | null | undefined) ?? null,
+    status: ['running', 'warning', 'stopped', 'offline'].includes(String(record.status)) ? record.status as MachineState : null,
+    lifecycleStatus: (pick(record, 'lifecycleStatus', 'lifecycle_status') as Machine['lifecycleStatus']) ?? (['active', 'inactive', 'archived'].includes(String(record.status)) ? record.status as Machine['lifecycleStatus'] : 'active'),
     asOf: (pick(record, 'asOf', 'as_of') as string | null | undefined) ?? null,
     freshnessS: numberOrNull(pick(record, 'freshnessS', 'freshness_s')),
     metrics: hasMetrics ? {
@@ -840,7 +1070,7 @@ export function createApiClient(baseUrl = import.meta.env.VITE_API_URL ?? '/api/
       const error = payload && typeof payload === 'object' && 'error' in payload ? (payload as { error: ApiErrorPayload }).error : undefined;
       const detail = payload && typeof payload === 'object' && 'detail' in payload ? (payload as { detail?: unknown }).detail : undefined;
       const detailRecord = detail && typeof detail === 'object' ? detail as Record<string, unknown> : undefined;
-      const detailCode = typeof detailRecord?.code === 'string' ? detailRecord.code : undefined;
+      const detailCode = typeof detailRecord?.code === 'string' ? detailRecord.code : typeof detail === 'string' && /^[a-z0-9_]+$/.test(detail) ? detail : undefined;
       const detailMessage = typeof detail === 'string'
         ? ({ invalid_credentials: 'Identifiants invalides.', authentication_required: 'Authentification requise.', invalid_token: 'Session invalide.', session_revoked: 'Session expirée.' } as Record<string, string>)[detail] ?? detail.split('_').join(' ')
         : typeof detailRecord?.message === 'string' ? detailRecord.message : undefined;
@@ -917,7 +1147,12 @@ export function createApiClient(baseUrl = import.meta.env.VITE_API_URL ?? '/api/
     async createSite(input) {
       return mapSite(await request('/sites', { method: 'POST', body: input }));
     },
+    async archiveSite(siteId) {
+      await request<void>(`/sites/${siteId}/archive`, { method: 'POST' });
+    },
     async deleteSite(siteId) {
+      // Legacy callers are deliberately routed through the backend's archive
+      // compatibility endpoint; the UI never offers physical deletion.
       await request<void>(`/sites/${siteId}`, { method: 'DELETE' });
     },
     async getSite(siteId) {
@@ -1078,6 +1313,19 @@ export function createApiClient(baseUrl = import.meta.env.VITE_API_URL ?? '/api/
       return listPayload<unknown>(await requestWithLegacyFallback(`/machines/${machineId}/hdt-predictions?${params.toString()}`)).map(mapHdtPrediction);
     },
     async createMachine(siteId, body) { return mapMachine(await request(`/sites/${siteId}/machines`, { method: 'POST', body })); },
+    async updateMachine(machineId, body) { return mapMachine(await request(`/machines/${machineId}`, { method: 'PATCH', body })); },
+    async archiveMachine(machineId) { await request<void>(`/machines/${machineId}/archive`, { method: 'POST' }); },
+    async getSources(siteId) { return listPayload<unknown>(await requestWithLegacyFallback(`/sites/${siteId}/sources`)).map(mapSource); },
+    async createSource(siteId, body = {}) { return mapSource(await request(`/sites/${siteId}/sources`, { method: 'POST', body: { name: body.name ?? 'Passerelle du site' } })); },
+    async createSourceCredential(sourceId) { return request<unknown>(`/sources/${encodeURIComponent(sourceId)}/credentials`, { method: 'POST' }).then((value) => { const source = mapSource(value); return { id: source.id, sourceId: String((value as Record<string, unknown>)?.source_id ?? sourceId), createdAt: source.createdAt, secret: source.secret ?? '' }; }); },
+    async createSourceMachineMapping(sourceId, body) { return request<unknown>(`/sources/${encodeURIComponent(sourceId)}/machine-mappings`, { method: 'POST', body }).then((value) => { const record = value as Record<string, unknown>; return { id: String(record.id ?? ''), sourceId: String(record.source_id ?? record.sourceId ?? sourceId), siteId: Number(record.site_id ?? record.siteId), externalMachineId: String(record.external_machine_id ?? record.externalMachineId ?? body.external_machine_id), machineId: Number(record.machine_id ?? record.machineId ?? body.machine_id), validFrom: (record.valid_from ?? record.validFrom) as string | null | undefined, validTo: (record.valid_to ?? record.validTo) as string | null | undefined, replayedCount: Number(record.replayed_count ?? record.replayedCount ?? 0) }; }); },
+    async getDetectedMachines(sourceId) { return listPayload<unknown>(await requestWithLegacyFallback(`/sources/${encodeURIComponent(sourceId)}/detected-machines`)).map(mapDetectedMachine); },
+    async getPlanning(siteId, input) { const params = new URLSearchParams(); if (input.weekStart) params.set('week_start', input.weekStart); if (input.week) params.set('week', input.week); const payload = await requestWithLegacyFallback(`/sites/${siteId}/planning?${params.toString()}`) as Record<string, unknown>; return { siteId: Number(payload.site_id ?? payload.siteId ?? siteId), timezone: String(payload.timezone ?? 'UTC'), weekStart: String(payload.week_start ?? payload.weekStart ?? input.weekStart ?? ''), weekEnd: String(payload.week_end ?? payload.weekEnd ?? ''), items: listPayload<unknown>(payload.items ?? payload.data).map(mapPlanningSlot) }; },
+    async createWorkOrder(siteId, body) { const payload = await request<unknown>(`/sites/${siteId}/work-orders`, { method: 'POST', body }); const record = payload as Record<string, unknown>; return { id: String(record.id ?? ''), siteId: Number(record.site_id ?? record.siteId ?? siteId), orderNumber: String(record.order_number ?? record.orderNumber ?? body.order_number), allocations: listPayload<Record<string, unknown>>(record.allocations).map((allocation) => ({ id: String(allocation.id ?? ''), machineId: Number(allocation.machine_id ?? allocation.machineId), slot: allocation.slot ? mapPlanningSlot(allocation.slot) : undefined })) }; },
+    async addWorkOrderAllocation(workOrderId, body) { return request(`/work-orders/${encodeURIComponent(workOrderId)}/allocations`, { method: 'POST', body }); },
+    async createPlanningSlot(body) { return mapPlanningSlot(await request(`/planning/slots`, { method: 'POST', body })); },
+    async updatePlanningSlot(slotId, body) { return mapPlanningSlot(await request(`/planning/slots/${encodeURIComponent(slotId)}`, { method: 'PATCH', body })); },
+    async cancelPlanningSlot(slotId, rowVersion) { return mapPlanningSlot(await request(`/planning/slots/${encodeURIComponent(slotId)}/cancel`, { method: 'POST', body: { row_version: rowVersion } })); },
     async createImportSession(siteId, name) {
       return mapImportSession(await request(`/sites/${siteId}/import-sessions`, { method: 'POST', body: { name } }));
     },
@@ -1161,9 +1409,12 @@ export const mockApiClient: ApiClient = {
     DEMO_SITES.push(site);
     return site;
   },
+  archiveSite: async (siteId) => {
+    const site = DEMO_SITES.find((item) => item.id === siteId);
+    if (site) site.status = 'archived';
+  },
   deleteSite: async (siteId) => {
-    const index = DEMO_SITES.findIndex((site) => site.id === siteId);
-    if (index >= 0) DEMO_SITES.splice(index, 1);
+    await mockApiClient.archiveSite(siteId);
   },
   getSite: async (id) => DEMO_SITES.find((site) => site.id === id) ?? DEMO_SITES[0],
   getMachines: async () => DEMO_MACHINES,
@@ -1232,6 +1483,24 @@ export const mockApiClient: ApiClient = {
   getProductionContext: async (_machineId, bounds) => ({ knownAt: bounds.knownAt ?? DEMO_DATE, declarations: [{ id: 'demo-declaration', orderRef: 'OF-2025-0012', team: 'A', producedParts: 1200, goodParts: 1166, scrapParts: 34, status: 'open', history: [] }], target: null, erpStatus: null, qualityStatus: 'unknown', coverageStatus: 'incomplete' }),
   getHdtPredictions: async () => [],
   createMachine: async () => { throw new Error('La création nécessite une API connectée.'); },
+  updateMachine: async (machineId, input) => {
+    const machine = DEMO_MACHINES.find(item => item.id === machineId);
+    if (!machine) throw new Error('Presse introuvable.');
+    Object.assign(machine, { name: input.name ?? machine.name, workshopCode: input.workshop_code ?? machine.workshopCode, erpRef: input.erp_ref === undefined ? machine.erpRef : input.erp_ref, brand: input.brand === undefined ? machine.brand : input.brand, model: input.model === undefined ? machine.model : input.model });
+    return machine;
+  },
+  archiveMachine: async (machineId) => { const machine = DEMO_MACHINES.find(item => item.id === machineId); if (machine) machine.lifecycleStatus = 'archived'; },
+  getSources: async () => [],
+  createSource: async () => { throw new Error('La configuration nécessite une API connectée.'); },
+  createSourceCredential: async () => { throw new Error('La rotation nécessite une API connectée.'); },
+  createSourceMachineMapping: async () => { throw new Error('Le mapping nécessite une API connectée.'); },
+  getDetectedMachines: async () => { throw new Error('La détection nécessite une API connectée.'); },
+  getPlanning: async () => ({ siteId: 1, timezone: 'Europe/Paris', weekStart: '2025-02-10', weekEnd: '2025-02-17', items: [] }),
+  createWorkOrder: async () => { throw new Error('La planification nécessite une API connectée.'); },
+  addWorkOrderAllocation: async () => { throw new Error('La planification nécessite une API connectée.'); },
+  createPlanningSlot: async () => { throw new Error('La planification nécessite une API connectée.'); },
+  updatePlanningSlot: async () => { throw new Error('La planification nécessite une API connectée.'); },
+  cancelPlanningSlot: async () => { throw new Error('La planification nécessite une API connectée.'); },
   createImportSession: async (siteId, name) => ({ id: 'session-demo', site_id: siteId, name, status: 'collecting', summary: {}, files: [], created_at: DEMO_DATE, updated_at: DEMO_DATE }),
   getImportSession: async () => ({ id: 'session-demo', site_id: 1, name: 'Projet usine pilote', status: 'profiling', summary: { recognizedColumns: 18, unknownColumns: 2, confidence: .91 }, files: [], created_at: DEMO_DATE, updated_at: DEMO_DATE }),
   registerImportFile: async (sessionId, file) => ({ id: sessionId, site_id: 1, name: 'Projet usine pilote', status: 'profiling', summary: { recognizedColumns: 6, unknownColumns: 1, confidence: .84 }, files: [{ id: `file-${file.file_name}`, ...file, status: 'needs_review', profile: { columns: ['machine_id', 'timestamp', 'cycle_time_s'], recognized: ['machine_id', 'timestamp'], unknown: ['cycle_time_s'], confidence: .84 } }], created_at: DEMO_DATE, updated_at: DEMO_DATE }),

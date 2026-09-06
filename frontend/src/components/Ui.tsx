@@ -27,6 +27,9 @@ export function machineStatusLabel(value?: string | null): string {
   if (value === 'warning') return 'À surveiller';
   if (value === 'stopped') return 'Arrêtée';
   if (value === 'offline') return 'Hors ligne';
+  if (value === 'active') return 'Active';
+  if (value === 'inactive') return 'Inactive';
+  if (value === 'archived') return 'Archivée';
   return 'Statut inconnu';
 }
 

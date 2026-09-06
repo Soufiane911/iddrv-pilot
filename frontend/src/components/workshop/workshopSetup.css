@@ -1,0 +1,89 @@
+.workshop-setup {
+  display: grid;
+  gap: 24px;
+  margin-top: 8px;
+}
+.workshop-setup-card,
+.workshop-catalog-card,
+.workshop-gateway-card {
+  border: 1px solid var(--color-border);
+  background: var(--color-card);
+}
+.workshop-setup-card { padding: 24px; }
+.workshop-setup-card h2,
+.workshop-catalog-card h2,
+.workshop-gateway-card h2 { margin: 0; font-size: 22px; line-height: 1.2; }
+.workshop-setup-card header p { margin: 6px 0 0; color: var(--color-muted-foreground); }
+.workshop-checklist {
+  display: grid;
+  gap: 0;
+  margin: 22px 0 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--color-border);
+}
+.workshop-checklist li {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 62px;
+  border-bottom: 1px solid var(--color-border);
+}
+.workshop-checklist-marker {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--color-border);
+  color: var(--color-muted-foreground);
+  font-size: 12px;
+  font-weight: 700;
+}
+.workshop-checklist li.complete .workshop-checklist-marker {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 9%, var(--color-card));
+  color: var(--color-accent);
+}
+.workshop-checklist li strong { display: block; font-size: 14px; }
+.workshop-checklist li small { display: block; margin-top: 2px; color: var(--color-muted-foreground); }
+.workshop-checklist button { min-height: 38px; padding: 7px 12px; font-size: 13px; }
+.workshop-setup-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 22px; }
+.workshop-configuration-access { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 16px 20px; border: 1px solid var(--color-border); background: var(--color-card); }
+.workshop-configuration-access strong { display: block; margin-top: 3px; }
+.workshop-configuration-access p { margin: 4px 0 0; }
+.workshop-catalog-actions { display: inline-flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.workshop-catalog-card { padding: 20px 24px; }
+.workshop-catalog-card header { display: flex; align-items: start; justify-content: space-between; gap: 16px; margin-bottom: 14px; }
+.workshop-catalog-card header p { margin: 5px 0 0; color: var(--color-muted-foreground); font-size: 14px; }
+.workshop-catalog-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.workshop-catalog-table th { padding: 0 10px 10px; border-bottom: 1px solid var(--color-border); color: var(--color-muted-foreground); font-size: 11px; text-align: left; text-transform: uppercase; letter-spacing: .05em; }
+.workshop-catalog-table td { padding: 13px 10px; border-bottom: 1px solid var(--color-border); vertical-align: middle; }
+.workshop-catalog-table th:first-child,
+.workshop-catalog-table td:first-child { padding-left: 0; }
+.workshop-catalog-table th:last-child,
+.workshop-catalog-table td:last-child { padding-right: 0; text-align: right; }
+.workshop-catalog-table small { display: block; margin-top: 3px; color: var(--color-muted-foreground); }
+.workshop-catalog-empty { margin: 0; padding: 18px 0 4px; color: var(--color-muted-foreground); }
+.workshop-form-drawer-backdrop { position: fixed; inset: 0; z-index: 30; display: flex; justify-content: flex-end; background: color-mix(in srgb, var(--color-primary) 48%, transparent); }
+.workshop-form-drawer { width: min(100%, 480px); height: 100%; overflow: auto; padding: 28px; background: var(--color-card); box-shadow: var(--shadow-modal); }
+.workshop-form-drawer header { display: flex; align-items: start; justify-content: space-between; gap: 16px; }
+.workshop-form-drawer h2 { margin: 4px 0 0; font-size: 25px; line-height: 1.15; }
+.workshop-form-drawer form { display: grid; gap: 8px; margin-top: 24px; }
+.workshop-form-drawer label { margin-top: 8px; font-size: 13px; font-weight: 650; }
+.workshop-form-drawer .helper-text { margin-bottom: 4px; }
+.workshop-form-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 14px; }
+.workshop-gateway-card { padding: 18px 20px; }
+.workshop-gateway-card p { margin: 7px 0 0; color: var(--color-muted-foreground); font-size: 14px; }
+.workshop-gateway-dialog { margin-top: 16px; padding: 14px; border: 1px solid var(--color-border); background: var(--color-muted); }
+.workshop-gateway-dialog strong { display: block; }
+.workshop-gateway-dialog p { margin-top: 5px; }
+@media (max-width: 700px) {
+  .workshop-setup-card, .workshop-catalog-card { padding: 18px 16px; }
+  .workshop-checklist li { grid-template-columns: 28px minmax(0, 1fr); padding: 10px 0; }
+  .workshop-checklist li button { grid-column: 2; justify-self: start; }
+  .workshop-configuration-access { align-items: flex-start; flex-direction: column; padding: 16px; }
+  .workshop-catalog-card { overflow-x: auto; }
+  .workshop-catalog-table { min-width: 620px; }
+  .workshop-form-drawer { padding: 22px; }
+}

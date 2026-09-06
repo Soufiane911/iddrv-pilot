@@ -27,6 +27,7 @@ def public_preview(request):
 
 def create_request(*, site_id, creator_id, raw_path, original_name, file_hash):
     with get_connection() as conn, conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
+        lock_site(cur, site_id)
         cur.execute('''INSERT INTO erp_import_requests(site_id,creator_id,raw_path,original_name,file_hash,state)
                        VALUES (%s,%s,%s,%s,%s,'uploaded') RETURNING *''',
                     (site_id, creator_id, raw_path, original_name, file_hash))
@@ -43,12 +44,15 @@ def _preview_request(import_id, *, refresh=False, choices=None):
     with get_connection() as conn, conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
         # Lock request before site, matching worker/confirmation lock order.
         cur.execute('SELECT * FROM erp_import_requests WHERE id=%s FOR UPDATE', (str(import_id),))
-        request = dict(cur.fetchone())
+        row = cur.fetchone()
+        if row is None:
+            raise ERPConflict('import_not_found')
+        request = dict(row)
+        lock_site(cur, request['site_id'])
         if request['state'] in {'queued', 'processing', 'completed'}:
             return public_preview(request)
         if request['preview_version'] and not refresh:
             return public_preview(request)
-        lock_site(cur, request['site_id'])
         chosen = choices if choices is not None else request['choices']
         cur.execute("UPDATE erp_import_requests SET state='profiling' WHERE id=%s", (str(import_id),))
         preview = build_preview(cur, request, chosen)
@@ -60,6 +64,9 @@ def _preview_request(import_id, *, refresh=False, choices=None):
 def preview_request(import_id, *, refresh=False, choices=None):
     try:
         return _preview_request(import_id, refresh=refresh, choices=choices)
+    except ERPConflict:
+        # Do not mutate a request after an archive race.
+        raise
     except Exception:
         # The workbook stays in raw storage; only a public failure code is stored.
         with get_connection() as conn, conn, conn.cursor() as cur:
@@ -70,14 +77,17 @@ def preview_request(import_id, *, refresh=False, choices=None):
 def confirm_request(import_id, payload):
     with get_connection() as conn, conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
         cur.execute('SELECT * FROM erp_import_requests WHERE id=%s FOR UPDATE', (str(import_id),))
-        request = dict(cur.fetchone())
+        row = cur.fetchone()
+        if row is None:
+            raise ERPConflict('import_not_found')
+        request = dict(row)
+        lock_site(cur, request['site_id'])
         if payload['preview_version'] != request['preview_version']:
             raise ERPConflict('preview_stale')
         if request['state'] in {'queued', 'processing', 'completed'}:
             return public_request(request)
         if request['state'] != 'preview_ready':
             raise ERPConflict('preview_required')
-        lock_site(cur, request['site_id'])
         preview = request['preview']
         latest = build_preview(cur, request, request['choices'])
         if any(latest[key] != preview[key] for key in ('snapshot', 'calendar_version', 'new_machine_refs')):

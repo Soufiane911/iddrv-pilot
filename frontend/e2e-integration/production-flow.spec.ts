@@ -170,7 +170,7 @@ test.describe('flux réel connexion → import ERP → cycles → rapprochement 
     await expect(page.getByText(/Mesures visibles|En attente de cycles|Cycles inconnus/).first()).toBeVisible();
     await expect(page.getByText('Ajouter une presse manuellement')).toBeVisible();
 
-    await page.goto(`/imports?site=${siteId}`);
+    await page.goto(`/imports?siteId=${siteId}`);
     const importsBefore = new Set((await listImports(request)).map(item => item.id));
     await uploadAndConfirm(page, trsFile);
     await expect(page.getByRole('status')).toContainText(/Import en attente|Import terminé/, { timeout: 30_000 });

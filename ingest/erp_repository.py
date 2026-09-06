@@ -14,22 +14,58 @@ class ERPConflict(ValueError):
 
 
 def lock_site(cursor, site_id):
-    # Serializes calendars, previews and ERP mutations; no runtime DDL required.
+    """Serialize ERP work and hold the site's lifecycle row lock.
+
+    The row lock is deliberate: archiving takes the same lock before disabling
+    sources/connections, so an ERP preview or commit cannot cross the archive
+    boundary between its checks and its writes.
+    """
     cursor.execute('SELECT pg_advisory_xact_lock(1347568467, %s)', (site_id,))
+    cursor.execute('SELECT status FROM sites WHERE id=%s FOR UPDATE', (site_id,))
+    site = cursor.fetchone()
+    if site is None:
+        raise ERPConflict('site_not_found')
+    status = site['status'] if isinstance(site, dict) else site[0]
+    if status == 'archived':
+        raise ERPConflict('site_archived')
 
 
 def persist_declarations(conn, *, site_id: int, passport_id: UUID, declarations: list[ERPDeclaration], recorded_at: datetime) -> ImportCommitResult:
     result = ImportCommitResult()
     with conn.cursor(cursor_factory=RealDictCursor) as cur:
         lock_site(cur, site_id)
+        cur.execute('SELECT status FROM sites WHERE id=%s', (site_id,))
+        site = cur.fetchone()
+        if not site:
+            raise ERPConflict('site_not_found')
+        if site['status'] == 'archived':
+            raise ERPConflict('site_archived')
         seen = set()
         order_observations = {}
         for declaration in declarations:
-            cur.execute('SELECT id FROM machines WHERE site_id=%s AND erp_ref=%s', (site_id, declaration.machine_ref))
+            cur.execute('SELECT id,status FROM machines WHERE site_id=%s AND erp_ref=%s', (site_id, declaration.machine_ref))
             machine = cur.fetchone()
             if machine is None:
                 raise ValueError('machine_creation_not_confirmed')
+            if machine.get('status', 'active') == 'archived':
+                raise ERPConflict('machine_archived')
             machine_id = machine['id']
+            cur.execute(
+                '''INSERT INTO work_orders(site_id,order_number,order_number_normalized,created_by)
+                   VALUES (%s,%s,lower(btrim(%s)),%s)
+                   ON CONFLICT (site_id,order_number_normalized) DO NOTHING''',
+                (site_id, declaration.order_ref, declaration.order_ref, 'erp-import'),
+            )
+            cur.execute(
+                'SELECT id FROM work_orders WHERE site_id=%s AND order_number_normalized=lower(btrim(%s)) FOR UPDATE',
+                (site_id, declaration.order_ref),
+            )
+            work_order = cur.fetchone()
+            cur.execute(
+                '''INSERT INTO work_order_allocations(site_id,work_order_id,machine_id,created_by)
+                   VALUES (%s,%s,%s,%s) ON CONFLICT (site_id,work_order_id,machine_id) DO NOTHING''',
+                (site_id, work_order['id'], machine_id, 'erp-import'),
+            )
             key = declaration.key(site_id, machine_id)
             if key in seen:
                 raise ValueError('duplicate_declaration_key')
@@ -83,4 +119,8 @@ def persist_declarations(conn, *, site_id: int, passport_id: UUID, declarations:
                 observation_id = cur.fetchone()['id']
                 order_observations[group_key] = observation_id
                 cur.execute('INSERT INTO production_order_observation_sources VALUES(%s,%s) ON CONFLICT DO NOTHING', (observation_id, revision_id))
+        # ERP confirmation is a valid reconciliation trigger too: receipts
+        # may have arrived before either the OF or its press line existed.
+        from backend.app.source_repository import replay_pending_receipts_in_transaction
+        replay_pending_receipts_in_transaction(cur, site_id=site_id)
     return result

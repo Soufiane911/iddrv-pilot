@@ -46,6 +46,7 @@ class Site(BaseModel):
     machine_count: int | None = None
     open_incident_count: int | None = None
     last_import_at: datetime | None = None
+    status: Literal["active", "archived"] = "active"
 
 
 class SiteCreateInput(BaseModel):
@@ -69,11 +70,13 @@ class Machine(BaseModel):
     id: int
     site_id: int | None = None
     line_id: int | None = None
+    workshop_code: str | None = None
     erp_ref: str | None = None
     name: str
     brand: str | None = None
     model: str | None = None
     status: Literal["running", "warning", "stopped", "offline"] | None = None
+    lifecycle_status: Literal["active", "inactive", "archived"] = "active"
     as_of: datetime | None = None
     layout: dict[str, Any] | None = None
 
@@ -202,11 +205,13 @@ class MachineListItem(BaseModel):
     id: int
     site_id: int
     line_id: int | None = None
-    erp_ref: str
+    workshop_code: str | None = None
+    erp_ref: str | None = None
     name: str
     brand: str | None = None
     model: str | None = None
     status: Literal["running", "warning", "stopped", "offline"] | None = None
+    lifecycle_status: Literal["active", "inactive", "archived"] = "active"
     as_of: datetime | None = None
     layout: dict[str, Any] | None = None
 
@@ -433,9 +438,31 @@ class FeedbackResponse(BaseModel):
 
 
 class MachineCreateInput(BaseModel):
+    """Atelier press creation contract.
+
+    ``erp_ref`` is deliberately optional: ERP identity can be mapped later.
+    ``workshop_code`` remains mandatory for a newly created press, including
+    when the press has not yet been imported into the ERP.
+    """
+
     model_config = ConfigDict(extra='forbid', str_strip_whitespace=True)
-    erp_ref: str = Field(min_length=1, max_length=50)
+    workshop_code: str = Field(min_length=1, max_length=50)
+    erp_ref: str | None = Field(default=None, min_length=1, max_length=50)
     name: str = Field(min_length=1, max_length=100)
+    brand: str | None = Field(default=None, max_length=50)
+    model: str | None = Field(default=None, max_length=100)
+
+
+class MachinePatchInput(BaseModel):
+    """Mutable press identity fields; lifecycle is changed by archive only."""
+
+    model_config = ConfigDict(extra='forbid', str_strip_whitespace=True)
+    workshop_code: str | None = Field(default=None, min_length=1, max_length=50)
+    erp_ref: str | None = Field(default=None, min_length=1, max_length=50)
+    name: str | None = Field(default=None, min_length=1, max_length=100)
+    brand: str | None = Field(default=None, max_length=50)
+    model: str | None = Field(default=None, max_length=100)
+
 
 
 class ShiftDefinition(BaseModel):

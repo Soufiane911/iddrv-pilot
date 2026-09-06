@@ -13,6 +13,7 @@ import { IncidentsPage } from './pages/IncidentsPage';
 import { LoginPage } from './pages/LoginPage';
 import { ModelMonitoringPage } from './pages/ModelMonitoringPage';
 import { OverviewPage } from './pages/OverviewPage';
+import { ProductionPlanningPage } from './pages/ProductionPlanningPage';
 import { ShowroomPage } from './pages/ShowroomPage';
 import { SitesPage } from './pages/SitesPage';
 import './styles.css';
@@ -92,6 +93,7 @@ export function App({ api = apiClient }: { api?: ApiClient }) {
             <Route path="workspace" element={<Navigate to="/imports" replace />} />
             <Route path="sites" element={<SitesPage />} />
             <Route path="sites/:siteId/workshop" element={<Suspense fallback={<section className="page"><StatePanel tone="loading" title="Chargement de l’atelier" text="Préparation du plan 2D." /></section>}><WorkshopPage /></Suspense>} />
+            <Route path="sites/:siteId/planning" element={<ProductionPlanningPage />} />
             <Route path="sites/:siteId/opportunities" element={<Navigate to="/incidents" replace />} />
             <Route path="incidents" element={<IncidentsPage />} />
             <Route path="incidents/:incidentId" element={<IncidentDetailPage />} />

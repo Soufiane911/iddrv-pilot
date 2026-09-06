@@ -39,6 +39,10 @@ def authorized_machine(machine_id, identity, write=False):
     machine = local_machine(machine_id)
     if not machine:
         raise HTTPException(404, 'machine_not_found')
+    if machine.get('site_lifecycle_status') == 'archived':
+        raise HTTPException(409, 'site_archived')
+    if machine.get('machine_lifecycle_status') == 'archived':
+        raise HTTPException(409, 'machine_archived')
     if write:
         require_site_roles(identity, machine['site_id'], 'supervisor', 'admin')
     else:

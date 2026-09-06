@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useApi } from '../../App';
 import { ApiRequestError, type ERPImportPreview, type ERPImportRequest, type ERPPreviewChoices, type ERPReplacement, type ShiftCalendar } from '../../lib/api';
 import { formatDate, SectionTitle } from '../Ui';
@@ -12,6 +13,10 @@ const FIELD_LABELS: Record<string, string> = {
 const STATE_LABELS: Record<string, string> = { uploaded: 'Fichier reçu', profiling: 'Analyse', preview_ready: 'À confirmer', queued: 'En attente de traitement', processing: 'En cours', completed: 'Terminé', failed: 'Échec' };
 function message(error: unknown) {
   if (error instanceof ApiRequestError) {
+    if (error.code === 'workshop_code_already_exists') return 'Ce code atelier existe déjà sur ce site.';
+    if (error.code === 'machine_erp_ref_already_exists') return 'Cette référence ERP est déjà utilisée par une presse de ce site.';
+    if (error.code === 'machine_archived') return 'Cette presse est archivée et ne peut plus être associée.';
+    if (error.code === 'machine_identity_already_exists') return 'Cette identité presse existe déjà sur ce site.';
     if (error.status === 413) return 'Le fichier dépasse la limite autorisée : 20 Mio compressés ou 100 Mio décompressés.';
     if (error.status === 415) return 'Sélectionnez un classeur XLSX valide et non chiffré.';
     if (error.status === 409) return 'Les données ou les choix ont changé. Relisez l’aperçu avant de confirmer.';
@@ -46,7 +51,7 @@ function SitePreparation({ siteId, timezone, onCalendarChanged }: { siteId: numb
     event.preventDefault(); const form = event.currentTarget; const data = new FormData(form);
     setBusy(true); setError(''); setNotice('');
     try {
-      await api.createMachine(siteId, { erp_ref: String(data.get('erp_ref')), name: String(data.get('name')) });
+      await api.createMachine(siteId, { workshop_code: String(data.get('workshop_code')).trim(), erp_ref: String(data.get('erp_ref')).trim() || null, name: String(data.get('name')).trim() });
       await cache.invalidateQueries({ queryKey: ['machines'] });
       setNotice('Presse ajoutée au catalogue de l’atelier.'); form.reset();
     } catch (error) { setError(message(error)); } finally { setBusy(false); }
@@ -57,8 +62,9 @@ function SitePreparation({ siteId, timezone, onCalendarChanged }: { siteId: numb
     {notice && <p role="status">{notice}</p>}
     <form onSubmit={createMachine} className="form-grid">
       <h3>Ajouter une presse sans bilan ERP</h3>
-      <label>Référence ERP<input name="erp_ref" required maxLength={50} /></label>
       <label>Nom de la presse<input name="name" required maxLength={100} /></label>
+      <label>Code atelier<input name="workshop_code" required maxLength={50} /><small className="muted">Obligatoire et unique dans ce site.</small></label>
+      <label>Référence ERP (facultative)<input name="erp_ref" maxLength={50} /></label>
       <button type="submit" className="button-secondary" disabled={busy}>Ajouter la presse</button>
     </form>
     <form onSubmit={save} className="form-grid">
@@ -94,10 +100,24 @@ export function ErpImportWizard({ siteId, timezone, canImport, canConfigure }: {
   const [machines, setMachines] = useState<string[]>([]);
   const [choices, setChoices] = useState<ERPPreviewChoices>({});
   const [replacements, setReplacements] = useState<Record<number, string>>({});
+  const [associationValues, setAssociationValues] = useState<Record<string, string>>({});
   const [previewPage, setPreviewPage] = useState(0);
+  const machinesQuery = useQuery({ queryKey: ['machines', siteId], queryFn: () => api.getMachines(siteId), enabled: canConfigure });
   const previewPageSize = 20;
   const journal = useQuery({ queryKey: ['erp-imports', siteId], queryFn: () => api.getERPImports(siteId), refetchInterval: 5000 });
   const pending = job?.state === 'queued' || job?.state === 'processing';
+  const association = useMutation({
+    mutationFn: ({ erpRef, machineId }: { erpRef: string; machineId: number }) => api.updateMachine(machineId, { erp_ref: erpRef }),
+    onSuccess: async () => {
+      setError('');
+      await cache.invalidateQueries({ queryKey: ['machines', siteId] });
+      if (job) {
+        try { display(await api.getERPPreview(job.id, true)); }
+        catch (error) { setError(message(error)); }
+      }
+    },
+    onError: (error) => setError(message(error)),
+  });
   useEffect(() => {
     if (!pending || !job) return;
     let active = true;
@@ -121,7 +141,12 @@ export function ErpImportWizard({ siteId, timezone, canImport, canConfigure }: {
     } finally { setBusy(false); }
   }
   function display(value: ERPImportPreview) {
-    setPreview(value); setJob(value); setChoices(value.choices ?? {}); setMachines([]); setReplacements({}); setPreviewPage(0); setStale(false);
+    setPreview(value); setJob(value); setChoices(value.choices ?? {}); setMachines([]); setReplacements({}); setAssociationValues({}); setPreviewPage(0); setStale(false);
+  }
+  function associateERPRef(erpRef: string) {
+    const machineId = Number(associationValues[erpRef]);
+    if (!Number.isInteger(machineId) || machineId <= 0) return;
+    association.mutate({ erpRef, machineId });
   }
   function upload(event: FormEvent) {
     event.preventDefault(); if (!file) return;
@@ -170,6 +195,7 @@ export function ErpImportWizard({ siteId, timezone, canImport, canConfigure }: {
       {preview && preview.preview_version > 0 && <>
         <h3>Aperçu · version {preview.preview_version}</h3>
         <p>{preview.counts.created} nouvelles · {preview.counts.revised} corrigées · {preview.counts.unchanged} inchangées</p>
+        {preview.new_machine_refs.length > 0 && <section className="erp-machine-association" aria-labelledby="erp-machine-association-title"><h4 id="erp-machine-association-title">Éviter un doublon de presse</h4><p>Si une presse existe déjà dans l’atelier mais n’a pas encore de référence ERP, associez-la ici. La référence sera enregistrée par PATCH puis l’aperçu sera relu avant confirmation.</p>{canConfigure ? <>{machinesQuery.isPending && <p className="muted">Lecture du catalogue des presses…</p>}{machinesQuery.isError && <p className="helper-error" role="alert">Le catalogue des presses est indisponible. Vous pouvez ouvrir l’atelier pour faire l’association.</p>}{preview.new_machine_refs.map(ref => { const candidates = (machinesQuery.data ?? []).filter(machine => machine.lifecycleStatus !== 'archived' && (!machine.erpRef || machine.erpRef === ref)); return <div className="erp-machine-association-row" key={ref}><strong>Référence ERP {ref}</strong><select aria-label={`Presse existante pour ${ref}`} value={associationValues[ref] ?? ''} onChange={event => setAssociationValues(current => ({ ...current, [ref]: event.target.value }))} disabled={association.isPending || machinesQuery.isPending}><option value="">Sélectionner une presse existante</option>{candidates.map(machine => <option key={machine.id} value={machine.id}>{machine.name} · {machine.workshopCode ?? `ID ${machine.id}`}{machine.erpRef === ref ? ' · déjà associée' : ''}</option>)}</select><button type="button" className="button-secondary" disabled={!associationValues[ref] || association.isPending} onClick={() => associateERPRef(ref)}>{association.isPending ? 'Association…' : 'Associer puis relire'}</button></div>; })}</> : <p className="muted">Un superviseur peut associer cette référence depuis le catalogue de l’atelier.</p>}<Link className="button-ghost" to={`/sites/${siteId}/workshop`}>Ouvrir l’atelier et modifier une presse</Link></section>}
         {preview.sheets.length > 1 && <label>Feuille TRS<select disabled={locked} value={choices.sheet_name ?? preview.sheet_name} onChange={event => setChoices({ ...choices, sheet_name: event.target.value })}><option value="">Choisir une feuille</option>{preview.sheets.map(sheet => <option key={sheet}>{sheet}</option>)}</select></label>}
         {errors.length > 0 && <div role="alert"><strong>{errors.length} erreurs bloquantes</strong><ul>{errors.slice(0, 25).map((issue, index) => <li key={index}>Ligne {issue.source_row || 'en-tête'} : {issue.field ? `${issue.field} · ` : ''}{issue.message}</li>)}</ul></div>}
         {warnings.length > 0 && <details open><summary>{warnings.length} valeurs ERP à vérifier</summary><p className="muted">Ces chiffres sont conservés. Ils empêchent de certifier la progression de l’OF.</p><ul>{warnings.slice(0, 25).map((issue, index) => <li key={index}>Ligne {issue.source_row} · {issue.field} : {issue.message}</li>)}</ul></details>}

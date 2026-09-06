@@ -219,7 +219,7 @@ export function WorkshopWorkspace({ site, replayReady = true, connectionApi, mac
       <aside className="workshop-console-inspector" aria-label="Détail de la presse sélectionnée">
         <div className="workshop-inspector-kicker"><span>ÉQUIPEMENT SÉLECTIONNÉ</span><StatusBadge value={status ?? activeMachine?.status} /></div>
         <div className="workshop-inspector-title"><small>{activeMachine?.brand ?? 'Presse industrielle'}</small><h3>{activeMachine?.name ?? 'Aucune sélection'}</h3><p>{activeMachine?.erpRef ? `ERP · ${activeMachine.erpRef}` : 'Sélectionnez une presse sur le plan'}</p></div>
-        {activeMachine ? <Link className="button-ghost workshop-manual-machine-link" to={`/imports?site=${site?.id ?? ''}`}>Ajouter une presse manuellement</Link> : null}
+        {activeMachine ? <Link className="button-ghost workshop-manual-machine-link" to={`/imports?siteId=${site?.id ?? ''}`}>Ajouter une presse manuellement</Link> : null}
         {statusLoading ? <p className="helper-status">Lecture des statuts historiques…</p> : null}
         {statusUnavailable ? <p className="helper-error">Statut historique indisponible pour une partie du parc.</p> : null}
         {activeMachine ? <>
