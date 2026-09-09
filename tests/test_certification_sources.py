@@ -125,12 +125,20 @@ class Sources(unittest.TestCase):
             extract(None, '1; DROP TABLE machines', '2026-01-01T00:00:00Z', '2026-01-02T00:00:00Z')
 
     def test_duckdb_real(self):
+        try:
+            import duckdb  # noqa: F401
+        except ModuleNotFoundError as exc:
+            if exc.name != 'duckdb':
+                raise
+            self.skipTest('Optional DuckDB absent: install scripts/certification/requirements-analytics.txt')
         from scripts.certification.sources.analytics import extract as analytics
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / 'cycles.jsonl'
             path.write_text('\n'.join(json.dumps({'site_id': site, 'machine_id': 1, 'time': '2026-09-01T00:00:00Z', 'cycle_time_s': 10, 'data_quality_status': 'valid'}) for site in [1, 1, 2]))
             result = analytics(path, 1, '2026-09-01T00:00:00Z', '2026-09-02T00:00:00Z')
             self.assertEqual(result['rows'][0]['cycle_count'], 2)
+            offset_result = analytics(path, 1, '2026-09-01T02:00:00+02:00', '2026-09-01T20:00:00-04:00')
+            self.assertEqual(offset_result['rows'], result['rows'])
             print('DuckDB real:', result)
 
 

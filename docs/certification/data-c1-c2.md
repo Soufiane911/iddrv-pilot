@@ -18,7 +18,7 @@ Objectif de collecte : caractériser les cycles valides par machine et heure, co
 
 ## Contrat opérateur et sécurité
 
-Point d'entrée : `scripts/certification/extract_sources.py`. Python **3.13.9** (bibliothèque standard pour fichiers et HTTP) ; dépendances optionnelles déjà disponibles ici : psycopg **3.3.4**, DuckDB **1.4.4**, Docker **28.5.1**. Pour reproduire les 10 tests, DuckDB est requis ; pour le bac DB, psycopg et l'image Timescale locale sont requis. Aucune dépendance installée pendant ce lot. Chaque exécution crée un **nouveau** répertoire privé ; échec code 1 et `error.json` à code expurgé, réussite `records.jsonl` UTF-8 canonique et `manifest.json` version 1. Champs projetés explicitement ; aucune fusion silencieuse de sources hétérogènes.
+Point d'entrée : `scripts/certification/extract_sources.py`. Python **3.13.9** (bibliothèque standard pour fichiers et HTTP) ; dépendances optionnelles déjà disponibles ici : psycopg **3.3.4**, DuckDB **1.4.4**, Docker **28.5.1**. DuckDB est optionnel : seul le test d'intégration analytique est ignoré avec motif explicite s'il est absent ; les tests purs, notamment les bornes temporelles, restent exécutés sans lui. Dépendance dédiée : `scripts/certification/requirements-analytics.txt` (`duckdb==1.4.4`), sans ajout au runtime principal ; pour le bac DB, psycopg et l'image Timescale locale sont requis. Aucune dépendance installée pendant ce lot. Chaque exécution crée un **nouveau** répertoire privé ; échec code 1 et `error.json` à code expurgé, réussite `records.jsonl` UTF-8 canonique et `manifest.json` version 1. Champs projetés explicitement ; aucune fusion silencieuse de sources hétérogènes.
 
 Exemple de contrat local (chemin à adapter, ne pas utiliser de fichier privé) :
 
@@ -67,6 +67,23 @@ SQL `sql/cycles.sql` : jointure gauche avec filtres temporels/qualité dans ON p
 DuckDB **1.4.4** réellement disponible et exécuté par test sur **3 lignes JSONL synthétiques**, filtre site/qualité/temps et agrégat : site 1 = 2 cycles, moyenne 10 s. Requête `sql/analytics.sql`, paramètres liés, UTC, mémoire bornée et extensions automatiques désactivées. **Ce n'est pas une source big data ni un cluster distribué ; aucune qualification jury supposée. SQLite ne remplace pas non plus cette exigence.**
 
 Spark/pyspark/spark-submit absents. `sources/spark.py` + `sql/spark_cycles.sql` : adaptateur **NON EXÉCUTÉ**, session Spark >=3.4 fournie explicitement, lecture d'une partition Parquet autorisée, SQL nommé, vue temporaire nettoyée, borne résultat +1. Avant exécution : obtenir moteur/source réellement disponibles, valider schéma (time TIMESTAMP, site_id/machine_id, cycle_time_s, data_quality_status), autorisations et volumes de partition ; imposer deadline/cancellation et quotas cluster dans le superviseur ; configurer UTC ; appeler `extract(session, partition, site, from_utc, to_utc)` ; archiver version, plan EXPLAIN, comptes attendus/obtenus et manifestes SHA. Le LIMIT résultat ne borne pas le volume scanné : ne pas lancer sur un lac entier. Ne pas installer Spark massivement pour fabriquer une preuve nominale.
+
+## Correctifs de revue (base `54156891`)
+
+- Sandbox : inspection du nom unique dans `finally`, même si `docker run` crée le conteneur puis échoue. Suppression seulement si le label propriétaire correspond ; label étranger ou inspection impossible : aucune suppression. Tests simulés création suivie d'échec, propriétaire étranger et conteneur absent ; Docker/Timescale non rejoués pendant cette revue.
+- Spark : `newSession()` isole timezone UTC et vue temporaire de chaque extraction ; aucun `stop()` (SparkContext partagé avec l'appelant). Tests avec faux Spark : vue préexistante et timezone Europe/Paris conservées après succès, exception et deux extractions concurrentes. **Spark réel toujours NON EXÉCUTÉ** ; ces doubles ne prouvent ni compatibilité moteur ni comportement cluster.
+- PostgreSQL, Spark et DuckDB partagent la validation stricte avant accès source/SQL : ISO 8601 ou datetime avec fuseau, conversion UTC, début strictement antérieur à fin ; None, naïf, égal/inversé rejetés. Les offsets équivalents sont normalisés, pas comparés lexicalement. Validation pure testée même avec import DuckDB interdit ; intervalle avec offsets également vérifié sur DuckDB réel.
+- Vérification revue : 18 tests sources réussis avec DuckDB **1.4.4**, aucun skip ; processus Python séparé interdisant l'import DuckDB : 18 tests, **17 réussis et 1 skip explicite** (intégration seulement). Les 5 tests `test_certification_data_demo.py` réussissent aussi. Ruff et `git diff --check` sans erreur. Aucune installation ni accès réseau/production pendant la revue.
+
+Reproduction de l'intégration optionnelle dans un environnement isolé (commande opérateur, non exécutée ici ; installation nécessitant un index autorisé ou des wheels locales) :
+
+```sh
+python3 -m venv /tmp/iddrv-c1c2-analytics-venv
+/tmp/iddrv-c1c2-analytics-venv/bin/python -m pip install -r scripts/certification/requirements-analytics.txt
+PYTHONDONTWRITEBYTECODE=1 /tmp/iddrv-c1c2-analytics-venv/bin/python -m unittest discover -s tests -p 'test_certification_sources*.py' -v
+```
+
+Limites des fixtures inchangées : HTTP loopback, projection SQL minuscule, trois lignes JSONL et faux Spark ne constituent ni source industrielle, ni benchmark, ni preuve de récupération big data. Les observations HTTP publiques et PostgreSQL ci-dessus sont historiques, non renouvelées par cette revue.
 
 ## Restes précis sans bloquer le livré
 

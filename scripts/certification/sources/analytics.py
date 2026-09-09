@@ -1,9 +1,11 @@
 """DuckDB local analytical adapter. No claim of a qualified big-data system."""
 from pathlib import Path
 from .database import SQL_DIR
+from .window import validate_window
 
 
 def extract(path, site_id, start, end, limit=1000):
+    start, end = validate_window(start, end)
     import duckdb
     path = Path(path).resolve(strict=True)
     if path.suffix != '.jsonl' or path.stat().st_size > 10 * 1024 * 1024:

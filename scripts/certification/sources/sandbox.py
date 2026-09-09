@@ -19,7 +19,6 @@ def run():
     name = 'iddrv-c1c2-' + uuid.uuid4().hex[:12]
     image = 'timescale/timescaledb:2.28.2-pg16'
     command('image', 'inspect', image)  # No implicit download.
-    created = False
     try:
         command('run', '--pull=never', '-d', '--name', name,
                 '--label', 'iddrv.certification.owner=' + name,
@@ -27,7 +26,6 @@ def run():
                 '--tmpfs', '/var/lib/postgresql/data:rw,size=256m',
                 '-e', 'POSTGRES_HOST_AUTH_METHOD=trust',
                 '-p', '127.0.0.1::5432', image)
-        created = True
         port = int(command('port', name, '5432/tcp').rsplit(':', 1)[1])
         for _ in range(40):
             try:
@@ -54,7 +52,13 @@ def run():
             result['fixture_sha256'] = hashlib.sha256((SQL_DIR / 'fixture.sql').read_bytes()).hexdigest()
             return result
     finally:
-        if created and command('inspect', '--format', '{{ index .Config.Labels "iddrv.certification.owner" }}', name) == name:
+        # docker run can create the container and then fail before returning.
+        # Inspect even on failure; absence/inspection failure grants no ownership.
+        try:
+            owner = command('inspect', '--format', '{{ index .Config.Labels "iddrv.certification.owner" }}', name)
+        except subprocess.CalledProcessError:
+            owner = None
+        if owner == name:
             command('rm', '-f', name)
 
 

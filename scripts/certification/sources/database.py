@@ -3,15 +3,15 @@ import hashlib
 from datetime import datetime, timezone
 from pathlib import Path
 
+from .window import validate_window
+
 SQL_DIR = Path(__file__).resolve().parents[1] / 'sql'
 
 
 def extract(connection, site_id, from_utc, to_utc, limit=1000):
     if type(site_id) is not int or site_id < 1 or type(limit) is not int or not 1 <= limit <= 10000:
         raise ValueError('invalid_scope')
-    start, end = (datetime.fromisoformat(v.replace('Z', '+00:00')) for v in (from_utc, to_utc))
-    if start.tzinfo is None or end.tzinfo is None or end <= start:
-        raise ValueError('invalid_window')
+    start, end = validate_window(from_utc, to_utc)
     query = (SQL_DIR / 'cycles.sql').read_text()
     params = {'site_id': site_id, 'from_utc': start, 'to_utc': end, 'limit': limit + 1}
     with connection.transaction():
