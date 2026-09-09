@@ -377,6 +377,61 @@ def _week_bounds(site_timezone: str, week_start: date) -> tuple[datetime, dateti
     return start.astimezone(timezone.utc), (start + timedelta(days=7)).astimezone(timezone.utc)
 
 
+def update_actual_scrap(*, work_order_id, machine_id: int, actual_scrap_count: int | None,
+                        comment: str | None, row_version: int, actor_id: str) -> dict:
+    """Persist an OF/press actual with its own optimistic version.
+
+    The site is locked before either child identity, matching all planning
+    writes and archive operations.  A slot row is intentionally never
+    selected: overlapping slots must share this OF/press actual.
+    """
+    if (actual_scrap_count is not None and actual_scrap_count < 0) or row_version < 1:
+        raise PlanningValidation("scrap_value_invalid")
+    with get_connection() as conn, conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
+        cur.execute("SELECT site_id FROM work_orders WHERE id=%s", (work_order_id,))
+        order = cur.fetchone()
+        if not order:
+            raise PlanningNotFound("work_order_not_found")
+        site_id = int(order["site_id"])
+        _active_machine(cur, site_id, machine_id)
+        cur.execute("""SELECT 1 FROM work_order_allocations
+                       WHERE site_id=%s AND work_order_id=%s AND machine_id=%s
+                       FOR SHARE""", (site_id, work_order_id, machine_id))
+        if not cur.fetchone():
+            raise PlanningNotFound("work_order_machine_not_found")
+        cur.execute("""SELECT site_id, work_order_id, machine_id, actual_scrap_count,
+                              comment, row_version, updated_by, updated_at
+                       FROM planning_scrap_actuals
+                       WHERE site_id=%s AND work_order_id=%s AND machine_id=%s FOR UPDATE""",
+                    (site_id, work_order_id, machine_id))
+        row = cur.fetchone()
+        if row is None:
+            if row_version != 1:
+                raise PlanningConflict("stale_row_version")
+            cur.execute("""INSERT INTO planning_scrap_actuals
+                           (site_id,work_order_id,machine_id,actual_scrap_count,comment,updated_by)
+                           VALUES(%s,%s,%s,%s,%s,%s) RETURNING *""",
+                        (site_id, work_order_id, machine_id, actual_scrap_count, comment, actor_id))
+            after = dict(cur.fetchone())
+            before = None
+        else:
+            if int(row["row_version"]) != row_version:
+                raise PlanningConflict("stale_row_version")
+            cur.execute("""UPDATE planning_scrap_actuals SET actual_scrap_count=%s,
+                           comment=%s, updated_by=%s, updated_at=now(), row_version=row_version+1
+                           WHERE site_id=%s AND work_order_id=%s AND machine_id=%s
+                           AND row_version=%s RETURNING *""",
+                        (actual_scrap_count, comment, actor_id, site_id, work_order_id,
+                         machine_id, row_version))
+            after = dict(cur.fetchone())
+            before = dict(row)
+        # entity_id is UUID by schema; machine_id remains in the audited state.
+        _audit(cur, site_id=site_id, actor_id=actor_id, action="scrap_entered",
+               entity_type="work_order_scrap", entity_id=work_order_id,
+               before=before, after=after)
+        return after
+
+
 def list_planning_week(*, site_id: int, week_start: date) -> dict:
     with get_connection() as conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
         cur.execute("SELECT id, timezone, status FROM sites WHERE id=%s", (site_id,))
@@ -394,6 +449,13 @@ def list_planning_week(*, site_id: int, week_start: date) -> dict:
                       COALESCE(c.cycles_received, 0)::int AS cycles_received,
                       c.first_cycle_at, c.last_cycle_at, c.last_cycle_counter,
                       c.observed_order_number,
+                      NULL::integer AS estimated_scrap_count,
+                      NULL::numeric AS estimated_scrap_rate,
+                      actuals.actual_scrap_count,
+                      actuals.comment AS actual_scrap_comment,
+                      COALESCE(actuals.row_version, 1)::int AS actual_scrap_row_version,
+                      CASE WHEN actuals.actual_scrap_count IS NULL THEN 'not_entered' ELSE 'entered' END AS actual_scrap_status,
+                      NULL::text AS quality_source,
                       gateway.last_seen_at AS source_last_success_at,
                       CASE WHEN ps.status = 'cancelled' THEN 'cancelled'
                            WHEN w.status = 'completed' THEN 'completed'
@@ -439,6 +501,10 @@ def list_planning_week(*, site_id: int, week_start: date) -> dict:
                      AND c.work_order_allocation_id=ps.allocation_id
                      AND c.time >= ps.starts_at AND c.time < ps.ends_at
                ) c ON true
+               LEFT JOIN planning_scrap_actuals actuals
+                 ON actuals.site_id=ps.site_id
+                AND actuals.work_order_id=w.id
+                AND actuals.machine_id=ps.machine_id
                LEFT JOIN LATERAL (
                    SELECT count(DISTINCT r.id) FILTER (WHERE r.work_order_allocation_id=ps.allocation_id) AS receipts_received,
                           count(DISTINCT mapping.id) AS mapping_count,

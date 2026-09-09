@@ -7,7 +7,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 import re
-from pydantic import AliasChoices, BaseModel, ConfigDict, Field, model_validator
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, StrictInt, model_validator
 
 from .. import planning_repository as repository
 from ..security import Identity, get_current_identity, require_site, require_site_roles
@@ -87,6 +87,16 @@ class SlotPatchInput(BaseModel):
         if self.starts_at is not None and self.ends_at is not None and self.starts_at >= self.ends_at:
             raise ValueError("slot_period_must_be_positive")
         return self
+
+
+class ScrapInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    # StrictInt deliberately distinguishes 0 from null and rejects bools and
+    # fractional JSON numbers at the HTTP boundary.
+    machine_id: StrictInt = Field(gt=0)
+    actual_scrap_count: StrictInt | None = Field(default=None, ge=0)
+    comment: str | None = Field(default=None, max_length=2000)
+    row_version: StrictInt = Field(ge=1)
 
 
 class SlotCancelInput(BaseModel):
@@ -244,6 +254,21 @@ def edit_slot(
             note_provided="note" in payload.model_fields_set,
             actor_id=identity.user_id,
         )
+    except (repository.PlanningNotFound, repository.PlanningConflict, repository.PlanningValidation) as exc:
+        raise _error(exc) from None
+
+
+@router.post("/planning/work-orders/{work_order_id}/scrap")
+def enter_scrap(work_order_id: UUID, payload: ScrapInput, identity: Identity = Depends(get_current_identity)):
+    # Read authorization first: operators may enter actuals, while the
+    # planning lifecycle remains supervisor/admin-only.
+    order = _authorized_order(work_order_id, identity, write=False)
+    if identity.role_for_site(int(order['site_id'])) not in ('operator', 'supervisor', 'admin'):
+        raise HTTPException(status_code=403, detail='insufficient_role')
+    try:
+        return repository.update_actual_scrap(work_order_id=work_order_id, machine_id=payload.machine_id,
+            actual_scrap_count=payload.actual_scrap_count, comment=payload.comment,
+            row_version=payload.row_version, actor_id=identity.user_id)
     except (repository.PlanningNotFound, repository.PlanningConflict, repository.PlanningValidation) as exc:
         raise _error(exc) from None
 

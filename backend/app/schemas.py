@@ -285,9 +285,9 @@ class AuthUser(BaseModel):
     id: UUID | str
     email: str
     display_name: str
-    role: Literal["viewer", "analyst", "supervisor", "admin"]
+    role: Literal["viewer", "operator", "analyst", "supervisor", "admin"]
     site_ids: list[int]
-    site_roles: dict[int, Literal["viewer", "analyst", "supervisor", "admin"]] = Field(default_factory=dict)
+    site_roles: dict[int, Literal["viewer", "operator", "analyst", "supervisor", "admin"]] = Field(default_factory=dict)
 
 
 class LoginRequest(BaseModel):
@@ -304,7 +304,7 @@ class CreateUserRequest(BaseModel):
     email: str = Field(min_length=3, max_length=320)
     password: str = Field(min_length=12, max_length=512)
     display_name: str = Field(min_length=1, max_length=150)
-    role: Literal["viewer", "analyst", "supervisor", "admin"]
+    role: Literal["viewer", "operator", "analyst", "supervisor", "admin"]
     site_ids: list[int] = Field(default_factory=list, max_length=100)
 
 

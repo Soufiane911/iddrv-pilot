@@ -73,6 +73,9 @@ API_TABLE_GRANTS: Mapping[str, frozenset[str]] = {
     "site_source_credentials": frozenset({"SELECT", "INSERT", "UPDATE"}),
     "source_machine_mappings": frozenset({"SELECT", "INSERT", "UPDATE"}),
     "cycle_event_receipts": frozenset({"SELECT", "INSERT", "UPDATE"}),
+    "machine_hdt_controls": frozenset({"SELECT", "INSERT", "UPDATE"}),
+    "machine_hdt_control_audit": frozenset({"SELECT", "INSERT"}),
+    "planning_scrap_actuals": frozenset({"SELECT", "INSERT", "UPDATE"}),
 }
 
 WORKER_TABLE_GRANTS: Mapping[str, frozenset[str]] = {
@@ -115,6 +118,9 @@ WORKER_TABLE_GRANTS: Mapping[str, frozenset[str]] = {
     "import_jobs": frozenset({"SELECT", "INSERT", "UPDATE"}),
     "import_job_events": frozenset({"INSERT"}),
     "incidents": frozenset({"SELECT", "INSERT", "UPDATE"}),
+    "machine_hdt_controls": frozenset({"SELECT", "INSERT", "UPDATE"}),
+    "machine_hdt_control_audit": frozenset({"SELECT", "INSERT"}),
+    "planning_scrap_actuals": frozenset({"SELECT", "INSERT", "UPDATE"}),
 }
 
 RUNTIME_TABLE_GRANTS: Mapping[str, Mapping[str, frozenset[str]]] = {

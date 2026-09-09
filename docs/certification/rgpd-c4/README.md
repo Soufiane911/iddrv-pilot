@@ -16,7 +16,7 @@ La grille accepte des traitements de tri **automatisés ou non** : aucun ordonna
 Référence inspectée `59a4846b`, branche de départ iddrv-pilot. Aucune compétence auto-validée, aucune attestation de conformité exhaustive. Aucun schéma, migration, serveur, collecteur, CI, frontend ou modèle ML modifié. Aucun accès base utilisateur, secret ou donnée réelle.
 
 - [Modèles Merise textuels, MLD, MPD et dictionnaire ciblé](modeles.md)
-- [Index reproductible des sources SQL](sql-source-index.json) : 56 tables déclarées, 24 fichiers (init, 22 migrations, setup), empreintes SHA-256 ; pas catalogue d'une base active.
+- [Index reproductible des sources SQL](sql-source-index.json) : 59 tables déclarées, 27 fichiers (init, 25 migrations, setup), empreintes SHA-256 ; pas catalogue d'une base active.
 - [Registre expliqué](registre.md) et [8 fiches structurées](registre.json)
 - [Politique proposée, procédure et exercice synthétique](conservation-exercice.md)
 - [Script simulateur](../../../scripts/certification/rgpd/synthetic_purge.py) et [tests](../../../tests/test_certification_rgpd.py)

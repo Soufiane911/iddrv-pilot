@@ -76,7 +76,7 @@ def authenticate(email: str, password: str) -> Identity | None:
     for value in _dev_users():
         if str(value.get("email", "")).lower() == email.lower() and verify_password(password, str(value.get("password_hash", ""))):
             role = str(value.get("role", "viewer"))
-            if role not in {"viewer", "analyst", "supervisor", "admin"}:
+            if role not in {"viewer", "operator", "analyst", "supervisor", "admin"}:
                 continue
             return Identity(
                 user_id=str(value.get("id", email)),
@@ -91,7 +91,7 @@ def authenticate(email: str, password: str) -> Identity | None:
 
 def create_user(email: str, password: str, display_name: str, role: str, site_ids: list[int]):
     """Create a local account and assign its site scope atomically."""
-    if role not in {"viewer", "analyst", "supervisor", "admin"}:
+    if role not in {"viewer", "operator", "analyst", "supervisor", "admin"}:
         raise ValueError("invalid_role")
     with get_connection() as conn:
         with conn.cursor() as cur:

@@ -1,6 +1,6 @@
 # Modélisation C4 — Merise textuel et ancrage physique
 
-Référence inspectée : `59a4846b` (iddrv-pilot), `db/init.sql` + migrations **001 à 022**, et `db/setup_db.py`. Ce document ne prétend pas que ces migrations ont été appliquées sur une base utilisateur : aucune connexion réalisée. [Index des 56 tables déclarées et empreintes](sql-source-index.json). La lecture du SQL complet fait autorité sur ces vues simplifiées.
+Référence inspectée : `59a4846b` (iddrv-pilot), `db/init.sql` + migrations **001 à 025**, et `db/setup_db.py`. Ce document ne prétend pas que ces migrations ont été appliquées sur une base utilisateur : aucune connexion réalisée. [Index des 59 tables déclarées et empreintes](sql-source-index.json). La lecture du SQL complet fait autorité sur ces vues simplifiées.
 
 Les propositions locales `Preuve-manquante/architecture/02_mcd_atelier_hdt.mmd`, `03_mld_atelier_hdt.mmd`, `04_schema_physique_reference.md` et `05_conservation_purge_proposee.md` ont servi de point de départ (lecture seule, non dépendance d'exécution). Complément à [governance-proposal](../governance-proposal.md). Aucun faux objet `uploads`, `audit_logs` ou `operators` n'est ajouté au MPD.
 

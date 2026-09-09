@@ -94,6 +94,7 @@ export function App({ api = apiClient }: { api?: ApiClient }) {
             <Route path="sites" element={<SitesPage />} />
             <Route path="sites/:siteId/workshop" element={<Suspense fallback={<section className="page"><StatePanel tone="loading" title="Chargement de l’atelier" text="Préparation du plan 2D." /></section>}><WorkshopPage /></Suspense>} />
             <Route path="sites/:siteId/planning" element={<ProductionPlanningPage />} />
+            <Route path="planning" element={<ProductionPlanningPage />} />
             <Route path="sites/:siteId/opportunities" element={<Navigate to="/incidents" replace />} />
             <Route path="incidents" element={<IncidentsPage />} />
             <Route path="incidents/:incidentId" element={<IncidentDetailPage />} />

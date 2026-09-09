@@ -2,9 +2,10 @@ import { CheckIcon } from '@phosphor-icons/react/Check';
 import { XIcon } from '@phosphor-icons/react/X';
 import type { AuthRole } from '../../lib/api';
 
-const ROLES: AuthRole[] = ['viewer', 'analyst', 'supervisor', 'admin'];
+const ROLES: AuthRole[] = ['viewer', 'operator', 'analyst', 'supervisor', 'admin'];
 
 const ROLE_LABELS: Record<AuthRole, string> = {
+  operator: 'Opérateur',
   viewer: 'Lecteur',
   analyst: 'Analyste',
   supervisor: 'Superviseur',
@@ -20,6 +21,13 @@ const CAPABILITIES = [
 ] as const;
 
 const MATRIX: Record<AuthRole, Record<(typeof CAPABILITIES)[number]['key'], boolean>> = {
+  operator: {
+    read_workshop: true,
+    run_investigation: false,
+    comment_incident: false,
+    validate_action: false,
+    manage_accounts: false,
+  },
   viewer: {
     read_workshop: true,
     run_investigation: false,

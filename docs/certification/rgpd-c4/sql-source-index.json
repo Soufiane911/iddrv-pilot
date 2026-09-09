@@ -94,8 +94,20 @@
       "sha256": "a0b99e8a395b726c63f1b2688f10007f742ab296f8b81813ca377b092aaac639"
     },
     {
+      "path": "db/migrations/023_machine_hdt_control.sql",
+      "sha256": "b402e3b4330fdeb11b482b56bdd751b3f4db72c73196891386ec160cf9a5a0bb"
+    },
+    {
+      "path": "db/migrations/024_planning_quality_scrap.sql",
+      "sha256": "49213beeec4e34cea835666b525a662467d32d1a351413a8c27527d3e98e9bed"
+    },
+    {
+      "path": "db/migrations/025_operator_role.sql",
+      "sha256": "d7ae5d9e2ab9817d0812b78c7f79f9e7dc9296814b301ed4f3ef1d6c7aae7a0f"
+    },
+    {
       "path": "db/setup_db.py",
-      "sha256": "0952adc36d667549d941e4281dc31784358bcbe9f7819269b09902ce6c5cf7eb"
+      "sha256": "80c89fbcc69083474ebf7e90399b37b438119c1843bac43600e62ae647abd993"
     }
   ],
   "tables": {
@@ -255,6 +267,18 @@
         "path": "db/init.sql"
       }
     ],
+    "machine_hdt_control_audit": [
+      {
+        "line": 16,
+        "path": "db/migrations/023_machine_hdt_control.sql"
+      }
+    ],
+    "machine_hdt_controls": [
+      {
+        "line": 1,
+        "path": "db/migrations/023_machine_hdt_control.sql"
+      }
+    ],
     "machine_layouts": [
       {
         "line": 23,
@@ -295,6 +319,12 @@
       {
         "line": 87,
         "path": "db/migrations/020_workshop_planning.sql"
+      }
+    ],
+    "planning_scrap_actuals": [
+      {
+        "line": 4,
+        "path": "db/migrations/024_planning_quality_scrap.sql"
       }
     ],
     "planning_slots": [
@@ -347,7 +377,7 @@
     ],
     "schema_migrations": [
       {
-        "line": 399,
+        "line": 401,
         "path": "db/setup_db.py"
       }
     ],

@@ -105,6 +105,23 @@ export interface Machine {
   layout?: MachineLayout | null;
 }
 
+export interface HdtControl {
+  machineId: number;
+  desiredState: 'active' | 'stopped' | string;
+  effectiveState: 'blocked' | 'active' | 'stopped' | 'starting' | string;
+  blockingReasons: string[];
+  modelProfile?: string | null;
+}
+
+export interface ScrapActual {
+  site_id: number;
+  work_order_id: string;
+  machine_id: number;
+  actual_scrap_count: number | null;
+  comment: string | null;
+  row_version: number;
+}
+
 export interface MachineStatus {
   machineId: number;
   status: MachineState;
@@ -343,7 +360,7 @@ export interface ImportSession {
   updated_at: string;
 }
 
-export type AuthRole = 'viewer' | 'analyst' | 'supervisor' | 'admin';
+export type AuthRole = 'viewer' | 'operator' | 'analyst' | 'supervisor' | 'admin';
 
 export interface AuthUser {
   id: string;
@@ -497,6 +514,13 @@ export interface PlanningSlot {
   orderScrapPartsErp?: number | null;
   orderCyclesErp?: number | null;
   orderErpStatus?: string | null;
+  estimatedScrapCount?: number | null;
+  estimatedScrapRate?: number | null;
+  actualScrapCount?: number | null;
+  actualScrapComment?: string | null;
+  actualScrapRowVersion?: number;
+  actualScrapStatus?: string | null;
+  qualitySource?: string | null;
 }
 
 export interface PlanningWeek {
@@ -715,6 +739,10 @@ export interface ApiClient {
   createPlanningSlot(input: PlanningSlotCreateInput): Promise<PlanningSlot>;
   updatePlanningSlot(slotId: string, input: PlanningSlotPatchInput): Promise<PlanningSlot>;
   cancelPlanningSlot(slotId: string, rowVersion: number): Promise<PlanningSlot>;
+  getHdtControl(machineId: number): Promise<HdtControl>;
+  activateHdt(machineId: number): Promise<HdtControl>;
+  stopHdt(machineId: number): Promise<HdtControl>;
+  updateWorkOrderScrap(workOrderId: string, input: { actual_scrap_count: number | null; machine_id: number; row_version: number; comment?: string | null }): Promise<ScrapActual>;
   createImportSession(siteId: number, name: string): Promise<ImportSession>;
   getImportSession(sessionId: string): Promise<ImportSession>;
   registerImportFile(sessionId: string, file: { file_name: string; source_kind: ImportSourceKind; mime_type?: string; size_bytes: number; file_hash?: string }): Promise<ImportSession>;
@@ -797,6 +825,30 @@ function mapDetectedMachine(value: unknown): DetectedMachine {
   };
 }
 
+function mapHdtControl(value: unknown): HdtControl {
+  const record = (value ?? {}) as Record<string, unknown>;
+  const reasons = record.blocking_reasons ?? record.blockingReasons;
+  return {
+    machineId: Number(record.machine_id ?? record.machineId),
+    desiredState: String(record.desired_state ?? record.desiredState ?? 'stopped'),
+    effectiveState: String(record.effective_state ?? record.effectiveState ?? 'stopped'),
+    blockingReasons: Array.isArray(reasons) ? reasons.filter((reason): reason is string => typeof reason === 'string') : [],
+    modelProfile: (record.model_profile ?? record.modelProfile ?? null) as string | null,
+  };
+}
+
+function mapScrapActual(value: unknown): ScrapActual {
+  const record = (value ?? {}) as Record<string, unknown>;
+  return {
+    site_id: Number(record.site_id ?? record.siteId),
+    work_order_id: String(record.work_order_id ?? record.workOrderId ?? ''),
+    machine_id: Number(record.machine_id ?? record.machineId),
+    actual_scrap_count: record.actual_scrap_count === null ? null : numberOrNull(record.actual_scrap_count) ?? null,
+    comment: (record.comment ?? null) as string | null,
+    row_version: Number(record.row_version ?? record.rowVersion ?? 1),
+  };
+}
+
 function mapPlanningSlot(value: unknown): PlanningSlot {
   const record = (value ?? {}) as Record<string, unknown>;
   const params = pick(record, 'process_parameters', 'processParameters', 'parameters');
@@ -834,6 +886,7 @@ function mapPlanningSlot(value: unknown): PlanningSlot {
     orderScrapPartsErp: numberOrNull(orderErpValue('order_total_scrap_parts', 'order_scrap_parts_erp', 'orderScrapPartsErp', 'total_scrap_parts', 'totalScrapParts', 'scrap_parts_total')),
     orderCyclesErp: numberOrNull(orderErpValue('order_total_cycles', 'order_cycles_erp', 'orderCyclesErp', 'total_cycles', 'totalCycles', 'cycles_total')),
     orderErpStatus: (Object.prototype.hasOwnProperty.call(record, 'erp_order_status') ? record.erp_order_status : pick(record, 'order_erp_status', 'orderErpStatus') ?? pick(orderErp, 'status', 'erp_order_status', 'erp_status', 'erpStatus') ?? null) as string | null,
+    estimatedScrapCount: numberOrNull(record.estimated_scrap_count ?? record.estimatedScrapCount), estimatedScrapRate: numberOrNull(record.estimated_scrap_rate ?? record.estimatedScrapRate), actualScrapCount: numberOrNull(record.actual_scrap_count ?? record.actualScrapCount), actualScrapComment: (record.actual_scrap_comment ?? record.actualScrapComment ?? null) as string | null, actualScrapRowVersion: Number(record.actual_scrap_row_version ?? record.actualScrapRowVersion ?? 1), actualScrapStatus: (record.actual_scrap_status ?? record.actualScrapStatus) as string | null | undefined, qualitySource: (record.quality_source ?? record.qualitySource) as string | null | undefined,
   };
 }
 
@@ -1377,6 +1430,10 @@ export function createApiClient(baseUrl = import.meta.env.VITE_API_URL ?? '/api/
     async createPlanningSlot(body) { return mapPlanningSlot(await request(`/planning/slots`, { method: 'POST', body })); },
     async updatePlanningSlot(slotId, body) { return mapPlanningSlot(await request(`/planning/slots/${encodeURIComponent(slotId)}`, { method: 'PATCH', body })); },
     async cancelPlanningSlot(slotId, rowVersion) { return mapPlanningSlot(await request(`/planning/slots/${encodeURIComponent(slotId)}/cancel`, { method: 'POST', body: { row_version: rowVersion } })); },
+    async getHdtControl(machineId) { return mapHdtControl(await request(`/machines/${machineId}/hdt-control`)); },
+    async activateHdt(machineId) { return mapHdtControl(await request(`/machines/${machineId}/hdt-control/activate`, { method: 'POST' })); },
+    async stopHdt(machineId) { return mapHdtControl(await request(`/machines/${machineId}/hdt-control/stop`, { method: 'POST' })); },
+    async updateWorkOrderScrap(workOrderId, input) { return mapScrapActual(await request(`/planning/work-orders/${encodeURIComponent(workOrderId)}/scrap`, { method: 'POST', body: input })); },
     async createImportSession(siteId, name) {
       return mapImportSession(await request(`/sites/${siteId}/import-sessions`, { method: 'POST', body: { name } }));
     },
@@ -1556,6 +1613,10 @@ export const mockApiClient: ApiClient = {
   createPlanningSlot: async () => { throw new Error('La planification nécessite une API connectée.'); },
   updatePlanningSlot: async () => { throw new Error('La planification nécessite une API connectée.'); },
   cancelPlanningSlot: async () => { throw new Error('La planification nécessite une API connectée.'); },
+  getHdtControl: async () => { throw new Error('Le contrôle HDT nécessite une API connectée.'); },
+  activateHdt: async () => { throw new Error('Le contrôle HDT nécessite une API connectée.'); },
+  stopHdt: async () => { throw new Error('Le contrôle HDT nécessite une API connectée.'); },
+  updateWorkOrderScrap: async () => { throw new Error('La qualité nécessite une API connectée.'); },
   createImportSession: async (siteId, name) => ({ id: 'session-demo', site_id: siteId, name, status: 'collecting', summary: {}, files: [], created_at: DEMO_DATE, updated_at: DEMO_DATE }),
   getImportSession: async () => ({ id: 'session-demo', site_id: 1, name: 'Projet usine pilote', status: 'profiling', summary: { recognizedColumns: 18, unknownColumns: 2, confidence: .91 }, files: [], created_at: DEMO_DATE, updated_at: DEMO_DATE }),
   registerImportFile: async (sessionId, file) => ({ id: sessionId, site_id: 1, name: 'Projet usine pilote', status: 'profiling', summary: { recognizedColumns: 6, unknownColumns: 1, confidence: .84 }, files: [{ id: `file-${file.file_name}`, ...file, status: 'needs_review', profile: { columns: ['machine_id', 'timestamp', 'cycle_time_s'], recognized: ['machine_id', 'timestamp'], unknown: ['cycle_time_s'], confidence: .84 } }], created_at: DEMO_DATE, updated_at: DEMO_DATE }),

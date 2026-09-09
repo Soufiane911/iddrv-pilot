@@ -242,8 +242,10 @@ def print_validation_report(conn):
         "diagnostic_evidence", "diagnostic_hypotheses", "diagnostic_runs",
         "evidence_vault", "feedback", "import_job_events", "import_jobs",
         "import_passports", "import_sessions", "incidents", "machine_aliases",
-        "machine_cycles", "machines", "maintenance_events", "operator_notes",
-        "production_lines", "production_orders", "quality_checks",
+        "machine_cycles", "machine_hdt_controls", "machine_hdt_control_audit", "machines",
+        "maintenance_events", "operator_notes", "planning_audit_events", "planning_scrap_actuals",
+        "planning_slots", "production_lines", "production_orders", "quality_checks",
+        "work_order_allocations", "work_orders",
         "schema_migrations", "sessions", "shifts", "sites", "staging_import_rows",
         "user_site_roles", "users",
     ]

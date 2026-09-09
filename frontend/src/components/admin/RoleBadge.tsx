@@ -4,6 +4,7 @@ const ROLE_STYLES: Record<AuthRole, { background: string; color: string; label: 
   admin: { background: '#059669', color: '#FFFFFF', label: 'Administrateur' },
   supervisor: { background: '#475569', color: '#FFFFFF', label: 'Superviseur' },
   analyst: { background: '#334155', color: '#FFFFFF', label: 'Analyste' },
+  operator: { background: '#0F766E', color: '#FFFFFF', label: 'Opérateur' },
   viewer: { background: '#64748B', color: '#FFFFFF', label: 'Lecteur' },
 };
 

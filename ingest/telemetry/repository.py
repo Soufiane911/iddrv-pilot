@@ -33,7 +33,7 @@ def store_page(conn, *, connection_id: UUID, page: CyclePage, received_at: datet
             # Use the same lock order as ERP and archive transactions:
             # advisory site lock first, then the lifecycle row lock. Acquiring
             # the row first would deadlock with lock_site().
-            cur.execute('SELECT site_id FROM machine_connections WHERE id=%s', (str(connection_id),))
+            cur.execute('SELECT site_id,machine_id FROM machine_connections WHERE id=%s', (str(connection_id),))
             source = cur.fetchone()
             if not source:
                 raise SourceError('connection_not_found')
@@ -42,6 +42,9 @@ def store_page(conn, *, connection_id: UUID, page: CyclePage, received_at: datet
                 lock_site(cur, source['site_id'])
             except ERPConflict as exc:
                 raise SourceError(str(exc)) from None
+            # The same per-press lock is used by HDT control and the scorer.
+            # Collection cannot enqueue a job after a committed stop.
+            cur.execute('SELECT pg_advisory_xact_lock(1347568468,%s)', (source['machine_id'],))
             cur.execute('SELECT * FROM machine_connections WHERE id=%s FOR UPDATE', (str(connection_id),))
             connection = cur.fetchone()
             if not connection or page.machine_id != connection['external_machine_id']:
@@ -88,10 +91,17 @@ def store_page(conn, *, connection_id: UUID, page: CyclePage, received_at: datet
                 fields.update({column: item.measurements[key] for key, (column, _) in MEASUREMENTS.items() if key in item.measurements})
                 cur.execute(sql.SQL('INSERT INTO machine_cycles ({}) VALUES ({})').format(
                     sql.SQL(',').join(map(sql.Identifier, fields)), sql.SQL(',').join(sql.Placeholder() for _ in fields)), list(fields.values()))
+                # HDT is opt-in per press.  Collection and API reads continue
+                # while stopped/blocked; no job is created in those states.
                 if historical_enabled():
-                    cur.execute('''INSERT INTO hdt_scoring_jobs(event_id,machine_id,site_id,model_version,mode,calculation_revision)
-                                VALUES(%s,%s,%s,%s,'live',1)''',
-                                (event_id, connection['machine_id'], connection['site_id'], os.getenv('TELEMETRY_MODEL_VERSION', 'hdt-process-drift-iforest-v1')))
+                    cur.execute("""SELECT effective_state,desired_state
+                                   FROM machine_hdt_controls WHERE machine_id=%s FOR SHARE""",
+                                (connection['machine_id'],))
+                    hdt = cur.fetchone()
+                    if hdt and hdt['desired_state'] == 'active' and hdt['effective_state'] == 'active':
+                        cur.execute('''INSERT INTO hdt_scoring_jobs(event_id,machine_id,site_id,model_version,mode,calculation_revision)
+                                    VALUES(%s,%s,%s,%s,'live',1) ON CONFLICT DO NOTHING''',
+                                    (event_id, connection['machine_id'], connection['site_id'], os.getenv('TELEMETRY_MODEL_VERSION', 'hdt-process-drift-iforest-v1')))
                 inserted += 1
                 inserted_dates.append(item.cycle_ended_at)
             stale = stale or (offset is not None and bool(page.items) and inserted + rejected == 0)

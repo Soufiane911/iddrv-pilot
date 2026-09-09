@@ -29,6 +29,8 @@ test('présente la checklist et ajoute une presse depuis un atelier vide', async
   renderWorkshop(api);
 
   expect(await screen.findByRole('heading', { name: 'Préparer cet atelier' })).toBeInTheDocument();
+  expect(screen.getByText(/Aucune presse configurée/)).toBeInTheDocument();
+  expect(screen.getByText(/Vue 3D désactivée/)).toBeInTheDocument();
   expect(screen.getAllByRole('button', { name: 'Configurer la passerelle' })[0]).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Importer l’ERP' })).toBeInTheDocument();
   await user.click(screen.getAllByRole('button', { name: 'Ajouter une presse' })[0]);

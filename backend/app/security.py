@@ -32,7 +32,7 @@ except ImportError:  # pragma: no cover - only used in minimal local installs
     VerificationError = VerifyMismatchError = Exception
 
 
-ROLES = ("viewer", "analyst", "supervisor", "admin")
+ROLES = ("viewer", "operator", "analyst", "supervisor", "admin")
 ROLE_LEVEL = {role: index for index, role in enumerate(ROLES)}
 SESSION_HEADER = "Authorization"
 

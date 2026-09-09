@@ -107,8 +107,10 @@ class SourceInventoryTests(unittest.TestCase):
         spec.loader.exec_module(module)
         saved = json.loads((ROOT / 'docs/certification/rgpd-c4/sql-source-index.json').read_text())
         self.assertEqual(saved, module.inventory())
-        self.assertEqual(len(saved['tables']), 56)
-        self.assertEqual(len(saved['sources']), 24)
+        # The HDT control/audit and OF-press quality tables are part of the
+        # declared schema inventory, not an undocumented runtime side effect.
+        self.assertEqual(len(saved['tables']), 59)
+        self.assertEqual(len(saved['sources']), 27)
 
     def test_document_local_links_exist(self):
         import re

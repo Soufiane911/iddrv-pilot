@@ -233,7 +233,7 @@ describe('SitesPage', () => {
     await screen.findByRole('heading', { name: /Vos ateliers/i });
     const button = await screen.findByRole('button', { name: /Ouvrir l’atelier/i });
     fireEvent.click(button);
-    await waitFor(() => expect(screen.getByRole('heading', { name: /État des presses/i })).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole('heading', { name: /Catalogue des presses/i })).toBeInTheDocument());
   });
 });
 

@@ -2,12 +2,12 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import { App } from '../App';
 import { mockApiClient } from '../lib/api';
 
-test('réserve le menu principal aux quatre parcours opérationnels', async () => {
+test('expose le planning comme parcours principal indépendant', async () => {
   window.history.pushState({}, '', '/overview');
   render(<App api={mockApiClient} />);
   const navigation = await screen.findByRole('navigation', { name: 'Navigation métier' });
   expect(within(navigation).getAllByRole('link').map((link) => link.getAttribute('href')))
-    .toEqual(['/overview', '/sites', '/incidents', '/imports']);
+    .toEqual(['/overview', '/sites', '/incidents', '/planning', '/imports']);
   expect(within(navigation).queryByRole('link', { name: /Nouvel import/i })).not.toBeInTheDocument();
 });
 

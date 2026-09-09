@@ -65,6 +65,13 @@ def claim_job(conn, *, machine_id=None, lease_seconds=60):
             if not job:
                 cur.execute('SELECT pg_advisory_unlock(1347568468,%s)',(candidate['machine_id'],))
                 continue
+            # Stop is a hard gate, including jobs queued before the stop.
+            cur.execute("SELECT effective_state, desired_state FROM machine_hdt_controls WHERE machine_id=%s FOR UPDATE", (job['machine_id'],))
+            control = cur.fetchone()
+            if not control or control['desired_state'] != 'active' or control['effective_state'] != 'active':
+                cur.execute("UPDATE hdt_scoring_jobs SET state='failed', public_error='hdt_stopped', updated_at=clock_timestamp() WHERE id=%s AND state IN ('pending','running')", (candidate['id'],))
+                cur.execute('SELECT pg_advisory_unlock(1347568468,%s)',(candidate['machine_id'],))
+                continue
             job = dict(job)
             token = str(uuid4())
             if job['input_event_ids'] is None:
@@ -147,6 +154,13 @@ def finish_job(conn, job, outcome):
     with conn,conn.cursor(cursor_factory=RealDictCursor) as cur:
         cur.execute("SELECT id FROM hdt_scoring_jobs WHERE id=%s AND claim_token=%s AND state='running' FOR UPDATE",(job['id'],job['claim_token']))
         if not cur.fetchone():
+            return False
+        # Re-check under the same machine lock immediately before prediction
+        # persistence: a successful stop cannot be followed by a score.
+        cur.execute("SELECT desired_state, effective_state FROM machine_hdt_controls WHERE machine_id=%s FOR UPDATE", (job['machine_id'],))
+        control = cur.fetchone()
+        if not control or control['desired_state'] != 'active' or control['effective_state'] != 'active':
+            cur.execute("UPDATE hdt_scoring_jobs SET state='failed', public_error='hdt_stopped', lease_until=NULL WHERE id=%s", (job['id'],))
             return False
         if outcome.model_version and outcome.model_version != job['model_version']:
             raise ValueError('model_version_mismatch')

@@ -12,13 +12,14 @@ import { useApi } from '../App';
 import { broadcastSessionState } from '../lib/session';
 import './layout.css';
 
-type IconName = 'overview' | 'workshop' | 'incident' | 'import' | 'admin';
+type IconName = 'overview' | 'workshop' | 'incident' | 'import' | 'planning' | 'admin';
 type NavItem = { to: string; label: string; caption: string; icon: IconName };
 
 const primary: NavItem[] = [
   { to: '/overview', label: 'Vue d’ensemble', caption: 'Situation', icon: 'overview' },
   { to: '/sites', label: 'Atelier', caption: 'Sites & machines', icon: 'workshop' },
   { to: '/incidents', label: 'Incidents', caption: 'Preuves', icon: 'incident' },
+  { to: '/planning', label: 'Planning', caption: 'Ordres de fabrication', icon: 'planning' },
   { to: '/imports', label: 'Imports', caption: 'Journal des traitements', icon: 'import' },
 ];
 const secondary: NavItem[] = [
@@ -27,7 +28,7 @@ const secondary: NavItem[] = [
 const DIRECT_LOCAL_ACCESS = import.meta.env.VITE_SKIP_AUTH === 'true';
 
 function Icon({ name }: { name: IconName }) {
-  const icons = { overview: SquaresFourIcon, workshop: FactoryIcon, incident: WarningIcon, import: DownloadSimpleIcon, admin: GearSixIcon };
+  const icons = { overview: SquaresFourIcon, workshop: FactoryIcon, incident: WarningIcon, import: DownloadSimpleIcon, planning: SquaresFourIcon, admin: GearSixIcon };
   const Glyph = icons[name];
   return <Glyph className="nav-svg" size={20} weight="regular" aria-hidden="true" />;
 }
@@ -36,6 +37,7 @@ function titleFor(pathname: string) {
   if (pathname.startsWith('/overview')) return ['PILOTAGE', 'Vue d’ensemble'];
   if (pathname.startsWith('/incidents/')) return ['INVESTIGATION', 'Dossier incident'];
   if (pathname.startsWith('/incidents')) return ['SUPERVISION', 'File des incidents'];
+  if (pathname.includes('/planning')) return ['ORGANISATION', 'Planning production'];
   if (pathname.startsWith('/imports')) return ['DONNÉES', 'Journal des imports'];
   if (pathname.startsWith('/health')) return ['OUTILS', 'État des services'];
   if (pathname.startsWith('/admin')) return ['OUTILS', 'Profil et accès'];
@@ -49,6 +51,7 @@ function active(item: NavItem, pathname: string) {
   if (item.to === '/health') return ['/health', '/admin', '/monitoring'].includes(pathname);
   if (item.to === '/sites') return pathname.startsWith('/sites');
   if (item.to === '/incidents') return pathname.startsWith('/incidents');
+  if (item.to === '/planning') return pathname.includes('/planning');
   return pathname.startsWith(item.to);
 }
 
