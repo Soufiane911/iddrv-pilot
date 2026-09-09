@@ -1,0 +1,8 @@
+.accessible-dialog { margin: auto; color: var(--color-foreground); max-width: calc(100vw - 24px); max-height: calc(100dvh - 24px); overflow: auto; }
+.accessible-dialog.workshop-form-drawer, .accessible-dialog.planning-editor { margin: 0 0 0 auto; height: 100dvh; max-height: 100dvh; border: 0; }
+.accessible-dialog::backdrop { background: rgb(15 23 42 / 48%); }
+.accessible-dialog input, .accessible-dialog select, .accessible-dialog textarea { min-width: 0; }
+.accessible-dialog form, .accessible-dialog fieldset { min-width: 0; }
+@media (max-width: 640px) {
+  .accessible-dialog .site-modal-actions, .accessible-dialog .workshop-form-actions, .accessible-dialog .planning-editor-actions { flex-wrap: wrap; }
+}

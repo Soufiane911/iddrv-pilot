@@ -1,3 +1,4 @@
+import { AccessibleDialog } from '../components/AccessibleDialog';
 import { ArrowRightIcon } from '@phosphor-icons/react/ArrowRight';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, type FormEvent } from 'react';
@@ -51,7 +52,7 @@ export function SitesPage() {
     mutationFn: () => api.archiveSite(archiveSiteId as number),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['sites'] });
-      setArchiveSiteId(null); setConfirmation(''); setFormError(null);
+      setArchiveSiteId(null); setConfirmation(''); setFormError(null); setNotice('Site archivé. L’historique reste conservé.');
     },
     onError: (error) => setFormError(publicError(error, 'Impossible d’archiver le site.')),
   });
@@ -93,14 +94,15 @@ export function SitesPage() {
       </article>)}</div>
     </>}
 
-    {createOpen && <div className="site-modal-backdrop" role="presentation"><section className="site-modal" role="dialog" aria-modal="true" aria-labelledby="create-site-title">
+    {createOpen && <div className="site-modal-backdrop" role="presentation"><AccessibleDialog className="site-modal" labelledBy="create-site-title" onClose={() => setCreateOpen(false)} busy={createMutation.isPending}>
       <p className="eyebrow">NOUVEL ATELIER</p><h2 id="create-site-title">Créer un site de production</h2><p className="muted">Le site est créé vide. Vous ajouterez les presses et l’ERP depuis l’Atelier.</p>
-      <form onSubmit={submitCreate}><label htmlFor="site-name">Nom du site</label><input id="site-name" value={name} onChange={(event) => setName(event.target.value)} autoFocus required maxLength={100} placeholder="Ex. Atelier injection Lyon" />
+      <form onSubmit={submitCreate}><label htmlFor="site-name">Nom du site</label><input id="site-name" aria-invalid={formError && (!name.trim() || createMutation.error instanceof ApiRequestError && createMutation.error.code === 'site_name_already_exists') ? true : undefined} aria-describedby={formError ? 'site-create-error' : undefined} value={name} onChange={(event) => setName(event.target.value)} required maxLength={100} placeholder="Ex. Atelier injection Lyon" />
         <label htmlFor="site-timezone">Fuseau horaire</label><select id="site-timezone" value={timezone} onChange={(event) => setTimezone(event.target.value)}><option>Europe/Paris</option><option>UTC</option><option>America/Montreal</option></select>
-        {formError && <p className="helper-error" role="alert">{formError}</p>}<div className="site-modal-actions"><button className="button-secondary" type="button" onClick={() => setCreateOpen(false)} disabled={createMutation.isPending}>Annuler</button><button className="button-primary" type="submit" disabled={createMutation.isPending}>{createMutation.isPending ? 'Création…' : 'Créer le site'}</button></div>
+        {createMutation.isPending && <p role="status">Création du site…</p>}
+        {formError && <p id="site-create-error" className="helper-error" role="alert">{formError}</p>}<div className="site-modal-actions"><button className="button-secondary" type="button" onClick={() => setCreateOpen(false)} disabled={createMutation.isPending}>Annuler</button><button className="button-primary" type="submit" disabled={createMutation.isPending}>{createMutation.isPending ? 'Création…' : 'Créer le site'}</button></div>
       </form>
-    </section></div>}
+    </AccessibleDialog></div>}
 
-    {selectedForArchive && <div className="site-modal-backdrop" role="presentation"><section className="site-modal" role="dialog" aria-modal="true" aria-labelledby="archive-site-title"><p className="eyebrow">CYCLE DE VIE DU SITE</p><h2 id="archive-site-title">Archiver {selectedForArchive.name} ?</h2><p className="muted">Le site ne sera plus utilisable, mais ses presses, OF, cycles, imports et incidents resteront conservés pour l’historique.</p><form onSubmit={submitDelete}><label htmlFor="site-confirmation">Saisissez le nom du site pour confirmer</label><input id="site-confirmation" value={confirmation} onChange={(event) => setConfirmation(event.target.value)} autoFocus /><p className="helper-text">{selectedForArchive.name}</p>{formError && <p className="helper-error" role="alert">{formError}</p>}<div className="site-modal-actions"><button className="button-secondary" type="button" onClick={() => setArchiveSiteId(null)} disabled={archiveMutation.isPending}>Annuler</button><button className="button-danger" type="submit" disabled={confirmation.trim() !== selectedForArchive.name || archiveMutation.isPending}>{archiveMutation.isPending ? 'Archivage…' : 'Archiver le site'}</button></div></form></section></div>}
+    {selectedForArchive && <div className="site-modal-backdrop" role="presentation"><AccessibleDialog className="site-modal" labelledBy="archive-site-title" onClose={() => setArchiveSiteId(null)} busy={archiveMutation.isPending}><p className="eyebrow">CYCLE DE VIE DU SITE</p><h2 id="archive-site-title">Archiver {selectedForArchive.name} ?</h2><p className="muted">Le site ne sera plus utilisable, mais ses presses, OF, cycles, imports et incidents resteront conservés pour l’historique.</p><form onSubmit={submitDelete}><label htmlFor="site-confirmation">Saisissez le nom du site pour confirmer</label><input id="site-confirmation" aria-describedby="site-confirmation-hint" value={confirmation} onChange={(event) => setConfirmation(event.target.value)} /><p id="site-confirmation-hint" className="helper-text">{selectedForArchive.name}</p>{archiveMutation.isPending && <p role="status">Archivage du site…</p>}{formError && <p className="helper-error" role="alert">{formError}</p>}<div className="site-modal-actions"><button className="button-secondary" type="button" onClick={() => setArchiveSiteId(null)} disabled={archiveMutation.isPending}>Annuler</button><button className="button-danger" type="submit" disabled={confirmation.trim() !== selectedForArchive.name || archiveMutation.isPending}>{archiveMutation.isPending ? 'Archivage…' : 'Archiver le site'}</button></div></form></AccessibleDialog></div>}
   </section>;
 }
