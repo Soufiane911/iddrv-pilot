@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "kind": "served-release-inventory-not-training-provenance",
+  "model_version": "hdt-process-drift-iforest-v1",
+  "observed_revision": "01fcb4fa8daa8261ca34cf2e44171a4d7836af5b",
+  "files": {
+    "process_drift_hdt_v1.joblib": "29dea3dca96ad0e3bfa1b1e54a4f7e55bd0d351a61cbe209ab84962530424eb6",
+    "process_drift_hdt_v1.meta.json": "07f05b215212a3eee1a870f6f89c418e5299c2ef81862c085ebaafbaa52c5b92"
+  },
+  "environment": {
+    "python": "3.13.9",
+    "scikit_learn": "1.7.2",
+    "joblib": "1.5.2"
+  },
+  "historical_audit_sha256": "8480d0b075831042afecd38bfa125bbf82970636d502ed4cb1d65a9c0a8a7b7d",
+  "historical_sha_matches_release": false,
+  "training_dataset_sha256": null,
+  "training_code_revision": null,
+  "seed_verified_from_original_training_run": null,
+  "note": "Release artifact unchanged. Historical audit hash is not the consolidated release hash. Original dataset/config provenance cannot be reconstructed from presence alone."
+}

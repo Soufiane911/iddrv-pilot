@@ -61,7 +61,7 @@ jobs:
           pip install -r requirements.txt -r backend/requirements.txt pytest
 
       - name: Run unit tests
-        run: python -m pytest -q --ignore=tests/e2e
+        run: python -m pytest -q tests --ignore=tests/e2e
 
   frontend:
     name: Frontend tests & build
@@ -179,3 +179,13 @@ jobs:
 
       - name: Run E2E harness
         run: python tests/e2e/run_tests.py -t 1,2
+
+      - name: Upload E2E diagnostic reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-reports
+          path: |
+            tests/e2e/report.json
+            tests/e2e/report.txt
+          if-no-files-found: warn

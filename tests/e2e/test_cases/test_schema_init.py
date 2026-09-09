@@ -110,6 +110,22 @@ def test_t2_init_01_reinitialization_idempotency(db_url):
     script_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../db/setup_db.py"))
     assert os.path.exists(script_path), f"Setup script {script_path} does not exist"
     
+    # Cleanup must preserve the immutable migration ledger, not only the DDL.
+    def migration_ledger():
+        conn = psycopg2.connect(db_url)
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT name, checksum, applied_at FROM schema_migrations ORDER BY name")
+                return cur.fetchall()
+        finally:
+            conn.close()
+
+    before = migration_ledger()
+    migration_dir = os.path.join(os.path.dirname(script_path), "migrations")
+    assert {row[0] for row in before} == {
+        name for name in os.listdir(migration_dir) if name.endswith(".sql")
+    }
+
     # Run once
     result1 = subprocess.run(["python3", script_path, "--db-url", db_url], capture_output=True, text=True)
     assert result1.returncode == 0, f"First run failed: {result1.stderr}"
@@ -117,6 +133,7 @@ def test_t2_init_01_reinitialization_idempotency(db_url):
     # Run twice
     result2 = subprocess.run(["python3", script_path, "--db-url", db_url], capture_output=True, text=True)
     assert result2.returncode == 0, f"Second run failed: {result2.stderr}"
+    assert migration_ledger() == before, "Setup must not reapply or rewrite applied migrations"
 
 @pytest.mark.tier2
 def test_t2_init_02_setup_missing_timescaledb(db_url):

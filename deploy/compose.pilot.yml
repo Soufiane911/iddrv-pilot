@@ -43,6 +43,8 @@ services:
     environment:
       DATABASE_URL: ${API_DATABASE_URL:?API_DATABASE_URL is required}
       API_DATABASE_URL: ${API_DATABASE_URL:?API_DATABASE_URL is required}
+      TELEMETRY_ALLOWED_ORIGINS: ${TELEMETRY_ALLOWED_ORIGINS:-}
+      TELEMETRY_ALLOW_HTTP: ${TELEMETRY_ALLOW_HTTP:-false}
       ERP_UPLOAD_ROOT: /var/lib/iddrv/raw/uploads
       REDIS_URL: redis://redis:6379/0
       APP_ENV: pilot
@@ -85,6 +87,50 @@ services:
     command: ["python", "-m", "ingest.watcher", "--root", "/var/lib/iddrv", "--poll-seconds", "5", "--stable-seconds", "10"]
     volumes:
       - ./data:/var/lib/iddrv
+    healthcheck:
+      test: ["CMD", "python", "-c", "from pathlib import Path; from ingest.watcher import heartbeat_is_fresh; raise SystemExit(0 if heartbeat_is_fresh(Path('/var/lib/iddrv/processing/.worker_heartbeat'), max_age_seconds=90) else 1)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 45s
+
+  collector:
+    image: ghcr.io/${GHCR_OWNER:?GHCR_OWNER is required}/iddrv-api:${IMAGE_TAG:?IMAGE_TAG is required}
+    restart: unless-stopped
+    environment:
+      WORKER_DATABASE_URL: ${WORKER_DATABASE_URL:?WORKER_DATABASE_URL is required}
+      TELEMETRY_ALLOWED_ORIGINS: ${TELEMETRY_ALLOWED_ORIGINS:-}
+      TELEMETRY_ALLOW_HTTP: ${TELEMETRY_ALLOW_HTTP:-false}
+      TELEMETRY_MODEL_VERSION: ${TELEMETRY_MODEL_VERSION:-hdt-process-drift-iforest-v1}
+      COLLECTOR_HEARTBEAT_PATH: /tmp/iddrv-collector-heartbeat
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    command: ["python", "-m", "ingest.telemetry.collector"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "from ingest.telemetry.collector import heartbeat_is_fresh; raise SystemExit(0 if heartbeat_is_fresh() else 1)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  scorer:
+    image: ghcr.io/${GHCR_OWNER:?GHCR_OWNER is required}/iddrv-api:${IMAGE_TAG:?IMAGE_TAG is required}
+    restart: unless-stopped
+    environment:
+      WORKER_DATABASE_URL: ${WORKER_DATABASE_URL:?WORKER_DATABASE_URL is required}
+      PROCESS_DRIFT_MODEL_PATH: /app/models/process_drift_hdt_v1.joblib
+      SCORER_HEARTBEAT_PATH: /tmp/iddrv-scorer-heartbeat
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    command: ["python", "-m", "ingest.telemetry.scorer"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "from ingest.telemetry.scorer import heartbeat_is_fresh; raise SystemExit(0 if heartbeat_is_fresh() else 1)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   web:
     image: ghcr.io/${GHCR_OWNER:?GHCR_OWNER is required}/iddrv-web:${IMAGE_TAG:?IMAGE_TAG is required}

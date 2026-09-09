@@ -32,7 +32,7 @@ def test_t1_load_01_basic_bulk_insert(db_url, db_cli_env):
     """
     conn = psycopg2.connect(db_url)
     with conn.cursor() as cur:
-        cur.execute("INSERT INTO machines (erp_ref, name) VALUES ('mach-A', 'Machine A') ON CONFLICT DO NOTHING;")
+        cur.execute("INSERT INTO machines (site_id, erp_ref, name) VALUES (1, 'mach-A', 'Machine A') ON CONFLICT DO NOTHING;")
         conn.commit()
     conn.close()
     
@@ -78,7 +78,7 @@ def test_t1_load_03_db_insert_conflict_handling(db_url, db_cli_env):
     """
     conn = psycopg2.connect(db_url)
     with conn.cursor() as cur:
-        cur.execute("INSERT INTO machines (erp_ref, name) VALUES ('mach-A', 'Machine A') ON CONFLICT DO NOTHING;")
+        cur.execute("INSERT INTO machines (site_id, erp_ref, name) VALUES (1, 'mach-A', 'Machine A') ON CONFLICT DO NOTHING;")
         conn.commit()
     conn.close()
     
@@ -99,7 +99,7 @@ def test_t1_load_04_transaction_rollback(db_url, db_cli_env):
     """
     conn = psycopg2.connect(db_url)
     with conn.cursor() as cur:
-        cur.execute("INSERT INTO machines (erp_ref, name) VALUES ('mach-A', 'Machine A') ON CONFLICT DO NOTHING;")
+        cur.execute("INSERT INTO machines (site_id, erp_ref, name) VALUES (1, 'mach-A', 'Machine A') ON CONFLICT DO NOTHING;")
         cur.execute("DELETE FROM machine_cycles WHERE machine_id = (SELECT id FROM machines WHERE erp_ref = 'mach-A');")
         conn.commit()
     conn.close()
@@ -167,7 +167,7 @@ def test_t2_load_03_large_batch_chunking(db_url, db_cli_env):
     """
     conn = psycopg2.connect(db_url)
     with conn.cursor() as cur:
-        cur.execute("INSERT INTO machines (erp_ref, name) VALUES ('mach-A', 'Machine A') ON CONFLICT DO NOTHING;")
+        cur.execute("INSERT INTO machines (site_id, erp_ref, name) VALUES (1, 'mach-A', 'Machine A') ON CONFLICT DO NOTHING;")
         conn.commit()
     conn.close()
     
@@ -190,7 +190,7 @@ def test_t2_load_04_backfilling_historical_data(db_url, db_cli_env):
     """
     conn = psycopg2.connect(db_url)
     with conn.cursor() as cur:
-        cur.execute("INSERT INTO machines (erp_ref, name) VALUES ('mach-A', 'Machine A') ON CONFLICT DO NOTHING;")
+        cur.execute("INSERT INTO machines (site_id, erp_ref, name) VALUES (1, 'mach-A', 'Machine A') ON CONFLICT DO NOTHING;")
         conn.commit()
     conn.close()
     
@@ -215,7 +215,7 @@ def test_t2_load_05_null_value_ingestion(db_url, db_cli_env):
     """
     conn = psycopg2.connect(db_url)
     with conn.cursor() as cur:
-        cur.execute("INSERT INTO machines (erp_ref, name) VALUES ('mach-A', 'Machine A') ON CONFLICT DO NOTHING;")
+        cur.execute("INSERT INTO machines (site_id, erp_ref, name) VALUES (1, 'mach-A', 'Machine A') ON CONFLICT DO NOTHING;")
         cur.execute("DELETE FROM machine_cycles WHERE time = '2026-07-09T20:00:00Z';")
         conn.commit()
     conn.close()
@@ -426,7 +426,7 @@ def test_t2_load_08_runtime_detector_is_idempotent(db_url, monkeypatch):
     """A committed cycle passport creates one incident, never duplicates it."""
     from types import SimpleNamespace
     from backend.app.diagnostics.runtime import trigger_after_import
-    import backend.app.db as db_module
+    import backend.app.config as config_module
     from backend.app.config import Settings
 
     conn = psycopg2.connect(db_url)
@@ -467,7 +467,7 @@ def test_t2_load_08_runtime_detector_is_idempotent(db_url, monkeypatch):
         conn.commit()
     conn.close()
 
-    monkeypatch.setattr(db_module, "settings", Settings(database_url=db_url))
+    monkeypatch.setattr(config_module, "settings", Settings(database_url=db_url))
     job = SimpleNamespace(site_id=1, passport_id=str(incident_passport_id))
     result = {
         "transaction_committed": True,

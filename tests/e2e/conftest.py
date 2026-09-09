@@ -302,10 +302,12 @@ def clean_db(db_conn):
                 WHERE datname = current_database()
                   AND pid <> pg_backend_pid()
             """)
+            # Migration history is schema metadata: truncating it makes setup
+            # replay immutable migrations against an already migrated schema.
             cur.execute("""
                 SELECT table_name FROM information_schema.tables
                 WHERE table_schema = 'public' AND table_type = 'BASE TABLE'
-                  AND table_name NOT IN ('spatial_ref_sys', '_iddrv_e2e_guard')
+                  AND table_name NOT IN ('spatial_ref_sys', '_iddrv_e2e_guard', 'schema_migrations')
             """)
             tables = [r[0] for r in cur.fetchall()]
             if tables:
