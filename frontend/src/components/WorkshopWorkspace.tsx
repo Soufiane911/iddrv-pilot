@@ -67,6 +67,7 @@ interface Props {
   range: { start: string; end: string };
   replayPercent: number;
   timeline: TimelinePoint[];
+  processDriftPanel?: ReactNode;
   processDriftApi: Pick<ApiClient, 'predictProcessDrift'>;
   processDriftSiteId: number;
   processDriftCycles: ProcessDriftCycle[];
@@ -167,7 +168,7 @@ function WorkshopTrend({ points, incidents, range, replayPercent, unavailable, l
   </div>;
 }
 
-export function WorkshopWorkspace({ site, replayReady = true, connectionApi, machines, activeMachine, machineIncidents, timelineIncidents, siteIncidentCount, incidentsUnavailable = false, statusUnavailable = false, statusLoading = false, statusDataInconsistent = false, sourceCutoffPartial = false, threeDUnavailable = false, qualityUnavailable = false, qualityLoading = false, hasQualityWindow = false, timelineUnavailable = false, timelineLoading = false, status, scrapRate, scrap, qualityTotal, replayAt, selectedReplayAt, replayPending = false, range, replayPercent, timeline, processDriftApi, processDriftSiteId, processDriftCycles, processDriftCyclesLoading = false, processDriftCyclesError = null, onProcessDriftCyclesRetry, viewMode, feature3dEnabled, visualization, onReplayChange, onViewModeChange, timeMode = 'replay', onTimeModeChange, selectedAt = selectedReplayAt, onSelectedAtChange, onRefresh, productionContext, persistedPrediction, connectionState }: Props) {
+export function WorkshopWorkspace({ site, replayReady = true, connectionApi, machines, activeMachine, machineIncidents, timelineIncidents, siteIncidentCount, incidentsUnavailable = false, statusUnavailable = false, statusLoading = false, statusDataInconsistent = false, sourceCutoffPartial = false, threeDUnavailable = false, qualityUnavailable = false, qualityLoading = false, hasQualityWindow = false, timelineUnavailable = false, timelineLoading = false, status, scrapRate, scrap, qualityTotal, replayAt, selectedReplayAt, replayPending = false, range, replayPercent, timeline, processDriftPanel, processDriftApi, processDriftSiteId, processDriftCycles, processDriftCyclesLoading = false, processDriftCyclesError = null, onProcessDriftCyclesRetry, viewMode, feature3dEnabled, visualization, onReplayChange, onViewModeChange, timeMode = 'replay', onTimeModeChange, selectedAt = selectedReplayAt, onSelectedAtChange, onRefresh, productionContext, persistedPrediction, connectionState }: Props) {
   const statusCoverageComplete = machines.every((machine) => machine.status !== undefined && machine.status !== null);
   const summaryUnavailable = statusUnavailable || statusLoading || !statusCoverageComplete;
   const running = machines.filter((machine) => machine.status === 'running').length;
@@ -238,7 +239,7 @@ export function WorkshopWorkspace({ site, replayReady = true, connectionApi, mac
             <header><span>QUALITÉ SUR LA PÉRIODE</span></header>
             {replayPending ? <p className="helper-status">Mise à jour de la borne qualité…</p> : !hasQualityWindow ? <p>Déplacez le replay pour ouvrir une période de calcul.</p> : qualityUnavailable ? <p className="helper-error">Métriques qualité indisponibles.</p> : qualityLoading ? <p className="helper-status">Lecture de la qualité…</p> : typeof qualityTotal !== 'number' || qualityTotal <= 0 ? <p>Aucune observation qualité dans cette période.</p> : typeof scrapRate !== 'number' ? <p className="helper-error">Réponse qualité incomplète pour cette période.</p> : <div className={`workshop-quality ${scrapRate > .1 ? 'danger' : ''}`}><strong>{formatPercent(scrapRate)}</strong><span>{formatNumber(qualityTotal, 0)} observations</span></div>}
           </section>
-          {replayReady && <ProcessDriftPanel api={processDriftApi} siteId={processDriftSiteId} cycles={processDriftCycles} cyclesLoading={processDriftCyclesLoading} cyclesError={processDriftCyclesError} onRetryCycles={onProcessDriftCyclesRetry} machineName={activeMachine.name} persistedPrediction={persistedPrediction} readOnly={timeMode === 'direct'} />}
+          {processDriftPanel !== undefined ? processDriftPanel : replayReady && <ProcessDriftPanel api={processDriftApi} siteId={processDriftSiteId} cycles={processDriftCycles} cyclesLoading={processDriftCyclesLoading} cyclesError={processDriftCyclesError} onRetryCycles={onProcessDriftCyclesRetry} machineName={activeMachine.name} persistedPrediction={persistedPrediction} readOnly={timeMode === 'direct'} />}
           <ProductionContextPanel context={productionContext} />
         </> : null}
       </aside>

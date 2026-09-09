@@ -18,6 +18,7 @@ from test_telemetry_contract import payload
 
 @pytest.fixture
 def database(monkeypatch):
+    monkeypatch.setenv('HDT_RUNTIME_MODE', 'historical')
     url = os.getenv('TELEMETRY_TEST_DATABASE_URL')
     if not url:
         pytest.skip('Dedicated TELEMETRY_TEST_DATABASE_URL not supplied')

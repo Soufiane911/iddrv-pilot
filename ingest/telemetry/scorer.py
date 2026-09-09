@@ -43,6 +43,9 @@ def infer_bounded(cycles, mode):
 
 
 def claim_job(conn, *, machine_id=None, lease_seconds=60):
+    from ml.runtime_mode import historical_enabled
+    if not historical_enabled():
+        return None
     with conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
         cur.execute('''SELECT j.id,j.machine_id FROM hdt_scoring_jobs j
             JOIN machine_source_events e ON e.id=j.event_id
@@ -138,6 +141,9 @@ def update_episode(cur, prediction):
 
 
 def finish_job(conn, job, outcome):
+    from ml.runtime_mode import historical_enabled
+    if not historical_enabled():
+        return False
     with conn,conn.cursor(cursor_factory=RealDictCursor) as cur:
         cur.execute("SELECT id FROM hdt_scoring_jobs WHERE id=%s AND claim_token=%s AND state='running' FOR UPDATE",(job['id'],job['claim_token']))
         if not cur.fetchone():
@@ -157,6 +163,9 @@ def finish_job(conn, job, outcome):
 
 
 def score_pending_once(*, database_url=None, machine_id=None, infer=None) -> int:
+    from ml.runtime_mode import historical_enabled
+    if not historical_enabled():
+        return 0  # Explicitly suspended; queued historical identities are untouched.
     with closing(psycopg2.connect(database_url or worker_database_url())) as conn:
         job = claim_job(conn,machine_id=machine_id)
         if not job:
@@ -177,6 +186,9 @@ def score_pending_once(*, database_url=None, machine_id=None, infer=None) -> int
 
 def request_recalculation(conn, *, site_id, prediction_id):
     """Explicit worker command. ERP reconciliation never calls this operation."""
+    from ml.runtime_mode import historical_enabled
+    if not historical_enabled():
+        raise ValueError('historical_scoring_disabled')
     with conn.cursor(cursor_factory=RealDictCursor) as cur:
         cur.execute('SELECT * FROM hdt_predictions WHERE site_id=%s AND id=%s',(site_id,str(prediction_id)))
         previous = cur.fetchone()
@@ -198,6 +210,10 @@ def heartbeat_is_fresh():
 
 
 def main():
+    from ml.runtime_mode import historical_enabled
+    if not historical_enabled():
+        import logging
+        logging.getLogger(__name__).warning('Historical scorer suspended by HDT_RUNTIME_MODE; summary6 live is not connected')
     heartbeat = Path(os.getenv('SCORER_HEARTBEAT_PATH','/tmp/iddrv-scorer-heartbeat'))
     while True:
         try:

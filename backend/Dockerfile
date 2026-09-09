@@ -3,6 +3,7 @@ FROM python:3.13-slim
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PYTHONPATH=/app
 WORKDIR /app
 
+COPY constraints-numerical.txt /app/constraints-numerical.txt
 COPY backend/requirements.txt /app/backend/requirements.txt
 RUN pip install --no-cache-dir -r /app/backend/requirements.txt
 
@@ -11,5 +12,7 @@ COPY db /app/db
 COPY ingest /app/ingest
 COPY ml /app/ml
 COPY models /app/models
+# Text-only synthetic replay observations, never the private model binary.
+COPY data/summary6 /app/data/summary6
 RUN mkdir -p /var/lib/iddrv/inbox /var/lib/iddrv/processing /var/lib/iddrv/archive /var/lib/iddrv/quarantine /var/lib/iddrv/raw
 EXPOSE 8000

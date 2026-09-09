@@ -20,7 +20,13 @@ def _response(status_code: int, code: str, message: str, details: dict | None = 
 
 async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
     request_id = getattr(request.state, "request_id", None) if hasattr(request, "state") else None
-    return _response(422, "validation_error", "Request validation failed", {"errors": exc.errors()}, request_id=request_id)
+    # Do not serialize raw input or ctx: these may contain secrets, non-finite
+    # numbers, overflowing integers or exception objects that JSON cannot encode.
+    errors = [{"type": error["type"], "loc": error["loc"], "msg": error["msg"]}
+              for error in exc.errors()]
+    return _response(422, "validation_error", "Request validation failed",
+                     {"errors": errors}, request_id=request_id)
+
 
 async def http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
     request_id = getattr(request.state, "request_id", None) if hasattr(request, "state") else None

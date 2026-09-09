@@ -70,6 +70,7 @@ services:
       dockerfile: backend/Dockerfile
     restart: unless-stopped
     environment:
+      HDT_RUNTIME_MODE: ${HDT_RUNTIME_MODE:-disabled}
       # Development may use the owner URL; pilot/production use the dedicated API role.
       DATABASE_URL: ${API_DATABASE_URL:-${DOCKER_DATABASE_URL:?DOCKER_DATABASE_URL must be set with URL-encoded credentials}}
       API_DATABASE_URL: ${API_DATABASE_URL:-}
@@ -109,6 +110,7 @@ services:
       dockerfile: backend/Dockerfile
     restart: unless-stopped
     environment:
+      HDT_RUNTIME_MODE: ${HDT_RUNTIME_MODE:-disabled}
       # Development may use the owner URL; pilot/production use the dedicated worker role.
       DATABASE_URL: ${WORKER_DATABASE_URL:-${DOCKER_DATABASE_URL:?DOCKER_DATABASE_URL must be set with URL-encoded credentials}}
       WORKER_DATABASE_URL: ${WORKER_DATABASE_URL:-}
@@ -155,6 +157,7 @@ services:
       dockerfile: backend/Dockerfile
     restart: unless-stopped
     environment:
+      HDT_RUNTIME_MODE: ${HDT_RUNTIME_MODE:-disabled}
       WORKER_DATABASE_URL: ${WORKER_DATABASE_URL:?WORKER_DATABASE_URL is required}
       TELEMETRY_ALLOWED_ORIGINS: ${TELEMETRY_ALLOWED_ORIGINS:-}
       TELEMETRY_ALLOW_HTTP: ${TELEMETRY_ALLOW_HTTP:-false}
@@ -177,6 +180,7 @@ services:
       dockerfile: backend/Dockerfile
     restart: unless-stopped
     environment:
+      HDT_RUNTIME_MODE: ${HDT_RUNTIME_MODE:-disabled}
       WORKER_DATABASE_URL: ${WORKER_DATABASE_URL:?WORKER_DATABASE_URL is required}
       PROCESS_DRIFT_MODEL_PATH: /app/models/process_drift_hdt_v1.joblib
       SCORER_HEARTBEAT_PATH: /tmp/iddrv-scorer-heartbeat
