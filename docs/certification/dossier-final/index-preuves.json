@@ -446,7 +446,7 @@
       ],
       "statut": "incomplet",
       "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
-      "prochaine_preuve": "Faire compléter et approuver tous traitements par responsable compétent."
+      "prochaine_preuve": "Compléter le registre de tous les traitements personnels impliqués dans la base."
     },
     {
       "competence": "C4",
@@ -465,7 +465,7 @@
       ],
       "statut": "incomplet",
       "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
-      "prochaine_preuve": "Rédiger tri sur base, fichiers, exports et sauvegardes."
+      "prochaine_preuve": "Rédiger la procédure de tri des données personnelles de la base."
     },
     {
       "competence": "C4",
@@ -484,7 +484,7 @@
       ],
       "statut": "incomplet",
       "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
-      "prochaine_preuve": "Faire approuver durées/fréquences puis exercice synthétique."
+      "prochaine_preuve": "Détailler les traitements de conformité, manuels possibles, et leur fréquence d’exécution."
     },
     {
       "competence": "C5",

@@ -50,6 +50,8 @@ Sources : P01, X01. Référentiel complémentaire : S03 p. 3.
 
 Sources : P02, P07, L1. Référentiel complémentaire : S03 p. 4–5.
 
+Minimum documentaire C4 en quatre pièces : **modèles ; installation/import et documentation ; registre ; procédure de tri**. S06 p.5 admet les traitements non automatisés : une procédure manuelle détaillant traitements et fréquence est possible. Approbation exhaustive, extension aux fichiers/exports/sauvegardes et exercice synthétique sont des recommandations opérationnelles facultatives hors exigences explicites citées, pas des conditions supplémentaires ; aucun simulateur de purge requis. Les décisions réelles (durées, règles et autorisations) restent à la personne compétente ; ceci ne tranche pas les obligations juridiques applicables.
+
 | ID | Exigence exacte (S06) | Page | Statut de preuve / prochaine preuve |
 |---|---|---|---|
 | C4.01 | Les modélisations des données respectent la méthode et le formalisme Merise. | 4 | **Incomplet**. Compléter MCD/MLD et correspondance exhaustive aux migrations. |
@@ -61,9 +63,9 @@ Sources : P02, P07, L1. Référentiel complémentaire : S03 p. 4–5.
 | C4.07 | Les documentations techniques des scripts couvrent les parties suivantes : | 4 | **Incomplet**. Contrôler les deux clauses documentaires filles. |
 | C4.08 | les dépendances nécessaires pour la réutilisation des scripts (langages, dépendances externes, etc) | 4 | **Incomplet**. Inventorier dépendances et versions de tous scripts import. |
 | C4.09 | les commandes pour l’exécution des scripts. | 4, 5 | **Incomplet**. Vérifier commandes sur environnement propre. |
-| C4.10 | Le registre des traitements de données personnelles intègre l’ensemble des traitements de données personnelles impliqués dans la base de données. | 5 | **Incomplet**. Faire compléter et approuver tous traitements par responsable compétent. |
-| C4.11 | Les procédures de tri des données personnelles pour la mise en conformité de la base de données avec le RGPD sont rédigées. | 5 | **Incomplet**. Rédiger tri sur base, fichiers, exports et sauvegardes. |
-| C4.12 | Les procédures de tri détaillent les traitements de conformité (automatisés ou non) à appliquer ainsi que leur fréquence d’exécution. | 5 | **Incomplet**. Faire approuver durées/fréquences puis exercice synthétique. |
+| C4.10 | Le registre des traitements de données personnelles intègre l’ensemble des traitements de données personnelles impliqués dans la base de données. | 5 | **Incomplet**. Compléter le registre de tous les traitements personnels impliqués dans la base. |
+| C4.11 | Les procédures de tri des données personnelles pour la mise en conformité de la base de données avec le RGPD sont rédigées. | 5 | **Incomplet**. Rédiger la procédure de tri des données personnelles de la base. |
+| C4.12 | Les procédures de tri détaillent les traitements de conformité (automatisés ou non) à appliquer ainsi que leur fréquence d’exécution. | 5 | **Incomplet**. Détailler les traitements de conformité, manuels possibles, et leur fréquence d’exécution. |
 
 ## E1 — C5 : API de données
 
@@ -231,7 +233,7 @@ Sources : P02, P03, L4. Référentiel complémentaire : S03 p. 17.
 
 Sources : P09, L4. Référentiel complémentaire : S03 p. 18.
 
-PR #1 est une trace réelle de revue du catalogue. Elle ne prouve aucun des quatre attendus de conduite collective sur toute la durée du projet. Historique collectif **non audité**, non reconstruit.
+P09 vérifie localement la fusion PR #1 et le catalogue dans Git, pas la revue. La revue interne effective est **déclarée par l’agent parent, non relue dans ce lot**. Le relevé veille API P2-reviews du 2026-09-09T14:29:31Z rapporte une réponse publique vide : aucune approbation publique observée à cette borne, sans nier la revue interne (détails et provenance dans P09). Ni revue humaine indépendante ni validation client ne sont établies. Ces éléments ne prouvent aucun des quatre attendus de conduite collective sur toute la durée du projet. Historique collectif **non audité**, non reconstruit.
 
 | ID | Exigence exacte (S06) | Page | Statut de preuve / prochaine preuve |
 |---|---|---|---|

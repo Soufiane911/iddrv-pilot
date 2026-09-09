@@ -39,8 +39,8 @@ Les commandes historiques sont celles rapportées par les documents, **pas des c
 - Source : `docs/certification/governance-proposal.md`; `db/init.sql`. Section : Modèle conceptuel partiel ; Registre de travail.
 - Commit observé : `59a4846bb13d31c8fb04b1a2dcfa0239c853605a` ; résolution : `resolved`.
 - Commande / examen : `git show 59a4846b:docs/certification/governance-proposal.md`.
-- Portée et limites : Modèle conceptuel partiel et registre proposés ; schéma initial seul insuffisant, migrations nécessaires. Aucune approbation RGPD ni purge exécutée.
-- Prochaine preuve : Modèle complet, registre, durées et procédures approuvés.
+- Portée et limites : Modèle conceptuel partiel, registre et tri proposés ; schéma initial seul insuffisant, migrations nécessaires. Installation/import non vérifiés ici. S06 p.5 demande registre des traitements impliqués dans la base et procédure écrite détaillant traitements de conformité (manuels possibles) et fréquence ; ni simulateur ni exercice de purge requis explicitement. Les décisions réelles restent au responsable compétent.
+- Prochaine preuve : Minimum C4 : modèles ; installation/import et documentation ; registre des traitements impliqués dans la base ; procédure de tri écrite avec traitements et fréquence, manuelle possible. Approbation exhaustive, extension fichiers/exports/sauvegardes et exercice synthétique : recommandations opérationnelles facultatives hors exigences explicites de S06 p.5, pas conditions ajoutées au critère.
 
 
 ### P03 — configuration non vérifiée
@@ -97,13 +97,13 @@ Les commandes historiques sont celles rapportées par les documents, **pas des c
 - Prochaine preuve : Reproduction avant/après archivée expurgée et lien outil de suivi ; expliquer contribution personnelle.
 
 
-### P09 — preuve vérifiée localement
+### P09 — preuve vérifiée localement (fusion/catalogue uniquement)
 
 - Source : `docs/certification/hdt-candidates.md`; `models/hdt/catalog.json`; `ml/hdt_registry.py`. Section : Périmètre et contrat ; Identités scientifiques.
-- Commit observé : `59a4846bb13d31c8fb04b1a2dcfa0239c853605a` ; résolution : `resolved`. Trace : PR #1 (revue signalée ; contenu de discussion non relu ici).
+- Commit observé : `59a4846bb13d31c8fb04b1a2dcfa0239c853605a` ; résolution : `resolved`. Trace : PR #1 : fusion Git vérifiée ; revue interne déclarée par le parent, non relue ; observation API publique historique bornée, non rejouée.
 - Commande / examen : `git show -s --format=%s 59a4846b ; git show 59a4846b:models/hdt/catalog.json`.
-- Portée et limites : PR #1 fusionnée 59a4846b : vraie trace de revue de code du catalogue API, pas coordination collective historique. Catalogue documentaire seulement ; exports recherche non distribués, aucun changement du modèle servi.
-- Prochaine preuve : Archiver revue expurgée et contrôler modèle réellement chargé sur cible.
+- Portée et limites : Vérification locale Git limitée à la fusion PR #1 en 59a4846b et au catalogue. Revue interne effective déclarée par l’agent parent, non relue dans ce lot : déclaration, pas preuve de revue vérifiée localement. Selon le relevé veille API P2-reviews du 2026-09-09T14:29:31Z (GET public /repos/Soufiane911/iddrv-pilot/pulls/1/reviews, HTTP 200, tableau vide), aucune approbation publique observée à cette borne ; requête non rejouée ici. Cela ne nie pas la revue interne et n’établit ni revue humaine indépendante ni validation client ou coordination collective historique. Catalogue documentaire seulement ; exports recherche non distribués, aucun changement du modèle servi.
+- Prochaine preuve : Faire préciser par le parent la provenance et la portée de la revue interne sans collecter de contenu privé ; contrôler le modèle réellement chargé sur cible.
 
 
 ### P10 — configuration non vérifiée
