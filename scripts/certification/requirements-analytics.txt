@@ -1,0 +1,2 @@
+# Optional local analytical integration only; not a core runtime dependency.
+duckdb==1.4.4
