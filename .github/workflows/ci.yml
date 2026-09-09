@@ -132,7 +132,10 @@ jobs:
         env:
           POSTGRES_PASSWORD: ci-validation-only
           DOCKER_DATABASE_URL: postgresql://iddrv_user:ci-validation-only@timescaledb:5432/iddrv
-        run: docker compose config --quiet
+          OWNER_DATABASE_URL: postgresql://iddrv_owner:ci-validation-only@timescaledb:5432/iddrv
+          API_DATABASE_URL: postgresql://iddrv_api:ci-validation-only@timescaledb:5432/iddrv
+          WORKER_DATABASE_URL: postgresql://iddrv_worker:ci-validation-only@timescaledb:5432/iddrv
+        run: docker compose --env-file /dev/null config --quiet
 
   e2e:
     name: E2E tests
