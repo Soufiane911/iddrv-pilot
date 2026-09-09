@@ -118,16 +118,31 @@ jobs:
     steps:
       - name: State whether pilot was deployed
         shell: bash
+        env:
+          CI_RESULT: ${{ github.event.workflow_run.conclusion }}
+          BUILD_RESULT: ${{ needs.build-and-push.result }}
+          DEPLOY_RESULT: ${{ needs.deploy.result }}
+          PROMOTION_ENABLED: ${{ vars.DEPLOY_ENABLED }}
+          VALIDATED_SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
           set -euo pipefail
-          if [[ "${{ needs.build-and-push.result }}" != "success" ]]; then
-            echo "Images were not published; pilot was not deployed." >&2
+          report() {
+            printf '%s\n' "$1"
+            printf '%s\n' "$1" >> "$GITHUB_STEP_SUMMARY"
+          }
+          report "CI: $CI_RESULT; build/push: $BUILD_RESULT; deploy: $DEPLOY_RESULT."
+          # Actual delivery failures/cancellations must never become a no-op success.
+          if [[ "$BUILD_RESULT" == "failure" || "$BUILD_RESULT" == "cancelled" ||
+                "$DEPLOY_RESULT" == "failure" || "$DEPLOY_RESULT" == "cancelled" ]]; then
+            report "Delivery failed or was cancelled; no successful deployment is claimed. Images may have been partially published."
             exit 1
-          elif [[ "${{ needs.deploy.result }}" == "success" ]]; then
-            echo "Pilot deployed at immutable SHA ${{ github.event.workflow_run.head_sha }}."
-          elif [[ "${{ vars.DEPLOY_ENABLED }}" != "true" ]]; then
-            echo "Pilot not deployed: DEPLOY_ENABLED is not true (dry-run/no promotion)."
+          elif [[ "$CI_RESULT" != "success" && "$BUILD_RESULT" == "skipped" && "$DEPLOY_RESULT" == "skipped" ]]; then
+            report "No delivery attempted: upstream CI did not succeed. No images published by this run; pilot not deployed."
+          elif [[ "$CI_RESULT" == "success" && "$BUILD_RESULT" == "success" && "$DEPLOY_RESULT" == "success" ]]; then
+            report "Images published. Pilot deployment job succeeded at immutable SHA $VALIDATED_SHA."
+          elif [[ "$CI_RESULT" == "success" && "$BUILD_RESULT" == "success" && "$DEPLOY_RESULT" == "skipped" && "$PROMOTION_ENABLED" != "true" ]]; then
+            report "Images published; pilot not deployed: DEPLOY_ENABLED is not true (no promotion)."
           else
-            echo "Pilot deployment failed; no successful deployment is claimed." >&2
+            report "Unexpected delivery state; no successful deployment is claimed."
             exit 1
           fi

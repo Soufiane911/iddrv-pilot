@@ -5,6 +5,6 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: './src/test/setup.ts',
-    exclude: [...configDefaults.exclude, 'e2e/**', 'e2e-integration/**'],
+    exclude: [...configDefaults.exclude, 'e2e/**', 'e2e-integration/**', 'e2e-accessibility/**'],
   },
 });

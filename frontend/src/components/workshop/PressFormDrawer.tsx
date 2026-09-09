@@ -1,4 +1,5 @@
 import './workshopSetup.css';
+import { AccessibleDialog } from '../AccessibleDialog';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import type { ApiClient, Machine } from '../../lib/api';
@@ -31,7 +32,6 @@ export function PressFormDrawer({ api, siteId, open, machine = null, onClose, on
   const [model, setModel] = useState('');
   const [validationError, setValidationError] = useState<string | null>(null);
   const nameRef = useRef<HTMLInputElement>(null);
-  const previousFocusRef = useRef<HTMLElement | null>(null);
   useEffect(() => {
     if (!open) return;
     setName(machine?.name ?? '');
@@ -40,15 +40,7 @@ export function PressFormDrawer({ api, siteId, open, machine = null, onClose, on
     setBrand(machine?.brand ?? '');
     setModel(machine?.model ?? '');
     setValidationError(null);
-    previousFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    nameRef.current?.focus();
-    const onKeyDown = (event: KeyboardEvent) => { if (event.key === 'Escape') { event.preventDefault(); onClose(); } };
-    document.addEventListener('keydown', onKeyDown);
-    return () => {
-      document.removeEventListener('keydown', onKeyDown);
-      previousFocusRef.current?.focus();
-    };
-  }, [machine, onClose, open]);
+  }, [machine, open]);
   const create = useMutation({
     mutationFn: () => {
       const input = { name: name.trim(), workshop_code: workshopCode.trim(), erp_ref: erpRef.trim() || null, brand: brand.trim() || null, model: model.trim() || null };
@@ -75,20 +67,19 @@ export function PressFormDrawer({ api, siteId, open, machine = null, onClose, on
     onClose();
   }
   const editing = Boolean(machine);
-  return <div className="workshop-form-drawer-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) close(); }}>
-    <section className="workshop-form-drawer" role="dialog" aria-modal="true" aria-labelledby="press-form-title" aria-describedby="press-form-description">
+  return <AccessibleDialog className="workshop-form-drawer" labelledBy="press-form-title" describedBy="press-form-description" onClose={close} busy={create.isPending}>
       <header><div><p className="eyebrow">PARC MACHINE</p><h2 id="press-form-title">{editing ? 'Modifier la presse' : 'Ajouter une presse'}</h2></div><button className="button-secondary" type="button" onClick={close} disabled={create.isPending}>Fermer</button></header>
       <p className="muted" id="press-form-description">{editing ? 'Modifiez l’identité atelier ou associez la référence ERP à cette presse. La référence ERP est unique dans le site.' : 'La presse est créée immédiatement dans le catalogue. Son mapping source pourra être fait plus tard.'} Appuyez sur Échap pour fermer.</p>
       <form onSubmit={submit}>
-        <label htmlFor="press-name">Nom de la presse</label><input ref={nameRef} id="press-name" value={name} onChange={(event) => setName(event.target.value)} required maxLength={100} placeholder="Ex. Presse 606" />
-        <label htmlFor="press-workshop-code">Code atelier</label><input id="press-workshop-code" value={workshopCode} onChange={(event) => setWorkshopCode(event.target.value)} required maxLength={50} placeholder="Ex. P-606" />
-        <p className="helper-text">Ce code est unique dans le site et ne remplace pas la référence ERP.</p>
-        <label htmlFor="press-erp-ref">Référence ERP (facultative)</label><input id="press-erp-ref" value={erpRef} onChange={(event) => setErpRef(event.target.value)} maxLength={50} />
+        <label htmlFor="press-name">Nom de la presse</label><input ref={nameRef} id="press-name" aria-invalid={validationError && !name.trim() ? true : undefined} aria-describedby={validationError ? 'press-form-error' : undefined} value={name} onChange={(event) => setName(event.target.value)} required maxLength={100} placeholder="Ex. Presse 606" />
+        <label htmlFor="press-workshop-code">Code atelier</label><input id="press-workshop-code" aria-invalid={validationError && (!workshopCode.trim() || create.error instanceof ApiRequestError && create.error.code === 'workshop_code_already_exists') ? true : undefined} aria-describedby={validationError ? 'press-code-hint press-form-error' : 'press-code-hint'} value={workshopCode} onChange={(event) => setWorkshopCode(event.target.value)} required maxLength={50} placeholder="Ex. P-606" />
+        <p id="press-code-hint" className="helper-text">Ce code est unique dans le site et ne remplace pas la référence ERP.</p>
+        <label htmlFor="press-erp-ref">Référence ERP (facultative)</label><input id="press-erp-ref" aria-invalid={create.error instanceof ApiRequestError && create.error.code === 'machine_erp_ref_already_exists' ? true : undefined} aria-describedby={validationError ? 'press-form-error' : undefined} value={erpRef} onChange={(event) => setErpRef(event.target.value)} maxLength={50} />
         <label htmlFor="press-brand">Marque (facultative)</label><input id="press-brand" value={brand} onChange={(event) => setBrand(event.target.value)} maxLength={50} />
         <label htmlFor="press-model">Modèle (facultatif)</label><input id="press-model" value={model} onChange={(event) => setModel(event.target.value)} maxLength={100} />
-        {validationError && <p className="helper-error" role="alert">{validationError}</p>}
+        {create.isPending && <p role="status">Enregistrement de la presse…</p>}
+        {validationError && <p id="press-form-error" className="helper-error" role="alert">{validationError}</p>}
         <div className="workshop-form-actions"><button className="button-secondary" type="button" onClick={close} disabled={create.isPending}>Annuler</button><button className="button-primary" type="submit" disabled={create.isPending}>{create.isPending ? 'Enregistrement…' : editing ? 'Enregistrer les modifications' : 'Ajouter la presse'}</button></div>
       </form>
-    </section>
-  </div>;
+    </AccessibleDialog>;
 }
