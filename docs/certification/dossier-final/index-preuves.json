@@ -1,0 +1,2863 @@
+{
+  "base_commit": "59a4846bb13d31c8fb04b1a2dcfa0239c853605a",
+  "regle": "Index documentaire ; statuts de preuves, jamais verdict jury. Résolution externe explicitement unresolved.",
+  "criteres": [
+    {
+      "competence": "C1",
+      "pages": [
+        2
+      ],
+      "exigence": "La présentation du projet et de son contexte est complète : acteurs, objectifs fonctionnels et techniques, environnements et contraintes techniques, budget, organisation du travail et planification.",
+      "id": "C1.01",
+      "epreuve": "E1",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 1–2",
+      "preuves": [
+        "P01",
+        "X01",
+        "L1",
+        "P12"
+      ],
+      "statut": "incomplet",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Faire confirmer acteurs, budget, planning et responsabilités du cas réel ou fictif."
+    },
+    {
+      "competence": "C1",
+      "pages": [
+        2
+      ],
+      "exigence": "Les spécifications techniques précisent : les technologies et outils, les services externes, les exigences de programmation (langages), l’accessibilité (disponibilité, accès).",
+      "id": "C1.02",
+      "epreuve": "E1",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 1–2",
+      "preuves": [
+        "P01",
+        "X01",
+        "L1",
+        "P12"
+      ],
+      "statut": "incomplet",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Spécifier outils, services et règles d’accès pour chaque source autorisée."
+    },
+    {
+      "competence": "C1",
+      "pages": [
+        2
+      ],
+      "exigence": "Le périmètre des spécifications techniques est complet : il couvre l’ensemble des moyens techniques à mettre en œuvre pour l’extraction et l'agrégation des données en un jeu de données brutes final.",
+      "id": "C1.03",
+      "epreuve": "E1",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 1–2",
+      "preuves": [
+        "P01",
+        "X01",
+        "L1",
+        "P12"
+      ],
+      "statut": "incomplet",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Définir un jeu final pertinent et les frontières extraction/agrégation."
+    },
+    {
+      "competence": "C1",
+      "pages": [
+        2
+      ],
+      "exigence": "Le script d’extraction des données est fonctionnel : toutes les données visées sont effectivement récupérées à l’issue de l’exécution du script.",
+      "id": "C1.04",
+      "epreuve": "E1",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 1–2",
+      "preuves": [
+        "P01",
+        "X01",
+        "L1",
+        "P12"
+      ],
+      "statut": "preuve vérifiée localement",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Rejouer chaque source visée avec compteurs et empreintes."
+    },
+    {
+      "competence": "C1",
+      "pages": [
+        2
+      ],
+      "exigence": "Le script comprend un point de lancement, l’initialisation des dépendances et des connexions externes, les règles logiques de traitement, la gestion des erreurs et des exceptions, la fin du traitement et la sauvegarde des résultats.",
+      "id": "C1.05",
+      "epreuve": "E1",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 1–2",
+      "preuves": [
+        "P01",
+        "X01",
+        "L1",
+        "P12"
+      ],
+      "statut": "preuve vérifiée localement",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Tester lancement, erreurs, connexions et sauvegarde pour les sources externes."
+    },
+    {
+      "competence": "C1",
+      "pages": [
+        2,
+        3
+      ],
+      "exigence": "Le script d’extraction des données est versionné* et accessible depuis un dépôt Git*.",
+      "id": "C1.06",
+      "epreuve": "E1",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 1–2",
+      "preuves": [
+        "P01",
+        "X01",
+        "L1",
+        "P12"
+      ],
+      "statut": "incomplet",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Vérifier accès au dépôt distant au SHA présenté."
+    },
+    {
+      "competence": "C1",
+      "pages": [
+        3
+      ],
+      "exigence": "L’extraction des données est faite depuis un mix entre au moins les sources suivantes : un service web (API REST), un fichier de données, un scraping, une base de données et un système big data.",
+      "id": "C1.07",
+      "epreuve": "E1",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 1–2",
+      "preuves": [
+        "P01",
+        "X01",
+        "L1",
+        "P12"
+      ],
+      "statut": "incomplet",
+      "audit": "absence constatée de preuve big data exécutée dans les pièces sélectionnées ; absence universelle non affirmée",
+      "prochaine_preuve": "Source et moteur big data autorisés, extraction réelle ; HTTP auxiliaire non assimilé à la collecte métier."
+    },
+    {
+      "competence": "C2",
+      "pages": [
+        3
+      ],
+      "exigence": "Les requêtes de type SQL pour la collecte de données sont fonctionnelles : les données visées sont effectivement extraites suite à l'exécution des requêtes.",
+      "id": "C2.01",
+      "epreuve": "E1",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 2–3",
+      "preuves": [
+        "P01",
+        "X01",
+        "P12"
+      ],
+      "statut": "preuve vérifiée localement",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Exécuter SQL SGBD et big data ; SQLite ne suffit pas."
+    },
+    {
+      "competence": "C2",
+      "pages": [
+        3
+      ],
+      "exigence": "La documentation des requêtes met en lumière choix de sélections, filtrages, conditions, jointures, etc., en fonction des objectifs de collecte.",
+      "id": "C2.02",
+      "epreuve": "E1",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 2–3",
+      "preuves": [
+        "P01",
+        "X01",
+        "P12"
+      ],
+      "statut": "preuve vérifiée localement",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Expliquer sélections/jointures des requêtes réellement livrées."
+    },
+    {
+      "competence": "C2",
+      "pages": [
+        3
+      ],
+      "exigence": "La documentation explicite les optimisations appliquées aux requêtes .",
+      "id": "C2.03",
+      "epreuve": "E1",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 2–3",
+      "preuves": [
+        "P01",
+        "X01",
+        "P12"
+      ],
+      "statut": "preuve vérifiée localement",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Produire EXPLAIN sur volumes représentatifs, sans gain supposé."
+    },
+    {
+      "competence": "C3",
+      "pages": [
+        3
+      ],
+      "exigence": "Le script d’agrégation des données est fonctionnel : les données sont effectivement agrégées, nettoyées et normalisées en un seul jeu de données à l’issue de l’exécution du script.",
+      "id": "C3.01",
+      "epreuve": "E1",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 3",
+      "preuves": [
+        "P01",
+        "X01"
+      ],
+      "statut": "preuve vérifiée localement",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Rejouer sources autorisées, unités/dates/conflits et jeu final unique."
+    },
+    {
+      "competence": "C3",
+      "pages": [
+        3
+      ],
+      "exigence": "Le script d’agrégation des données est versionné et accessible depuis un dépôt Git.",
+      "id": "C3.02",
+      "epreuve": "E1",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 3",
+      "preuves": [
+        "P01",
+        "X01"
+      ],
+      "statut": "incomplet",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Vérifier accès distant au script au SHA."
+    },
+    {
+      "competence": "C3",
+      "pages": [
+        3,
+        4
+      ],
+      "exigence": "La documentation du script d’agrégation est complète : dépendances, commandes, les enchaînements logiques de l’algorithme, les choix de nettoyage et d’homogénéisation des formats données.",
+      "id": "C3.03",
+      "epreuve": "E1",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 3",
+      "preuves": [
+        "P01",
+        "X01"
+      ],
+      "statut": "preuve vérifiée localement",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Étendre la documentation du microdémonstrateur à la chaîne réelle."
+    },
+    {
+      "competence": "C4",
+      "pages": [
+        4
+      ],
+      "exigence": "Les modélisations des données respectent la méthode et le formalisme Merise.",
+      "id": "C4.01",
+      "epreuve": "E1",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 4–5",
+      "preuves": [
+        "P02",
+        "P07",
+        "L1"
+      ],
+      "statut": "incomplet",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Compléter MCD/MLD et correspondance exhaustive aux migrations."
+    },
+    {
+      "competence": "C4",
+      "pages": [
+        4
+      ],
+      "exigence": "Le modèle physique des données est fonctionnel : il est intégré avec succès lors de la création de la base de données, sans erreur.",
+      "id": "C4.02",
+      "epreuve": "E1",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 4–5",
+      "preuves": [
+        "P02",
+        "P07",
+        "L1"
+      ],
+      "statut": "historique",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Installation à blanc de toutes migrations en bac autorisé."
+    },
+    {
+      "competence": "C4",
+      "pages": [
+        4
+      ],
+      "exigence": "La base de données est choisie au regard de la modélisation des données et des contraintes du projet.",
+      "id": "C4.03",
+      "epreuve": "E1",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 4–5",
+      "preuves": [
+        "P02",
+        "P07",
+        "L1"
+      ],
+      "statut": "incomplet",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "ADR motivant relationnel/temporel, limites et coûts."
+    },
+    {
+      "competence": "C4",
+      "pages": [
+        4
+      ],
+      "exigence": "La reproduction des procédures d’installation décrites (base de données et API) a pour résultat un système conforme aux objets techniques attendus..",
+      "id": "C4.04",
+      "epreuve": "E1",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 4–5",
+      "preuves": [
+        "P02",
+        "P07",
+        "L1"
+      ],
+      "statut": "incomplet",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Recette DB/API avec login réel, sans mocks."
+    },
+    {
+      "competence": "C4",
+      "pages": [
+        4
+      ],
+      "exigence": "Le script d’import fourni est fonctionnel : il permet l’insertion des données dans le système mis en place.",
+      "id": "C4.05",
+      "epreuve": "E1",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 4–5",
+      "preuves": [
+        "P02",
+        "P07",
+        "L1"
+      ],
+      "statut": "historique",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Import applicatif puis relecture persistée."
+    },
+    {
+      "competence": "C4",
+      "pages": [
+        4
+      ],
+      "exigence": "La documentation technique du script d’import est versionné à la racine du même dépôt Git que celui utilisé pour le script d’import.",
+      "id": "C4.06",
+      "epreuve": "E1",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 4–5",
+      "preuves": [
+        "P02",
+        "P07",
+        "L1"
+      ],
+      "statut": "incomplet",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Vérifier emplacement à la racine du dépôt exigé pour la documentation import."
+    },
+    {
+      "competence": "C4",
+      "pages": [
+        4
+      ],
+      "exigence": "Les documentations techniques des scripts couvrent les parties suivantes :",
+      "id": "C4.07",
+      "epreuve": "E1",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 4–5",
+      "preuves": [
+        "P02",
+        "P07",
+        "L1"
+      ],
+      "statut": "incomplet",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Contrôler les deux clauses documentaires filles."
+    },
+    {
+      "competence": "C4",
+      "pages": [
+        4
+      ],
+      "exigence": "les dépendances nécessaires pour la réutilisation des scripts (langages, dépendances externes, etc)",
+      "id": "C4.08",
+      "epreuve": "E1",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 4–5",
+      "preuves": [
+        "P02",
+        "P07",
+        "L1"
+      ],
+      "statut": "incomplet",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Inventorier dépendances et versions de tous scripts import.",
+      "parent": "C4.07"
+    },
+    {
+      "competence": "C4",
+      "pages": [
+        4,
+        5
+      ],
+      "exigence": "les commandes pour l’exécution des scripts.",
+      "id": "C4.09",
+      "epreuve": "E1",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 4–5",
+      "preuves": [
+        "P02",
+        "P07",
+        "L1"
+      ],
+      "statut": "incomplet",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Vérifier commandes sur environnement propre.",
+      "parent": "C4.07"
+    },
+    {
+      "competence": "C4",
+      "pages": [
+        5
+      ],
+      "exigence": "Le registre des traitements de données personnelles intègre l’ensemble des traitements de données personnelles impliqués dans la base de données.",
+      "id": "C4.10",
+      "epreuve": "E1",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 4–5",
+      "preuves": [
+        "P02",
+        "P07",
+        "L1"
+      ],
+      "statut": "incomplet",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Compléter le registre de tous les traitements personnels impliqués dans la base."
+    },
+    {
+      "competence": "C4",
+      "pages": [
+        5
+      ],
+      "exigence": "Les procédures de tri des données personnelles pour la mise en conformité de la base de données avec le RGPD sont rédigées.",
+      "id": "C4.11",
+      "epreuve": "E1",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 4–5",
+      "preuves": [
+        "P02",
+        "P07",
+        "L1"
+      ],
+      "statut": "incomplet",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Rédiger la procédure de tri des données personnelles de la base."
+    },
+    {
+      "competence": "C4",
+      "pages": [
+        5
+      ],
+      "exigence": "Les procédures de tri détaillent les traitements de conformité (automatisés ou non) à appliquer ainsi que leur fréquence d’exécution.",
+      "id": "C4.12",
+      "epreuve": "E1",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 4–5",
+      "preuves": [
+        "P02",
+        "P07",
+        "L1"
+      ],
+      "statut": "incomplet",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Détailler les traitements de conformité, manuels possibles, et leur fréquence d’exécution."
+    },
+    {
+      "competence": "C5",
+      "pages": [
+        5
+      ],
+      "exigence": "La documentation technique de l’API (REST) couvre tous les points de terminaisons.",
+      "id": "C5.01",
+      "epreuve": "E1",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 5–6",
+      "preuves": [
+        "P03",
+        "X01",
+        "P09"
+      ],
+      "statut": "configuration non vérifiée",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Exporter OpenAPI runtime et comparer toutes routes."
+    },
+    {
+      "competence": "C5",
+      "pages": [
+        5
+      ],
+      "exigence": "La documentation technique couvre les règles d’authentification et/ou d’autorisation de l’API.",
+      "id": "C5.02",
+      "epreuve": "E1",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 5–6",
+      "preuves": [
+        "P03",
+        "X01",
+        "P09"
+      ],
+      "statut": "configuration non vérifiée",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Vérifier security schemes, rôles, restrictions documentées."
+    },
+    {
+      "competence": "C5",
+      "pages": [
+        5
+      ],
+      "exigence": "La documentation technique respecte les standards du modèle choisi (par exemple OpenAPI*).",
+      "id": "C5.03",
+      "epreuve": "E1",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 5–6",
+      "preuves": [
+        "P03",
+        "X01",
+        "P09"
+      ],
+      "statut": "configuration non vérifiée",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Valider export et contrat OpenAPI choisi."
+    },
+    {
+      "competence": "C5",
+      "pages": [
+        5
+      ],
+      "exigence": "L’API REST est fonctionnelle pour l’accès aux données du projet : elle restreint par une autorisation (ou authentification) l'accès aux données,",
+      "id": "C5.04",
+      "epreuve": "E1",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 5–6",
+      "preuves": [
+        "P03",
+        "X01",
+        "P09"
+      ],
+      "statut": "configuration non vérifiée",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Login, révocation/expiration et refus intersites sur DB réelle."
+    },
+    {
+      "competence": "C5",
+      "pages": [
+        5
+      ],
+      "exigence": "L’API REST est fonctionnelle pour la mise à disposition : elle permet la récupération de l’ensemble des données nécessaires au projet, comme prévu selon les spécifications données.",
+      "id": "C5.05",
+      "epreuve": "E1",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 5–6",
+      "preuves": [
+        "P03",
+        "X01",
+        "P09"
+      ],
+      "statut": "configuration non vérifiée",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Comparer champs/pagination et données importées persistées."
+    },
+    {
+      "competence": "C6",
+      "pages": [
+        6
+      ],
+      "exigence": "La thématique de veille choisie porte sur un outil et/ou une réglementation mobilisée dans la mise en situation.",
+      "id": "C6.01",
+      "epreuve": "E2",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 6–8",
+      "preuves": [
+        "P04",
+        "L2"
+      ],
+      "statut": "incomplet",
+      "audit": "non audité : pratique humaine historique/partage non observés dans ce lot",
+      "prochaine_preuve": "Valider thème utile au projet."
+    },
+    {
+      "competence": "C6",
+      "pages": [
+        6
+      ],
+      "exigence": "Les temps de veille sont planifiés régulièrement (à minima une récurrence d’une heure hebdomadaire).",
+      "id": "C6.02",
+      "epreuve": "E2",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 6–8",
+      "preuves": [
+        "P04",
+        "L2"
+      ],
+      "statut": "incomplet",
+      "audit": "non audité : pratique humaine historique/partage non observés dans ce lot",
+      "prochaine_preuve": "Planifier au moins une heure hebdomadaire ; conserver séances réellement tenues."
+    },
+    {
+      "competence": "C6",
+      "pages": [
+        6
+      ],
+      "exigence": "Le choix des outils d’agrégation est cohérent avec les sources d’informations visées et le budget disponible (flux RSS, flux réseaux sociaux, agrégation newsletter, etc)",
+      "id": "C6.03",
+      "epreuve": "E2",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 6–8",
+      "preuves": [
+        "P04",
+        "L2"
+      ],
+      "statut": "incomplet",
+      "audit": "non audité : pratique humaine historique/partage non observés dans ce lot",
+      "prochaine_preuve": "Configurer agrégation cohérente avec sources et budget approuvé."
+    },
+    {
+      "competence": "C6",
+      "pages": [
+        6
+      ],
+      "exigence": "Les synthèses sont communiqués aux parties prenantes dans un format qui respecte les recommandations d’accessibilité (par exemples celles de l’association Valentin Haüy1ou de Atalan - AcceDe2).",
+      "id": "C6.04",
+      "epreuve": "E2",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 6–8",
+      "preuves": [
+        "P04",
+        "L2"
+      ],
+      "statut": "incomplet",
+      "audit": "non audité : pratique humaine historique/partage non observés dans ce lot",
+      "prochaine_preuve": "Partager réellement une synthèse accessible ; conserver retour expurgé."
+    },
+    {
+      "competence": "C6",
+      "pages": [
+        6
+      ],
+      "exigence": "Les informations partagées dans la synthèse répondent à la thématique de veille choisie.",
+      "id": "C6.05",
+      "epreuve": "E2",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 6–8",
+      "preuves": [
+        "P04",
+        "L2"
+      ],
+      "statut": "incomplet",
+      "audit": "non audité : pratique humaine historique/partage non observés dans ce lot",
+      "prochaine_preuve": "Relier synthèse recoupée à décision technique."
+    },
+    {
+      "competence": "C6",
+      "pages": [
+        7
+      ],
+      "exigence": "Les sources et flux identifiés répondent aux critères de fiabilité :",
+      "id": "C6.06",
+      "epreuve": "E2",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 6–8",
+      "preuves": [
+        "P04",
+        "L2"
+      ],
+      "statut": "incomplet",
+      "audit": "non audité : pratique humaine historique/partage non observés dans ce lot",
+      "prochaine_preuve": "Qualifier les six clauses filles pour chaque source."
+    },
+    {
+      "competence": "C6",
+      "pages": [
+        7
+      ],
+      "exigence": "L’auteur de la page est identifié",
+      "id": "C6.07",
+      "epreuve": "E2",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 6–8",
+      "preuves": [
+        "P04",
+        "L2"
+      ],
+      "statut": "incomplet",
+      "audit": "non audité : pratique humaine historique/partage non observés dans ce lot",
+      "prochaine_preuve": "Identifier auteur institutionnel sans republier données personnelles inutiles.",
+      "parent": "C6.06"
+    },
+    {
+      "competence": "C6",
+      "pages": [
+        7
+      ],
+      "exigence": "Des informations sur l’auteur sont disponibles et confirment ses compétences, sa notoriété et l’absence d’intérêts personnels",
+      "id": "C6.08",
+      "epreuve": "E2",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 6–8",
+      "preuves": [
+        "P04",
+        "L2"
+      ],
+      "statut": "incomplet",
+      "audit": "non audité : pratique humaine historique/partage non observés dans ce lot",
+      "prochaine_preuve": "Évaluer compétence, notoriété et conflits d’intérêts, pas neutralité présumée.",
+      "parent": "C6.06"
+    },
+    {
+      "competence": "C6",
+      "pages": [
+        7
+      ],
+      "exigence": "l’analyse du contenu est valable (date de publication récente, sources de l'information indiquées, niveau de langue correct),",
+      "id": "C6.09",
+      "epreuve": "E2",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 6–8",
+      "preuves": [
+        "P04",
+        "L2"
+      ],
+      "statut": "incomplet",
+      "audit": "non audité : pratique humaine historique/partage non observés dans ce lot",
+      "prochaine_preuve": "Vérifier date/version, citations et validité du contenu.",
+      "parent": "C6.06"
+    },
+    {
+      "competence": "C6",
+      "pages": [
+        7
+      ],
+      "exigence": "la source (site) ou le document est structuré",
+      "id": "C6.10",
+      "epreuve": "E2",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 6–8",
+      "preuves": [
+        "P04",
+        "L2"
+      ],
+      "statut": "incomplet",
+      "audit": "non audité : pratique humaine historique/partage non observés dans ce lot",
+      "prochaine_preuve": "Vérifier structure navigable des sources.",
+      "parent": "C6.06"
+    },
+    {
+      "competence": "C6",
+      "pages": [
+        7
+      ],
+      "exigence": "les sources (sites) ou documents respectant les normes d'accessibilités sont privilégiés.",
+      "id": "C6.11",
+      "epreuve": "E2",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 6–8",
+      "preuves": [
+        "P04",
+        "L2"
+      ],
+      "statut": "incomplet",
+      "audit": "non audité : pratique humaine historique/partage non observés dans ce lot",
+      "prochaine_preuve": "Contrôler accessibilité plutôt que la déduire du fournisseur.",
+      "parent": "C6.06"
+    },
+    {
+      "competence": "C6",
+      "pages": [
+        7
+      ],
+      "exigence": "l’information peut être confirmée par d’autres sites de confiance",
+      "id": "C6.12",
+      "epreuve": "E2",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 6–8",
+      "preuves": [
+        "P04",
+        "L2"
+      ],
+      "statut": "incomplet",
+      "audit": "non audité : pratique humaine historique/partage non observés dans ce lot",
+      "prochaine_preuve": "Recouper avec sources indépendantes fiables.",
+      "parent": "C6.06"
+    },
+    {
+      "competence": "C7",
+      "pages": [
+        7
+      ],
+      "exigence": "L’expression de besoin est reformulée et présente les objectifs et les contraintes du projet d’intégration d’une solution d’intelligence artificielle.",
+      "id": "C7.01",
+      "epreuve": "E2",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 8–9",
+      "preuves": [
+        "P04",
+        "P09",
+        "X02",
+        "L2"
+      ],
+      "statut": "incomplet",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Faire approuver objectifs et contraintes."
+    },
+    {
+      "competence": "C7",
+      "pages": [
+        7
+      ],
+      "exigence": "Le benchmark liste les services étudiés et les services non étudiés.",
+      "id": "C7.02",
+      "epreuve": "E2",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 8–9",
+      "preuves": [
+        "P04",
+        "P09",
+        "X02",
+        "L2"
+      ],
+      "statut": "incomplet",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Séparer services étudiés, testés, non étudiés."
+    },
+    {
+      "competence": "C7",
+      "pages": [
+        7
+      ],
+      "exigence": "Les raisons pour écarter un service sont explicitées.",
+      "id": "C7.03",
+      "epreuve": "E2",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 8–9",
+      "preuves": [
+        "P04",
+        "P09",
+        "X02",
+        "L2"
+      ],
+      "statut": "incomplet",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Motiver chaque exclusion à partir du besoin."
+    },
+    {
+      "competence": "C7",
+      "pages": [
+        8
+      ],
+      "exigence": "Le benchmark détaille le niveau d’adéquation du service étudié pour chaque ensemble fonctionnel souhaité par le commanditaire.",
+      "id": "C7.04",
+      "epreuve": "E2",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 8–9",
+      "preuves": [
+        "P04",
+        "P09",
+        "X02",
+        "L2"
+      ],
+      "statut": "incomplet",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Comparer par fonctionnalité sur protocole commun."
+    },
+    {
+      "competence": "C7",
+      "pages": [
+        8
+      ],
+      "exigence": "Le benchmark détaille le niveau de la démarche éco-responsable du service étudié, en fonction des informations disponibles.",
+      "id": "C7.05",
+      "epreuve": "E2",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 8–9",
+      "preuves": [
+        "P04",
+        "P09",
+        "X02",
+        "L2"
+      ],
+      "statut": "incomplet",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Sourcer démarche environnementale disponible ; inconnue si non mesurée."
+    },
+    {
+      "competence": "C7",
+      "pages": [
+        8
+      ],
+      "exigence": "Le benchmark détaille les principales contraintes techniques et les pré-requis pour chaque solution.",
+      "id": "C7.06",
+      "epreuve": "E2",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 8–9",
+      "preuves": [
+        "P04",
+        "P09",
+        "X02",
+        "L2"
+      ],
+      "statut": "incomplet",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Documenter contraintes, accès, matériel et dépendances."
+    },
+    {
+      "competence": "C7",
+      "pages": [
+        8
+      ],
+      "exigence": "Les conclusions délimitent clairement les services répondant aux besoins, avec leurs avantages et leurs inconvénients, des services ne couvrant pas les besoins du commanditaire.",
+      "id": "C7.07",
+      "epreuve": "E2",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 8–9",
+      "preuves": [
+        "P04",
+        "P09",
+        "X02",
+        "L2"
+      ],
+      "statut": "incomplet",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Conclure avantages/limites et décision humaine, sans gagnant global."
+    },
+    {
+      "competence": "C8",
+      "pages": [
+        8
+      ],
+      "exigence": "Le service installé est accessible, avec une éventuelle authentification.",
+      "id": "C8.01",
+      "epreuve": "E2",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 9–10",
+      "preuves": [
+        "P05",
+        "P06",
+        "L2"
+      ],
+      "statut": "historique",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Démarrer et vérifier service authentifié autorisé."
+    },
+    {
+      "competence": "C8",
+      "pages": [
+        8
+      ],
+      "exigence": "Le service est configuré correctement, il répond aux besoins fonctionnels et aux contraintes techniques du projet.",
+      "id": "C8.02",
+      "epreuve": "E2",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 9–10",
+      "preuves": [
+        "P05",
+        "P06",
+        "L2"
+      ],
+      "statut": "historique",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Comparer configuration effective aux exigences."
+    },
+    {
+      "competence": "C8",
+      "pages": [
+        8
+      ],
+      "exigence": "Le monitorage disponible du service est opérationnel.",
+      "id": "C8.03",
+      "epreuve": "E2",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 9–10",
+      "preuves": [
+        "P05",
+        "P06",
+        "L2"
+      ],
+      "statut": "configuration non vérifiée",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Observer monitorage vivant du service."
+    },
+    {
+      "competence": "C8",
+      "pages": [
+        8,
+        9
+      ],
+      "exigence": "La documentation couvre la gestion des accès à la solution, les procédures d’installation et de test, les éventuelles dépendances et interconnexions avec d’autres solutions, les données impliquées dans l’utilisation de la solution.",
+      "id": "C8.04",
+      "epreuve": "E2",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 9–10",
+      "preuves": [
+        "P05",
+        "P06",
+        "L2"
+      ],
+      "statut": "configuration non vérifiée",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Rejouer installation/tests et inventorier dépendances/données."
+    },
+    {
+      "competence": "C8",
+      "pages": [
+        9
+      ],
+      "exigence": "La documentation est communiquée aux parties prenantes dans un format qui respecte les recommandations d’accessibilité (par exemples celles de l’association Valentin Haüy3ou de Atalan - AcceDe4).",
+      "id": "C8.05",
+      "epreuve": "E2",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 9–10",
+      "preuves": [
+        "P05",
+        "P06",
+        "L2"
+      ],
+      "statut": "incomplet",
+      "audit": "non audité : pratique humaine historique/partage non observés dans ce lot",
+      "prochaine_preuve": "Partager documentation accessible, preuve de lecture consentie."
+    },
+    {
+      "competence": "C9",
+      "pages": [
+        9
+      ],
+      "exigence": "L’API restreint l’accès au modèle d’intelligence artificielle avec un moyen d’authentification.",
+      "id": "C9.01",
+      "epreuve": "E3",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 10–11",
+      "preuves": [
+        "P05",
+        "P07",
+        "L3"
+      ],
+      "statut": "historique",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Tester accès anonyme/authentifié/rôles/expiration sur vraie session."
+    },
+    {
+      "competence": "C9",
+      "pages": [
+        9
+      ],
+      "exigence": "L’API permet l’accès aux fonctions du modèle, comme attendu selon les spécifications.",
+      "id": "C9.02",
+      "epreuve": "E3",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 10–11",
+      "preuves": [
+        "P05",
+        "P07",
+        "L3"
+      ],
+      "statut": "historique",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Comparer sorties nominales et erreurs au contrat."
+    },
+    {
+      "competence": "C9",
+      "pages": [
+        9
+      ],
+      "exigence": "Les recommandations de sécurisation d’une API du top 10 OWASP sont intégrées quand nécessaires.",
+      "id": "C9.03",
+      "epreuve": "E3",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 10–11",
+      "preuves": [
+        "P05",
+        "P07",
+        "L3"
+      ],
+      "statut": "configuration non vérifiée",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Analyse OWASP point par point et tests justifiés."
+    },
+    {
+      "competence": "C9",
+      "pages": [
+        9
+      ],
+      "exigence": "Les sources sont versionnées et accessibles depuis un dépôt Git distant.",
+      "id": "C9.04",
+      "epreuve": "E3",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 10–11",
+      "preuves": [
+        "P05",
+        "P07",
+        "L3"
+      ],
+      "statut": "configuration non vérifiée",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Vérifier dépôt distant et SHA API."
+    },
+    {
+      "competence": "C9",
+      "pages": [
+        9,
+        10
+      ],
+      "exigence": "Les tests couvrent tous les points de terminaison dans le respect des spécifications.",
+      "id": "C9.05",
+      "epreuve": "E3",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 10–11",
+      "preuves": [
+        "P05",
+        "P07",
+        "L3"
+      ],
+      "statut": "configuration non vérifiée",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Inventorier endpoints puis relier chacun aux tests."
+    },
+    {
+      "competence": "C9",
+      "pages": [
+        10
+      ],
+      "exigence": "Les tests s’exécutent sans bug.",
+      "id": "C9.06",
+      "epreuve": "E3",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 10–11",
+      "preuves": [
+        "P05",
+        "P07",
+        "L3"
+      ],
+      "statut": "historique",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Rejouer suite cible, rapport passed/failed/skipped."
+    },
+    {
+      "competence": "C9",
+      "pages": [
+        10
+      ],
+      "exigence": "Les résultats des tests sont correctement interprétés.",
+      "id": "C9.07",
+      "epreuve": "E3",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 10–11",
+      "preuves": [
+        "P05",
+        "P07",
+        "L3"
+      ],
+      "statut": "historique",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Commenter assertions, mocks, skips et limites."
+    },
+    {
+      "competence": "C9",
+      "pages": [
+        10
+      ],
+      "exigence": "La documentation couvre l’architecture et tous les points de terminaisons de l’API.",
+      "id": "C9.08",
+      "epreuve": "E3",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 10–11",
+      "preuves": [
+        "P05",
+        "P07",
+        "L3"
+      ],
+      "statut": "configuration non vérifiée",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Contrôler architecture et exhaustivité des routes documentées."
+    },
+    {
+      "competence": "C9",
+      "pages": [
+        10
+      ],
+      "exigence": "La documentation couvre les règles d’authentification et/ou d’autorisation d’accès à l’API.",
+      "id": "C9.09",
+      "epreuve": "E3",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 10–11",
+      "preuves": [
+        "P05",
+        "P07",
+        "L3"
+      ],
+      "statut": "configuration non vérifiée",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Vérifier règles documentées et restrictions réelles."
+    },
+    {
+      "competence": "C9",
+      "pages": [
+        10
+      ],
+      "exigence": "La documentation et l’API respectent les standards d’un modèle choisi (par exemple Open API*).",
+      "id": "C9.10",
+      "epreuve": "E3",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 10–11",
+      "preuves": [
+        "P05",
+        "P07",
+        "L3"
+      ],
+      "statut": "configuration non vérifiée",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Valider conformité OpenAPI exportée."
+    },
+    {
+      "competence": "C9",
+      "pages": [
+        10
+      ],
+      "exigence": "La documentation est communiquée dans un format qui respecte les recommandations d’accessibilité (par exemple celles de l’association Valentin Haüy ou de Microsoft).",
+      "id": "C9.11",
+      "epreuve": "E3",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 10–11",
+      "preuves": [
+        "P05",
+        "P07",
+        "L3"
+      ],
+      "statut": "incomplet",
+      "audit": "non audité : pratique humaine historique/partage non observés dans ce lot",
+      "prochaine_preuve": "Partager documentation accessible et vérifier lecture."
+    },
+    {
+      "competence": "C10",
+      "pages": [
+        10
+      ],
+      "exigence": "L’application de départ est installée et fonctionnelle en environnement de développement.",
+      "id": "C10.01",
+      "epreuve": "E3",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 11–12",
+      "preuves": [
+        "P03",
+        "P07",
+        "L3"
+      ],
+      "statut": "historique",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Installation propre de l’application de départ."
+    },
+    {
+      "competence": "C10",
+      "pages": [
+        10
+      ],
+      "exigence": "La communication avec l’API depuis l’application fonctionne.",
+      "id": "C10.02",
+      "epreuve": "E3",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 11–12",
+      "preuves": [
+        "P03",
+        "P07",
+        "L3"
+      ],
+      "statut": "historique",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Recette navigateur→API réelle."
+    },
+    {
+      "competence": "C10",
+      "pages": [
+        11
+      ],
+      "exigence": "Les éventuelles étapes d’authentification et de renouvellement de l’authentification (expiration des jetons par exemple) sont intégrées correctement en suivant la documentation de l’API.",
+      "id": "C10.03",
+      "epreuve": "E3",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 11–12",
+      "preuves": [
+        "P03",
+        "P07",
+        "L3"
+      ],
+      "statut": "configuration non vérifiée",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Tester expiration/révocation et renouvellement prévu."
+    },
+    {
+      "competence": "C10",
+      "pages": [
+        11
+      ],
+      "exigence": "Tous les points de terminaison de l’API concernés par le projet sont intégrés à l’application selon les spécifications fonctionnelles et techniques.",
+      "id": "C10.04",
+      "epreuve": "E3",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 11–12",
+      "preuves": [
+        "P03",
+        "P07",
+        "L3"
+      ],
+      "statut": "configuration non vérifiée",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Matrice endpoints utilisés→parcours et assertions."
+    },
+    {
+      "competence": "C10",
+      "pages": [
+        11
+      ],
+      "exigence": "Les adaptations d’interfaces nécessaires et en accord avec les spécifications sont intégrées à l’application.",
+      "id": "C10.05",
+      "epreuve": "E3",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 11–12",
+      "preuves": [
+        "P03",
+        "P07",
+        "L3"
+      ],
+      "statut": "configuration non vérifiée",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Comparer interfaces et spécifications acceptées."
+    },
+    {
+      "competence": "C10",
+      "pages": [
+        11
+      ],
+      "exigence": "Les tests d’intégration couvrent tous les points de terminaison exploités.",
+      "id": "C10.06",
+      "epreuve": "E3",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 11–12",
+      "preuves": [
+        "P03",
+        "P07",
+        "L3"
+      ],
+      "statut": "configuration non vérifiée",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Cartographier tests pour tous endpoints consommés."
+    },
+    {
+      "competence": "C10",
+      "pages": [
+        11
+      ],
+      "exigence": "Les tests s’exécutent en totalité : il n’y a pas de bug dans les programmes des tests en eux-mêmes.",
+      "id": "C10.07",
+      "epreuve": "E3",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 11–12",
+      "preuves": [
+        "P03",
+        "P07",
+        "L3"
+      ],
+      "statut": "historique",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Rejouer tests intégrés, aucun skip présenté comme succès."
+    },
+    {
+      "competence": "C10",
+      "pages": [
+        11
+      ],
+      "exigence": "Les résultats des tests sont correctement interprétés.",
+      "id": "C10.08",
+      "epreuve": "E3",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 11–12",
+      "preuves": [
+        "P03",
+        "P07",
+        "L3"
+      ],
+      "statut": "historique",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Interpréter résultats par environnement et périmètre."
+    },
+    {
+      "competence": "C10",
+      "pages": [
+        11
+      ],
+      "exigence": "Les sources sont versionnées et accessibles depuis le dépôt Git de l’application.",
+      "id": "C10.09",
+      "epreuve": "E3",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 11–12",
+      "preuves": [
+        "P03",
+        "P07",
+        "L3"
+      ],
+      "statut": "configuration non vérifiée",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Vérifier version et accès distant du frontend."
+    },
+    {
+      "competence": "C11",
+      "pages": [
+        11
+      ],
+      "exigence": "Les métriques faisant l’objet du monitorage du modèle sont expliquées sans erreur d’interprétation.",
+      "id": "C11.01",
+      "epreuve": "E3",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 12–14",
+      "preuves": [
+        "P06",
+        "L3"
+      ],
+      "statut": "configuration non vérifiée",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Expliquer PSI/KS/scores non calibrés, pas précision sans labels."
+    },
+    {
+      "competence": "C11",
+      "pages": [
+        12
+      ],
+      "exigence": "Le ou les outils pour l’intégration du monitorage du modèle sont adaptés au contexte et aux contraintes techniques du projet.",
+      "id": "C11.02",
+      "epreuve": "E3",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 12–14",
+      "preuves": [
+        "P06",
+        "L3"
+      ],
+      "statut": "configuration non vérifiée",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Motiver outils et contraintes de monitorage."
+    },
+    {
+      "competence": "C11",
+      "pages": [
+        12
+      ],
+      "exigence": "Au moins un vecteur de restitution des métriques évaluées, en temps réel, est proposé (dashboard, feuille de calcul, etc).",
+      "id": "C11.03",
+      "epreuve": "E3",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 12–14",
+      "preuves": [
+        "P06",
+        "L3"
+      ],
+      "statut": "configuration non vérifiée",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Restituer métriques scorer vivant, pas compteur API seul."
+    },
+    {
+      "competence": "C11",
+      "pages": [
+        12
+      ],
+      "exigence": "Les enjeux d’accessibilité, pour toutes les parties prenantes du projet, sont pris en compte lors de la sélection de l’outil de restitution",
+      "id": "C11.04",
+      "epreuve": "E3",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 12–14",
+      "preuves": [
+        "P06",
+        "L3"
+      ],
+      "statut": "configuration non vérifiée",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Contrôler accessibilité du vecteur avec utilisateurs concernés."
+    },
+    {
+      "competence": "C11",
+      "pages": [
+        12
+      ],
+      "exigence": "La chaîne de monitorage est d’abord testée dans un bac à sable ou environnement de test dédié.",
+      "id": "C11.05",
+      "epreuve": "E3",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 12–14",
+      "preuves": [
+        "P06",
+        "L3"
+      ],
+      "statut": "historique",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Rejouer bac à sable et conserver traces expurgées."
+    },
+    {
+      "competence": "C11",
+      "pages": [
+        12
+      ],
+      "exigence": "La chaîne de monitorage est en état de marche. Les métriques visées sont effectivement évaluées et restituées.",
+      "id": "C11.06",
+      "epreuve": "E3",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 12–14",
+      "preuves": [
+        "P06",
+        "L3"
+      ],
+      "statut": "historique",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Relier collecte→calcul→restitution effectifs."
+    },
+    {
+      "competence": "C11",
+      "pages": [
+        12
+      ],
+      "exigence": "Les sources sont versionnées et accessibles depuis un dépôt Git distant",
+      "id": "C11.07",
+      "epreuve": "E3",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 12–14",
+      "preuves": [
+        "P06",
+        "L3"
+      ],
+      "statut": "configuration non vérifiée",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Vérifier SHA et accès distant."
+    },
+    {
+      "competence": "C11",
+      "pages": [
+        12
+      ],
+      "exigence": "La documentation technique de la chaîne de monitorage couvre la procédure d’installation de la chaîne, de configurations, et d’utilisation du monitorage à destination des équipes techniques",
+      "id": "C11.08",
+      "epreuve": "E3",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 12–14",
+      "preuves": [
+        "P06",
+        "L3"
+      ],
+      "statut": "configuration non vérifiée",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Reproduire installation/configuration/utilisation."
+    },
+    {
+      "competence": "C11",
+      "pages": [
+        12,
+        13
+      ],
+      "exigence": "La documentation est communiquée dans un format qui respecte les recommandations d’accessibilité (par exemple celles de l’association Valentin Haüy ou de Microsoft).",
+      "id": "C11.09",
+      "epreuve": "E3",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 12–14",
+      "preuves": [
+        "P06",
+        "L3"
+      ],
+      "statut": "incomplet",
+      "audit": "non audité : pratique humaine historique/partage non observés dans ce lot",
+      "prochaine_preuve": "Partager réellement support accessible."
+    },
+    {
+      "competence": "C12",
+      "pages": [
+        13
+      ],
+      "exigence": "L’ensemble des cas à tester sont listés et définis : la partie du modèle visée par le test, le périmètre du test et la stratégie de test.",
+      "id": "C12.01",
+      "epreuve": "E3",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 14–15",
+      "preuves": [
+        "P05",
+        "P07",
+        "L3"
+      ],
+      "statut": "configuration non vérifiée",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Définir cas données/préparation/train/évaluation et frontière temporelle."
+    },
+    {
+      "competence": "C12",
+      "pages": [
+        13
+      ],
+      "exigence": "Les outils de test (framework, bibliothèque, etc.) choisis sont cohérents avec l’environnement technique du projet.",
+      "id": "C12.02",
+      "epreuve": "E3",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 14–15",
+      "preuves": [
+        "P05",
+        "P07",
+        "L3"
+      ],
+      "statut": "configuration non vérifiée",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Justifier frameworks et environnement compatible."
+    },
+    {
+      "competence": "C12",
+      "pages": [
+        13
+      ],
+      "exigence": "Les tests sont intégrés et respectent la couverture souhaitée établie.",
+      "id": "C12.03",
+      "epreuve": "E3",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 14–15",
+      "preuves": [
+        "P05",
+        "P07",
+        "L3"
+      ],
+      "statut": "configuration non vérifiée",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Définir couverture souhaitée puis mesurer ; pas pourcentage jury."
+    },
+    {
+      "competence": "C12",
+      "pages": [
+        13
+      ],
+      "exigence": "Les tests s'exécutent sans problème technique en environnement de test.",
+      "id": "C12.04",
+      "epreuve": "E3",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 14–15",
+      "preuves": [
+        "P05",
+        "P07",
+        "L3"
+      ],
+      "statut": "historique",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Rejouer tests du modèle précisément identifié."
+    },
+    {
+      "competence": "C12",
+      "pages": [
+        13
+      ],
+      "exigence": "Les sources sont versionnées et accessibles depuis un dépôt Git distant (DVC, Gitlab…).",
+      "id": "C12.05",
+      "epreuve": "E3",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 14–15",
+      "preuves": [
+        "P05",
+        "P07",
+        "L3"
+      ],
+      "statut": "configuration non vérifiée",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Vérifier code/données versionnés et accès distant."
+    },
+    {
+      "competence": "C12",
+      "pages": [
+        13
+      ],
+      "exigence": "La documentation couvre la procédure d’installation de l’environnement de test, les dépendances installées, la procédure d’exécution des tests et de calcul de la couverture.",
+      "id": "C12.06",
+      "epreuve": "E3",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 14–15",
+      "preuves": [
+        "P05",
+        "P07",
+        "L3"
+      ],
+      "statut": "configuration non vérifiée",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Documenter installation, exécution et calcul de couverture."
+    },
+    {
+      "competence": "C12",
+      "pages": [
+        13
+      ],
+      "exigence": "La documentation est communiquée dans un format qui respecte les recommandations d’accessibilité (par exemple celles de l’association Valentin Haüy ou de Microsoft).",
+      "id": "C12.07",
+      "epreuve": "E3",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 14–15",
+      "preuves": [
+        "P05",
+        "P07",
+        "L3"
+      ],
+      "statut": "incomplet",
+      "audit": "non audité : pratique humaine historique/partage non observés dans ce lot",
+      "prochaine_preuve": "Partager documentation accessible."
+    },
+    {
+      "competence": "C13",
+      "pages": [
+        14
+      ],
+      "exigence": "La documentation pour l’utilisation de la chaîne couvre toutes les étapes, les tâches et tous les déclencheurs disponibles.",
+      "id": "C13.01",
+      "epreuve": "E3",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 15–16",
+      "preuves": [
+        "P05",
+        "L3"
+      ],
+      "statut": "configuration non vérifiée",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Décrire déclencheur manuel et toutes étapes réelles."
+    },
+    {
+      "competence": "C13",
+      "pages": [
+        14
+      ],
+      "exigence": "Les déclencheurs sont intégrés comme préalablement définis.",
+      "id": "C13.02",
+      "epreuve": "E3",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 15–16",
+      "preuves": [
+        "P05",
+        "L3"
+      ],
+      "statut": "configuration non vérifiée",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Déclencher workflow autorisé au SHA choisi."
+    },
+    {
+      "competence": "C13",
+      "pages": [
+        14
+      ],
+      "exigence": "Le ou les fichiers de configuration de la chaîne sont correctement reconnus et exécutés par le système selon les déclencheurs configurés.",
+      "id": "C13.03",
+      "epreuve": "E3",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 15–16",
+      "preuves": [
+        "P05",
+        "L3"
+      ],
+      "statut": "configuration non vérifiée",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Conserver run et étapes effectivement exécutées."
+    },
+    {
+      "competence": "C13",
+      "pages": [
+        14
+      ],
+      "exigence": "L’étape de test des données est intégrée à la chaîne et s’exécute sans erreur.",
+      "id": "C13.04",
+      "epreuve": "E3",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 15–16",
+      "preuves": [
+        "P05",
+        "L3"
+      ],
+      "statut": "historique",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Archiver tests données dans la même chaîne."
+    },
+    {
+      "competence": "C13",
+      "pages": [
+        14
+      ],
+      "exigence": "La ou les étapes de test, d'entraînement et de validation du modèle sont intégrées à la chaîne et s'exécutent sans erreur.",
+      "id": "C13.05",
+      "epreuve": "E3",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 15–16",
+      "preuves": [
+        "P05",
+        "L3"
+      ],
+      "statut": "historique",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Archiver entraînement/validation du même artefact."
+    },
+    {
+      "competence": "C13",
+      "pages": [
+        14
+      ],
+      "exigence": "Les sources de la chaîne sont versionnées et accessibles depuis le dépôt Git distant du projet",
+      "id": "C13.06",
+      "epreuve": "E3",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 15–16",
+      "preuves": [
+        "P05",
+        "L3"
+      ],
+      "statut": "configuration non vérifiée",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Vérifier version et accès distant de la chaîne."
+    },
+    {
+      "competence": "C13",
+      "pages": [
+        14
+      ],
+      "exigence": "La documentation de la chaîne de livraison continue couvre la procédure d’installation, de configuration et de test de la chaîne",
+      "id": "C13.07",
+      "epreuve": "E3",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 15–16",
+      "preuves": [
+        "P05",
+        "L3"
+      ],
+      "statut": "configuration non vérifiée",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Rejouer procédure dans environnement dédié."
+    },
+    {
+      "competence": "C13",
+      "pages": [
+        14
+      ],
+      "exigence": "La documentation est communiquée dans un format qui respecte les recommandations d’accessibilité (par exemple celles de l’association Valentin Haüy ou de Microsoft).",
+      "id": "C13.08",
+      "epreuve": "E3",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 15–16",
+      "preuves": [
+        "P05",
+        "L3"
+      ],
+      "statut": "incomplet",
+      "audit": "non audité : pratique humaine historique/partage non observés dans ce lot",
+      "prochaine_preuve": "Partager documentation accessible."
+    },
+    {
+      "competence": "C14",
+      "pages": [
+        15
+      ],
+      "exigence": "La modélisation des données respecte un formalisme : Merise, entités-relations, etc.",
+      "id": "C14.01",
+      "epreuve": "E4",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 16–17",
+      "preuves": [
+        "P02",
+        "P03",
+        "L4"
+      ],
+      "statut": "incomplet",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Compléter modèle formalisé et revue métier."
+    },
+    {
+      "competence": "C14",
+      "pages": [
+        15
+      ],
+      "exigence": "La modélisation des parcours utilisateurs respecte un formalisme : schéma fonctionnel, wireframes, etc.",
+      "id": "C14.02",
+      "epreuve": "E4",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 16–17",
+      "preuves": [
+        "P02",
+        "P03",
+        "L4"
+      ],
+      "statut": "incomplet",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Valider parcours nominaux et alternatives."
+    },
+    {
+      "competence": "C14",
+      "pages": [
+        15
+      ],
+      "exigence": "Chaque spécification fonctionnelle couvre le contexte, les scénarios d’utilisation et les critères de validation.",
+      "id": "C14.03",
+      "epreuve": "E4",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 16–17",
+      "preuves": [
+        "P02",
+        "P03",
+        "L4"
+      ],
+      "statut": "incomplet",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Contexte/scénarios/acceptation pour chaque story."
+    },
+    {
+      "competence": "C14",
+      "pages": [
+        15
+      ],
+      "exigence": "Les objectifs d’accessibilités sont directement intégrés aux critères d’acceptation des user stories.",
+      "id": "C14.04",
+      "epreuve": "E4",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 16–17",
+      "preuves": [
+        "P02",
+        "P03",
+        "L4"
+      ],
+      "statut": "incomplet",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Inscrire objectifs accessibilité dans chaque acceptation."
+    },
+    {
+      "competence": "C14",
+      "pages": [
+        15
+      ],
+      "exigence": "Les objectifs d’accessibilité sont formulés en s’appuyant sur un des standards d'accessibilité : WCAG, RG2AA, etc.",
+      "id": "C14.05",
+      "epreuve": "E4",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 16–17",
+      "preuves": [
+        "P02",
+        "P03",
+        "L4"
+      ],
+      "statut": "incomplet",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Rattacher objectifs à critères WCAG/RGAA explicites."
+    },
+    {
+      "competence": "C15",
+      "pages": [
+        15
+      ],
+      "exigence": "Les spécifications techniques rédigées couvrent l’architecture de l’application, ses dépendances et son environnement d’exécution (langage de programmation, framework, outils, etc).",
+      "id": "C15.01",
+      "epreuve": "E4",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 17",
+      "preuves": [
+        "P02",
+        "P03",
+        "L4"
+      ],
+      "statut": "incomplet",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Actualiser architecture, dépendances et runtime au SHA."
+    },
+    {
+      "competence": "C15",
+      "pages": [
+        16
+      ],
+      "exigence": "Les éventuels services (PaaS, SaaS, etc) et prestataires ayant une démarche éco-responsable sont favorisés lors des choix techniques.",
+      "id": "C15.02",
+      "epreuve": "E4",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 17",
+      "preuves": [
+        "P02",
+        "P03",
+        "L4"
+      ],
+      "statut": "incomplet",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Comparer justificatifs environnementaux disponibles."
+    },
+    {
+      "competence": "C15",
+      "pages": [
+        16
+      ],
+      "exigence": "Les flux de données impliqués dans l’application sont représentés par un diagramme de flux de données.",
+      "id": "C15.03",
+      "epreuve": "E4",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 17",
+      "preuves": [
+        "P02",
+        "P03",
+        "L4"
+      ],
+      "statut": "incomplet",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Diagramme complet fichiers/DB/logs/exports/modèles et frontières."
+    },
+    {
+      "competence": "C15",
+      "pages": [
+        16
+      ],
+      "exigence": "La preuve de concept est accessible et fonctionnelle en environnement de pré-production.",
+      "id": "C15.04",
+      "epreuve": "E4",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 17",
+      "preuves": [
+        "P02",
+        "P03",
+        "L4"
+      ],
+      "statut": "incomplet",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "POC fonctionnelle en préproduction isolée, pas mode démo."
+    },
+    {
+      "competence": "C15",
+      "pages": [
+        16
+      ],
+      "exigence": "La conclusion à l’issue de la preuve de concept donne un avis précis permettant une prise de décision sur la poursuite du projet.",
+      "id": "C15.05",
+      "epreuve": "E4",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 17",
+      "preuves": [
+        "P02",
+        "P03",
+        "L4"
+      ],
+      "statut": "incomplet",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Décision humaine go/no-go datée sur résultats, pas engagement inventé."
+    },
+    {
+      "competence": "C16",
+      "pages": [
+        16
+      ],
+      "exigence": "Les cycles, les étapes de chaque cycle, les rôles, les rituels et les outils de la méthode agile appliquée sont respectés dans sa mise en place et tout au long du projet.",
+      "id": "C16.01",
+      "epreuve": "E4",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 18",
+      "preuves": [
+        "P09",
+        "L4"
+      ],
+      "statut": "incomplet",
+      "audit": "non audité : pratique humaine historique/partage non observés dans ce lot",
+      "prochaine_preuve": "Recueillir pratiques réellement observées, pas cérémonies reconstruites."
+    },
+    {
+      "competence": "C16",
+      "pages": [
+        16
+      ],
+      "exigence": "Les outils de pilotage (tableau kanban, burndown chart, backlog, etc.) sont disponibles dans les conditions prévues par la méthode appliquée.",
+      "id": "C16.02",
+      "epreuve": "E4",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 18",
+      "preuves": [
+        "P09",
+        "L4"
+      ],
+      "statut": "incomplet",
+      "audit": "non audité : pratique humaine historique/partage non observés dans ce lot",
+      "prochaine_preuve": "Outil partagé, historique et conditions d’accès réels."
+    },
+    {
+      "competence": "C16",
+      "pages": [
+        16
+      ],
+      "exigence": "Les objectifs et les modalités des rituels sont partagés à toutes les parties prenantes et rappeler si besoin.",
+      "id": "C16.03",
+      "epreuve": "E4",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 18",
+      "preuves": [
+        "P09",
+        "L4"
+      ],
+      "statut": "incomplet",
+      "audit": "non audité : pratique humaine historique/partage non observés dans ce lot",
+      "prochaine_preuve": "Partager réellement objectifs/modalités des rituels."
+    },
+    {
+      "competence": "C16",
+      "pages": [
+        16,
+        17
+      ],
+      "exigence": "Les éléments de pilotage sont rendus accessibles à toutes les parties du projet et ce tout au long du projet, en accord avec les recommandations de la méthode de gestion de projet appliquée.",
+      "id": "C16.04",
+      "epreuve": "E4",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 18",
+      "preuves": [
+        "P09",
+        "L4"
+      ],
+      "statut": "incomplet",
+      "audit": "non audité : pratique humaine historique/partage non observés dans ce lot",
+      "prochaine_preuve": "Établir disponibilité historique du pilotage pour parties concernées."
+    },
+    {
+      "competence": "C17",
+      "pages": [
+        17
+      ],
+      "exigence": "L’environnement de développement installé respecte les spécifications techniques du projet.",
+      "id": "C17.01",
+      "epreuve": "E4",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 18–19",
+      "preuves": [
+        "P03",
+        "P07",
+        "L4"
+      ],
+      "statut": "configuration non vérifiée",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Installer environnement conforme et versions relevées."
+    },
+    {
+      "competence": "C17",
+      "pages": [
+        17
+      ],
+      "exigence": "Les interfaces sont intégrées et respectent les maquettes.",
+      "id": "C17.02",
+      "epreuve": "E4",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 18–19",
+      "preuves": [
+        "P03",
+        "P07",
+        "L4"
+      ],
+      "statut": "configuration non vérifiée",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Comparer rendu aux maquettes approuvées."
+    },
+    {
+      "competence": "C17",
+      "pages": [
+        17
+      ],
+      "exigence": "Les comportements des composants d’interface (validation formulaire, animations, etc.) et la navigation respectent les spécifications fonctionnelles.",
+      "id": "C17.03",
+      "epreuve": "E4",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 18–19",
+      "preuves": [
+        "P03",
+        "P07",
+        "L4"
+      ],
+      "statut": "configuration non vérifiée",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Recette formulaires/navigation/erreurs et clavier."
+    },
+    {
+      "competence": "C17",
+      "pages": [
+        17
+      ],
+      "exigence": "Les composants métier sont développés et fonctionnent comme prévu par les spécifications techniques et fonctionnelles.",
+      "id": "C17.04",
+      "epreuve": "E4",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 18–19",
+      "preuves": [
+        "P03",
+        "P07",
+        "L4"
+      ],
+      "statut": "configuration non vérifiée",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Tests métier et résultats comparés aux exigences."
+    },
+    {
+      "competence": "C17",
+      "pages": [
+        17
+      ],
+      "exigence": "La gestion des droits d’accès à l’application ou à certains espaces de l’application est développée et respecte les spécifications fonctionnelles.",
+      "id": "C17.05",
+      "epreuve": "E4",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 18–19",
+      "preuves": [
+        "P03",
+        "P07",
+        "L4"
+      ],
+      "statut": "configuration non vérifiée",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Vérifier droits sur vraie session et persistance."
+    },
+    {
+      "competence": "C17",
+      "pages": [
+        17
+      ],
+      "exigence": "Les flux de données sont intégrés dans le respect des spécifications techniques et fonctionnelles.",
+      "id": "C17.06",
+      "epreuve": "E4",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 18–19",
+      "preuves": [
+        "P03",
+        "P07",
+        "L4"
+      ],
+      "statut": "configuration non vérifiée",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Tracer flux de bout en bout et erreurs."
+    },
+    {
+      "competence": "C17",
+      "pages": [
+        17
+      ],
+      "exigence": "Les développements sont réalisés dans le respect des bonnes pratiques d’éco-conception d’une application (Les recommandations d’éco-index ou Green IT par exemple)",
+      "id": "C17.07",
+      "epreuve": "E4",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 18–19",
+      "preuves": [
+        "P03",
+        "P07",
+        "L4"
+      ],
+      "statut": "configuration non vérifiée",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Audit écoconception avec mesures contextualisées."
+    },
+    {
+      "competence": "C17",
+      "pages": [
+        17,
+        18
+      ],
+      "exigence": "Les préconisations du top 10 d’OWASP sont implémentées dans l’application quand nécessaire.",
+      "id": "C17.08",
+      "epreuve": "E4",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 18–19",
+      "preuves": [
+        "P03",
+        "P07",
+        "L4"
+      ],
+      "statut": "configuration non vérifiée",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Revue OWASP et contrôles applicables."
+    },
+    {
+      "competence": "C17",
+      "pages": [
+        18
+      ],
+      "exigence": "Des tests d’intégration ou unitaires couvrent au moins les composants métier et la gestion des accès.",
+      "id": "C17.09",
+      "epreuve": "E4",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 18–19",
+      "preuves": [
+        "P03",
+        "P07",
+        "L4"
+      ],
+      "statut": "historique",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Cartographier puis rejouer tests métier/accès."
+    },
+    {
+      "competence": "C17",
+      "pages": [
+        18
+      ],
+      "exigence": "Les sources sont versionnées et accessibles depuis un dépôt Git distant.",
+      "id": "C17.10",
+      "epreuve": "E4",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 18–19",
+      "preuves": [
+        "P03",
+        "P07",
+        "L4"
+      ],
+      "statut": "configuration non vérifiée",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Vérifier version et accès distant."
+    },
+    {
+      "competence": "C17",
+      "pages": [
+        18
+      ],
+      "exigence": "La documentation technique couvre l’installation de l’environnement de développement, l’architecture applicative, les dépendances, l’exécution des tests.",
+      "id": "C17.11",
+      "epreuve": "E4",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 18–19",
+      "preuves": [
+        "P03",
+        "P07",
+        "L4"
+      ],
+      "statut": "configuration non vérifiée",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Reproduire documentation installation/architecture/tests."
+    },
+    {
+      "competence": "C17",
+      "pages": [
+        18
+      ],
+      "exigence": "La documentation est communiquée dans un format qui respecte les recommandations d’accessibilité (par exemple celles de l’association Valentin Haüy ou de Microsoft).",
+      "id": "C17.12",
+      "epreuve": "E4",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 18–19",
+      "preuves": [
+        "P03",
+        "P07",
+        "L4"
+      ],
+      "statut": "incomplet",
+      "audit": "non audité : pratique humaine historique/partage non observés dans ce lot",
+      "prochaine_preuve": "Partager et contrôler accessibilité documentaire."
+    },
+    {
+      "competence": "C18",
+      "pages": [
+        18
+      ],
+      "exigence": "La documentation pour l’utilisation de la chaîne couvre les outils, toutes les étapes, les tâches et tous les déclencheurs de la chaîne.",
+      "id": "C18.01",
+      "epreuve": "E4",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 20",
+      "preuves": [
+        "P10",
+        "P11",
+        "P07",
+        "L4"
+      ],
+      "statut": "configuration non vérifiée",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Confronter documentation aux six jobs actuels et déclencheurs."
+    },
+    {
+      "competence": "C18",
+      "pages": [
+        18
+      ],
+      "exigence": "Un outil de configuration et d'exécution d’une chaîne d’intégration continue est sélectionné de façon cohérente avec l’environnement technique du projet.",
+      "id": "C18.02",
+      "epreuve": "E4",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 20",
+      "preuves": [
+        "P10",
+        "P11",
+        "P07",
+        "L4"
+      ],
+      "statut": "configuration non vérifiée",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Justifier GitHub Actions par environnement."
+    },
+    {
+      "competence": "C18",
+      "pages": [
+        18
+      ],
+      "exigence": "La chaîne intègre toutes les étapes nécessaires et préalables à l'exécution des tests de l’application (build, configurations…).",
+      "id": "C18.03",
+      "epreuve": "E4",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 20",
+      "preuves": [
+        "P10",
+        "P11",
+        "P07",
+        "L4"
+      ],
+      "statut": "configuration non vérifiée",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Vérifier préalables et séparation contexte build Web."
+    },
+    {
+      "competence": "C18",
+      "pages": [
+        19
+      ],
+      "exigence": "La chaîne exécute les tests de l’application disponibles lors de son déclenchement.",
+      "id": "C18.04",
+      "epreuve": "E4",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 20",
+      "preuves": [
+        "P10",
+        "P11",
+        "P07",
+        "L4"
+      ],
+      "statut": "historique",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Archiver run CI 34360646172 et tests/skips au même SHA."
+    },
+    {
+      "competence": "C18",
+      "pages": [
+        19
+      ],
+      "exigence": "Les configuration sont versionnées avec les sources du projet d’application, sur un dépôt Git distant.",
+      "id": "C18.05",
+      "epreuve": "E4",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 20",
+      "preuves": [
+        "P10",
+        "P11",
+        "P07",
+        "L4"
+      ],
+      "statut": "configuration non vérifiée",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Vérifier SHA et accès distant aux configurations."
+    },
+    {
+      "competence": "C18",
+      "pages": [
+        19
+      ],
+      "exigence": "La documentation de la chaîne d’intégration continue couvre la procédure d’installation, de configuration et de test de la chaîne.",
+      "id": "C18.06",
+      "epreuve": "E4",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 20",
+      "preuves": [
+        "P10",
+        "P11",
+        "P07",
+        "L4"
+      ],
+      "statut": "configuration non vérifiée",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Reproduire procédure de configuration et tests CI."
+    },
+    {
+      "competence": "C18",
+      "pages": [
+        19
+      ],
+      "exigence": "La documentation est communiquée dans un format qui respecte les recommandations d’accessibilité (par exemple celles de l’association Valentin Haüy ou de Microsoft).",
+      "id": "C18.07",
+      "epreuve": "E4",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 20",
+      "preuves": [
+        "P10",
+        "P11",
+        "P07",
+        "L4"
+      ],
+      "statut": "incomplet",
+      "audit": "non audité : pratique humaine historique/partage non observés dans ce lot",
+      "prochaine_preuve": "Partager documentation accessible."
+    },
+    {
+      "competence": "C19",
+      "pages": [
+        19
+      ],
+      "exigence": "La documentation pour l’utilisation de la chaîne couvre toutes les étapes de la chaîne, les tâches et tous les déclencheurs disponibles.",
+      "id": "C19.01",
+      "epreuve": "E4",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 21–22",
+      "preuves": [
+        "P10",
+        "P11",
+        "P06",
+        "L4"
+      ],
+      "statut": "configuration non vérifiée",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Documenter CI→build→livraison et promotion désactivée."
+    },
+    {
+      "competence": "C19",
+      "pages": [
+        19
+      ],
+      "exigence": "Le ou les fichiers de configuration de la chaîne sont correctement reconnus et exécutés par le système.",
+      "id": "C19.02",
+      "epreuve": "E4",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 21–22",
+      "preuves": [
+        "P10",
+        "P11",
+        "P06",
+        "L4"
+      ],
+      "statut": "historique",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Conserver résultat réel du workflow ; échec non masqué."
+    },
+    {
+      "competence": "C19",
+      "pages": [
+        19
+      ],
+      "exigence": "La ou les étapes de packaging (compilation, minification, build de containers, etc.) de l’application sont intégrées à la chaîne et s'exécutent sans erreur.",
+      "id": "C19.03",
+      "epreuve": "E4",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 21–22",
+      "preuves": [
+        "P10",
+        "P11",
+        "P06",
+        "L4"
+      ],
+      "statut": "incomplet",
+      "audit": "échec constaté signalé du build Web main ; correction locale non fusionnée P11",
+      "prochaine_preuve": "Après revue/fusion correctif, build complet distant réussi."
+    },
+    {
+      "competence": "C19",
+      "pages": [
+        20
+      ],
+      "exigence": "L’étape de livraison (pull request par exemple) est intégrée et exécutée une fois la ou les étapes de packaging validées.",
+      "id": "C19.04",
+      "epreuve": "E4",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 21–22",
+      "preuves": [
+        "P10",
+        "P11",
+        "P06",
+        "L4"
+      ],
+      "statut": "incomplet",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Prouver livraison après packaging validé, pas deploy skipped."
+    },
+    {
+      "competence": "C19",
+      "pages": [
+        20
+      ],
+      "exigence": "Les sources de la chaîne sont versionnées et accessibles depuis le dépôt Git distant du projet d’application.",
+      "id": "C19.05",
+      "epreuve": "E4",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 21–22",
+      "preuves": [
+        "P10",
+        "P11",
+        "P06",
+        "L4"
+      ],
+      "statut": "configuration non vérifiée",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Vérifier version et accès distant."
+    },
+    {
+      "competence": "C19",
+      "pages": [
+        20
+      ],
+      "exigence": "La documentation de la chaîne de livraison continue couvre la procédure d’installation, de configuration et de test de la chaîne.",
+      "id": "C19.06",
+      "epreuve": "E4",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 21–22",
+      "preuves": [
+        "P10",
+        "P11",
+        "P06",
+        "L4"
+      ],
+      "statut": "configuration non vérifiée",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Rejouer procédure sur cible autorisée et rollback compatible."
+    },
+    {
+      "competence": "C19",
+      "pages": [
+        20
+      ],
+      "exigence": "La documentation est communiquée dans un format qui respecte les recommandations d’accessibilité (par exemple celles de l’association Valentin Haüy ou de Microsoft).",
+      "id": "C19.07",
+      "epreuve": "E4",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 21–22",
+      "preuves": [
+        "P10",
+        "P11",
+        "P06",
+        "L4"
+      ],
+      "statut": "incomplet",
+      "audit": "non audité : pratique humaine historique/partage non observés dans ce lot",
+      "prochaine_preuve": "Partager documentation accessible."
+    },
+    {
+      "competence": "C20",
+      "pages": [
+        20
+      ],
+      "exigence": "La documentation liste les métriques et les seuils et valeurs d’alerte pour chaque métrique à risque.",
+      "id": "C20.01",
+      "epreuve": "E5",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 22",
+      "preuves": [
+        "P06",
+        "L5"
+      ],
+      "statut": "configuration non vérifiée",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Définir seuils par risque et métriques opérationnelles."
+    },
+    {
+      "competence": "C20",
+      "pages": [
+        20
+      ],
+      "exigence": "La documentation explicite les arguments en faveur des choix techniques pour l’outillage du monitorage de l’application.",
+      "id": "C20.02",
+      "epreuve": "E5",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 22",
+      "preuves": [
+        "P06",
+        "L5"
+      ],
+      "statut": "configuration non vérifiée",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Justifier choix de collecte/journalisation/restitution."
+    },
+    {
+      "competence": "C20",
+      "pages": [
+        20
+      ],
+      "exigence": "Les outils (collecteurs, journalisation, agrégateurs, filtres, dashboard, etc.) sont installés et opérationnels à minima en environnement local.",
+      "id": "C20.03",
+      "epreuve": "E5",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 22",
+      "preuves": [
+        "P06",
+        "L5"
+      ],
+      "statut": "historique",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Installer et observer chaîne complète au moins locale."
+    },
+    {
+      "competence": "C20",
+      "pages": [
+        21
+      ],
+      "exigence": "Les règles de journalisation sont intégrées aux sources de l’application, en fonction des métriques à surveiller.",
+      "id": "C20.04",
+      "epreuve": "E5",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 22",
+      "preuves": [
+        "P06",
+        "L5"
+      ],
+      "statut": "configuration non vérifiée",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Vérifier journalisation intégrée et minimisation des données."
+    },
+    {
+      "competence": "C20",
+      "pages": [
+        21
+      ],
+      "exigence": "Les alertes sont configurées et en état de marche, en fonction des seuils préalablement définis.",
+      "id": "C20.05",
+      "epreuve": "E5",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 22",
+      "preuves": [
+        "P06",
+        "L5"
+      ],
+      "statut": "historique",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Déclencher puis recevoir alerte par canal approuvé."
+    },
+    {
+      "competence": "C20",
+      "pages": [
+        21
+      ],
+      "exigence": "La documentation couvre la procédure d’installation et de configuration des dépendances pour l’outillage du monitorage de l’application.",
+      "id": "C20.06",
+      "epreuve": "E5",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 22",
+      "preuves": [
+        "P06",
+        "L5"
+      ],
+      "statut": "configuration non vérifiée",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Rejouer installation/configuration des dépendances."
+    },
+    {
+      "competence": "C20",
+      "pages": [
+        21
+      ],
+      "exigence": "La documentation est communiquée dans un format qui respecte les recommandations d’accessibilité (par exemple celles de l’association Valentin Haüy ou de Microsoft).",
+      "id": "C20.07",
+      "epreuve": "E5",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 22",
+      "preuves": [
+        "P06",
+        "L5"
+      ],
+      "statut": "incomplet",
+      "audit": "non audité : pratique humaine historique/partage non observés dans ce lot",
+      "prochaine_preuve": "Partager support accessible."
+    },
+    {
+      "competence": "C21",
+      "pages": [
+        21
+      ],
+      "exigence": "La ou les causes du problème sont identifiées correctement.",
+      "id": "C21.01",
+      "epreuve": "E5",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 23",
+      "preuves": [
+        "P08",
+        "P11",
+        "X03",
+        "L5"
+      ],
+      "statut": "historique",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Distinguer cause locale reproduite et cause distante non confirmée."
+    },
+    {
+      "competence": "C21",
+      "pages": [
+        21
+      ],
+      "exigence": "Le problème est reproduit en environnement de développement.",
+      "id": "C21.02",
+      "epreuve": "E5",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 23",
+      "preuves": [
+        "P08",
+        "P11",
+        "X03",
+        "L5"
+      ],
+      "statut": "historique",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Rejouer état avant correctif sur environnement éphémère autorisé."
+    },
+    {
+      "competence": "C21",
+      "pages": [
+        21
+      ],
+      "exigence": "La procédure de débogage du code est documentée depuis l’outil de de suivi.",
+      "id": "C21.03",
+      "epreuve": "E5",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 23",
+      "preuves": [
+        "P08",
+        "P11",
+        "X03",
+        "L5"
+      ],
+      "statut": "incomplet",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Lien outil de suivi authentique, pas ticket reconstruit."
+    },
+    {
+      "competence": "C21",
+      "pages": [
+        21
+      ],
+      "exigence": "La solution documentée explicite chaque étape de la résolution et de son implémentation.",
+      "id": "C21.04",
+      "epreuve": "E5",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 23",
+      "preuves": [
+        "P08",
+        "P11",
+        "X03",
+        "L5"
+      ],
+      "statut": "historique",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Conserver étapes diagnostic→correctif→non-régression."
+    },
+    {
+      "competence": "C21",
+      "pages": [
+        21,
+        22
+      ],
+      "exigence": "La solution est versionnée dans le dépôt Git du projet d’application (par exemple avec une merge request).",
+      "id": "C21.05",
+      "epreuve": "E5",
+      "source": "S06",
+      "reference_complementaire": "S03 p. 23",
+      "preuves": [
+        "P08",
+        "P11",
+        "X03",
+        "L5"
+      ],
+      "statut": "historique",
+      "audit": "partiel : voir périmètre des preuves, aucune acquisition attribuée",
+      "prochaine_preuve": "Relier solution au commit et revue, puis rejeu après intégration."
+    }
+  ]
+}
