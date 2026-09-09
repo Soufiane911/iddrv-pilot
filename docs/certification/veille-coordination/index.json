@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "created_on": "2026-09-09",
+  "clock_observed_at": "2026-09-09T14:28:23Z",
+  "base_commit": "59a4846bb13d31c8fb04b1a2dcfa0239c853605a",
+  "session_id": "run-mtu7110b-c8d25ad46b51487d",
+  "scope": "docs/certification/veille-coordination/ uniquement",
+  "ai_assisted": true,
+  "human_collaboration_proven": false,
+  "session_context_provenance": "Instruction parent déclarant demande utilisateur de coordination parallèle; conversation source non disponible",
+  "actual_watch_duration_minutes": null,
+  "recurrence_observed": false,
+  "sharing_performed": false,
+  "documents": ["README.md", "preuves.md", "veille-2026-09-09.md", "organisation-proposee.md", "backlog.json", "decisions-retrospective.md", "index.json", "templates/compte-rendu.md", "templates/compte-rendu.json"],
+  "public_evidence": [
+    {"id":"P2-pr","url":"https://api.github.com/repos/Soufiane911/iddrv-pilot/pulls/1","accessed_at":"2026-09-09T14:29:31Z","http_status":200,"method":"unauthenticated GET via urllib.request/bash","created_at":"2026-09-09T13:51:18Z","merged_at":"2026-09-09T13:59:23Z","merge_commit":"59a4846bb13d31c8fb04b1a2dcfa0239c853605a","scope":"Fusion et corps déclaratif; pas validation client"},
+    {"id":"P2-reviews","url":"https://api.github.com/repos/Soufiane911/iddrv-pilot/pulls/1/reviews","accessed_at":"2026-09-09T14:29:31Z","http_status":200,"returned_reviews":0,"scope":"Aucune approbation publique trouvée dans la réponse"},
+    {"id":"P2-issues","url":"https://api.github.com/repos/Soufiane911/iddrv-pilot/issues?state=all&per_page=10","accessed_at":"2026-09-09T14:29:31Z","http_status":200,"returned_entries":1,"returned_non_pr_issues":0,"scope":"Réponse bornée, aucune source privée consultée"},
+    {"id":"P2-ci","url":"https://api.github.com/repos/Soufiane911/iddrv-pilot/actions/runs?head_sha=31c8c2c2a265726c0db513bb25090d982562bb8f&per_page=10","accessed_at":"2026-09-09T14:30:04Z","run_url":"https://github.com/Soufiane911/iddrv-pilot/actions/runs/34359776838","head_sha":"31c8c2c2a265726c0db513bb25090d982562bb8f","event":"pull_request","status":"completed","conclusion":"success","created_at":"2026-09-09T13:51:22Z","updated_at":"2026-09-09T13:56:23Z","scope":"Conclusion globale; jobs/logs et déploiement non audités"}
+  ],
+  "primary_sources": [
+    {"id":"S1","url":"https://scikit-learn.org/1.7/model_persistence.html","institutional_author":"scikit-learn project","version":"1.7","publication_date":null,"accessed_at":"2026-09-09T14:29:31Z","web_fetch_status":"failed","fallback_method":"unauthenticated urllib.request GET; HTML thematic text extraction","fallback_http_status":200,"status":"passages_consultes","independent_cross_check":false,"accessibility_audited":false},
+    {"id":"S2","url":"https://scikit-learn.org/1.7/modules/outlier_detection.html","institutional_author":"scikit-learn project","version":"1.7","publication_date":null,"accessed_at":"2026-09-09T14:29:31Z","web_fetch_status":"failed","fallback_method":"unauthenticated urllib.request GET; HTML thematic text extraction","fallback_http_status":200,"status":"passages_consultes","independent_cross_check":false,"accessibility_audited":false},
+    {"id":"S3","url":"https://www.cnil.fr/fr/passer-laction/les-durees-de-conservation-des-donnees","institutional_author":"CNIL","displayed_date":"2026-04-02","accessed_at":"2026-09-09T14:29:31Z","web_fetch_status":"failed","fallback_method":"unauthenticated urllib.request GET; HTML thematic text extraction","fallback_http_status":200,"status":"passages_consultes","independent_legal_text_consulted":false,"accessibility_audited":false},
+    {"id":"S4","url":"https://www.w3.org/WAI/standards-guidelines/wcag/","institutional_author":"W3C/WAI; Accessibility Guidelines Working Group","page_publication_date":null,"standard_dates_mentioned":["2023-10-05","2024-12-12"],"accessed_at":"2026-09-09T14:29:31Z","web_fetch_status":"failed","fallback_method":"unauthenticated urllib.request GET; HTML thematic text extraction","fallback_http_status":200,"status":"passages_consultes","detailed_standard_consulted":false,"accessibility_audited":false}
+  ],
+  "local_evidence_root": "Dépôt principal fourni; chemins relatifs, fichiers non distribués ici",
+  "local_evidence_observed_on": "2026-09-09",
+  "local_evidence_limits": "SHA calculés sur octets lus sans modification. Date dans nom/README déclarative, pas horodatage probant de création. Images nominatives non copiées. Aucun accès Feedly. Aucun pickle désérialisé.",
+  "local_evidence": [
+    {"path":"Preuve-manquante/organisation/veille_2026-09-08.md","sha256":"03d16420ae23f0ae2d21b8f7cb48e87b6c1be6f33ac1a1d64a5bad321015a262","read_scope":"document entier"},
+    {"path":"Preuve-manquante/organisation/recette_et_validation.md","sha256":"5ba7146d9d8cddee41246dbdf529e7e3edbaf4df21173ab7647ad2bc6b7545e3","read_scope":"document entier"},
+    {"path":"Preuve-manquante/organisation/feedly-2026-09-09/README.md","sha256":"680d5eade3251ec0bb0fffa6e0b8a0bd1b3d480f79c97a32eed73b342467386c","read_scope":"document entier"},
+    {"path":"Preuve-manquante/organisation/feedly-2026-09-09/01-vue-ensemble.png","sha256":"8443be8a0774f93584cfda7063109072237becf1684f26bb76ba864c72d3303d","read_scope":"image examinée"},
+    {"path":"Preuve-manquante/organisation/feedly-2026-09-09/02-axe-technologique.png","sha256":"02fd8d823ccdb0bd57118293b6022001a8ab3ee4a203dd750db380aa825c0154","read_scope":"image examinée"},
+    {"path":"Preuve-manquante/organisation/feedly-2026-09-09/03-axe-reglementaire.png","sha256":"7ba43b3e4056ceb2f2af4d39a96731885402bf2926f72c7ae9e52fe724a52894","read_scope":"image examinée"},
+    {"path":"Preuve-manquante/organisation/feedly-2026-09-09/04-axe-strategique.png","sha256":"d4ed487a14c22fb058404694a6b7e3bcae45579d33a47adc3cff4b46d83fbc5a","read_scope":"image examinée"},
+    {"path":"output/hdt-feature-hypotheses-2026-09-07/REPORT.md","sha256":"451458d1eb9a68159969499b0bf0cb51c8115f872c18933eef820e7c19250777","read_scope":"100 premières lignes; empreinte fichier complet, résultats non recalculés"}
+  ],
+  "proposed_schedule": {
+    "status":"proposition_non_acceptee_non_invitee",
+    "timezone":"Europe/Paris",
+    "first_date":"2026-09-11",
+    "start_local":"14:00",
+    "end_local":"15:00",
+    "planned_minutes_per_week":60,
+    "rrule":"FREQ=WEEKLY;BYDAY=FR",
+    "first_review_on":"2026-10-02",
+    "owner":null,
+    "channel":null,
+    "budget_approved":false
+  }
+}

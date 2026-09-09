@@ -7,7 +7,7 @@ import { SquaresFourIcon } from '@phosphor-icons/react/SquaresFour';
 import { WarningIcon } from '@phosphor-icons/react/Warning';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useApi } from '../App';
 import { broadcastSessionState } from '../lib/session';
 import './layout.css';
@@ -60,28 +60,30 @@ export function Layout() {
   const logout = useMutation({ mutationFn: () => api.logout(), onSuccess: () => { broadcastSessionState('logout'); queryClient.clear(); navigate('/login', { replace: true }); } });
   const [eyebrow, title] = titleFor(location.pathname);
   const showroom = location.pathname === '/showroom';
+  const moreTrigger = useRef<HTMLButtonElement>(null);
   const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
   useEffect(() => { document.title = `${title} · IDDRV`; setMobileMoreOpen(false); }, [location.pathname, title]);
   useEffect(() => {
     if (!mobileMoreOpen) return;
-    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') setMobileMoreOpen(false); };
+    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') { setMobileMoreOpen(false); moreTrigger.current?.focus(); } };
     window.addEventListener('keydown', closeOnEscape);
     return () => window.removeEventListener('keydown', closeOnEscape);
   }, [mobileMoreOpen]);
 
   return <div className={`app-shell${showroom ? ' showroom-shell' : ''}`}>
-    <a className="skip-link" href="#main-content">Aller au contenu</a>
+    <a className="skip-link" href="#main-content" onClick={() => document.getElementById('main-content')?.focus()}>Aller au contenu</a>
     <aside className="sidebar" aria-label="Navigation principale">
       <Link className="brand" to="/overview" aria-label="IDDRV, vue d’ensemble"><span className="brand-mark" aria-hidden="true"><i /><i /><i /></span><span><strong>IDDRV</strong></span></Link>
       <div className="sidebar-scope"><span>ENVIRONNEMENT</span><strong>Pilote local</strong></div>
       <nav className="primary-nav" aria-label="Navigation métier">{primary.map((item) => <Link key={item.to} to={item.to} aria-label={`${item.label}, ${item.caption}`} className={`nav-link${active(item, location.pathname) ? ' active' : ''}`} aria-current={active(item, location.pathname) ? 'page' : undefined}><Icon name={item.icon} /><span><strong>{item.label}</strong><small>{item.caption}</small></span></Link>)}</nav>
       <div className="sidebar-divider"><span>OUTILS</span></div>
       <nav className="secondary-nav" aria-label="Outils et administration">{secondary.map((item) => <Link key={item.to} to={item.to} aria-label={`${item.label}, ${item.caption}`} className={`nav-link${active(item, location.pathname) ? ' active' : ''}`} aria-current={active(item, location.pathname) ? 'page' : undefined}><Icon name={item.icon} /><span><strong>{item.label}</strong><small>{item.caption}</small></span></Link>)}</nav>
-      <button className="mobile-more-trigger" type="button" aria-expanded={mobileMoreOpen} aria-controls="mobile-more-menu" onClick={() => setMobileMoreOpen((open) => !open)}><DotsThreeIcon size={20} aria-hidden="true" /><small>Plus</small></button>
+      <button ref={moreTrigger} className="mobile-more-trigger" type="button" aria-expanded={mobileMoreOpen} aria-controls="mobile-more-menu" onClick={() => setMobileMoreOpen((open) => !open)}><DotsThreeIcon size={20} aria-hidden="true" /><small>Plus</small></button>
       {mobileMoreOpen ? <nav id="mobile-more-menu" className="mobile-more-menu" aria-label="Navigation complémentaire">{secondary.map((item) => <Link key={item.to} to={item.to} aria-current={active(item, location.pathname) ? 'page' : undefined}><Icon name={item.icon} /><span>{item.label}<small>{item.caption}</small></span></Link>)}{!DIRECT_LOCAL_ACCESS ? <button type="button" onClick={() => logout.mutate()} disabled={logout.isPending}>Se déconnecter</button> : null}</nav> : null}
       <div className="sidebar-foot"><span className="status-pulse" aria-hidden="true" /><span>Lecture historique<small>État des services dans Outils</small></span>{!DIRECT_LOCAL_ACCESS ? <button type="button" aria-label="Se déconnecter" onClick={() => logout.mutate()} disabled={logout.isPending} title={logout.isError ? 'Déconnexion impossible, réessayez' : undefined}><SignOutIcon size={18} aria-hidden="true" /><span>{logout.isPending ? 'Déconnexion…' : 'Se déconnecter'}</span></button> : null}</div>
     </aside>
-    <main id="main-content" className="main-content">
+    <main id="main-content" className="main-content" tabIndex={-1}>
+      {logout.isError && <p role="alert">Déconnexion impossible. Réessayez.</p>}
       {!showroom && <header className="topbar"><div className="topbar-title"><p>{eyebrow}</p><h1>{title}</h1></div><div className="topbar-context"><Link to="/health" aria-label="Vérifier l’état des services"><GearSixIcon size={16} aria-hidden="true" />État des services</Link></div></header>}
       <Outlet />
     </main>
