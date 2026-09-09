@@ -41,7 +41,6 @@
 .planning-empty h3 { margin: 0; }
 .planning-empty p { max-width: 600px; margin: 8px auto 0; color: var(--color-muted-foreground); }
 .planning-readonly { padding: 12px; border: 1px solid var(--color-border); color: var(--color-muted-foreground); }
-.planning-editor-backdrop { position: fixed; inset: 0; z-index: 40; display: flex; justify-content: flex-end; background: color-mix(in srgb, var(--color-primary) 48%, transparent); }
 .planning-editor { width: min(100%, 620px); height: 100%; overflow: auto; padding: 28px; background: var(--color-card); box-shadow: var(--shadow-modal); }
 .planning-editor header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
 .planning-editor h2 { margin: 4px 0; }
