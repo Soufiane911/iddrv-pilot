@@ -1,0 +1,447 @@
+{
+  "schema_version": 1,
+  "notice": "Catalogue documentaire uniquement, sans sélection ni inférence. Populations et phases non interchangeables; aucun meilleur production. Métriques de recherche séparées du monitoring live.",
+  "candidates": [
+    {
+      "candidate_id": "hdt-historical-v1-release-29dea3dca96a",
+      "label": "Historique — défaut applicatif",
+      "representation": "historical-volatility20",
+      "model_version": "hdt-process-drift-iforest-v1",
+      "default": true,
+      "status": "executable",
+      "scientific_status": "Prototype historique distribué; validation terrain non établie.",
+      "blocked_reason": null,
+      "artifact": {
+        "path": "models/process_drift_hdt_v1.joblib",
+        "sha256": "29dea3dca96ad0e3bfa1b1e54a4f7e55bd0d351a61cbe209ab84962530424eb6",
+        "dataset": "Provenance du dataset original non reconstruite",
+        "seed": null,
+        "artifact_packaged": true,
+        "distribution": "packaged"
+      },
+      "evidence": [
+        {
+          "path": "models/process_drift_hdt_v1.manifest.json",
+          "sha256": "4f542980688e51db397d8db4ff6096435d3000689a17a23e141d97123812ac29"
+        },
+        {
+          "path": "models/process_drift_hdt_v1.meta.json",
+          "sha256": "07f05b215212a3eee1a870f6f89c418e5299c2ef81862c085ebaafbaa52c5b92"
+        }
+      ],
+      "input_contract": {
+        "sensors": ["cycle_time_s", "injection_time_s", "cooling_time_s", "peak_pressure_bar", "clamp_force_kn", "mold_temperature_c", "barrel_temp_zone2_c", "energy_kwh"],
+        "context": [
+          "machine_erp_ref",
+          "timestamp"
+        ],
+        "preprocessing": "Contrat historique ml.process_drift inchangé; volatilités fenêtre20, modèle machine sinon global. POST historique ≥3 cycles, live/backfill ≥20.",
+        "decision": "Seuil historique et horizon20 inchangés. Catalogue non utilisé pour sélectionner ou charger le modèle.",
+        "runtime_compatible": true
+      },
+      "evaluations": []
+    },
+    {
+      "candidate_id": "hdt-summary6-d61007-s42-f70c137b944a",
+      "label": "Summary6 — recherche",
+      "representation": "summary6",
+      "model_version": "hdt-feature-hypotheses-experimental-v1",
+      "default": false,
+      "status": "research_only",
+      "scientific_status": "Confirmation initiale refusée : plafond FP dépassé sur le jeu61008.",
+      "blocked_reason": "Source seule non distribuée; packaging et adaptateur causal absents; confirmation initiale refusée.",
+      "artifact": {
+        "path": "output/hdt-feature-hypotheses-2026-09-07/run01/confirmation/candidate_61007.joblib",
+        "sha256": "f70c137b944a04da6c8f1c405c4b217322019e60d3bb1e5d63066947d9a888ad",
+        "dataset": "61007",
+        "seed": 42,
+        "artifact_packaged": false,
+        "distribution": "source_only"
+      },
+      "evidence": [
+        {
+          "path": "output/hdt-feature-hypotheses-2026-09-07/REPORT.md",
+          "sha256": "451458d1eb9a68159969499b0bf0cb51c8115f872c18933eef820e7c19250777"
+        },
+        {
+          "path": "output/hdt-feature-hypotheses-2026-09-07/run01/selection.freeze.json",
+          "sha256": "3e3112fff04a21272e8bb53ab5fcd0954bfd43279b5f10f5bb42a4ce628427c8"
+        },
+        {
+          "path": "output/hdt-feature-hypotheses-2026-09-07/run01/provenance.json",
+          "sha256": "5f38a331560267fc922c5b5453517b2d37befb3689ac0e499e79282ef8b7d94a"
+        }
+      ],
+      "input_contract": {
+        "sensors": [
+          "cycle_time_s",
+          "injection_time_s",
+          "cooling_time_s",
+          "peak_pressure_bar",
+          "clamp_force_kn",
+          "mold_temperature_c",
+          "barrel_temp_zone2_c",
+          "energy_kwh"
+        ],
+        "context": [
+          "machine_erp_ref",
+          "recipe_id",
+          "lot_id",
+          "cycle_counter"
+        ],
+        "preprocessing": "Ancre médiane20–59; résidus dès60; moyenne/std population trailing20; max/RMS/q75 des amplitudes puis des std (6 features). IF200/max_samples1024 par contexte; seuil contextuel budget0.0025 après persistance. Référence médiane et 1.4826×MAD du train normal par contexte; garde médiane20–59 à 3 échelles. Six contextes synthétiques (3 machines × 2 recettes), aucun mapping terrain implicite. Capteurs finis, continuité et reset par lot requis.",
+        "decision": "Score -score_samples; minimum causal de 3 scores, >= seuil exporté; publication cycle84; historique causal depuis cycle20, pas une fenêtre arbitraire de 20 cycles.",
+        "runtime_compatible": false
+      },
+      "evaluations": [
+        {
+          "phase": "confirmation",
+          "population": "5 jeux synthétiques 61007–61011; 3 graines, 90 épisodes distincts (pas270); FP par1000 cycles de lots sans dérive.",
+          "dataset_ids": [
+            61007,
+            61008,
+            61009,
+            61010,
+            61011
+          ],
+          "seeds": [
+            42,
+            43,
+            44
+          ],
+          "useful_recall_pct": 51.5,
+          "episode_recall_pct": 56.7,
+          "fp_per_1000_healthy_cycles": 6.11,
+          "support_pct": 79,
+          "distinct_episodes": 90,
+          "interpretation": "61008: 14.18 FP/1000 > plafond10. Export référencé: un seul jeu/graine, pas une fusion des cinq modèles."
+        }
+      ]
+    },
+    {
+      "candidate_id": "hdt-mean79-pca16-d61042-s42-31234bda9fd4",
+      "label": "Mean79/PCA16 — challenger",
+      "representation": "global_mean79_pca16_s4096_t600__min3__0.005__pool1",
+      "model_version": "hdt-fixed-confirmation-attempt1",
+      "default": false,
+      "status": "blocked",
+      "scientific_status": "Confirmation01 échouée malgré un rappel moyen favorable.",
+      "blocked_reason": "Plafond10 FP/1000 dépassé sur7/50 jeux (pire18.401); source seule non distribuée; adaptateur absent.",
+      "artifact": {
+        "path": "output/hdt-adaptive-search-2026-09-08/confirmation01/model_61042_42_candidate.joblib",
+        "sha256": "31234bda9fd44e4f533f63f502bbfdd935b5593b8e0230e5f27087fd1df147e8",
+        "dataset": "61042",
+        "seed": 42,
+        "artifact_packaged": false,
+        "distribution": "source_only"
+      },
+      "evidence": [
+        {
+          "path": "output/hdt-adaptive-search-2026-09-08/CONFIRMATION01-REPORT.md",
+          "sha256": "aa0129a6cac912660216693e7aee692678366fa3d64575bbbd3079d29345e692"
+        },
+        {
+          "path": "output/hdt-adaptive-search-2026-09-08/CONFIRMATION01-AUDIT.json",
+          "sha256": "13a62ca9ad031889aca2a89087ae9d788b02ae0c019512d842f5e3e9bc91074e"
+        },
+        {
+          "path": "output/hdt-adaptive-search-2026-09-08/CONFIRMATION01-RECEIPT.json",
+          "sha256": "4572dd77f46aaef2875c85438c19857f98d5b771d9fdb109c2c2670b5e920682"
+        }
+      ],
+      "input_contract": {
+        "sensors": [
+          "cycle_time_s",
+          "injection_time_s",
+          "cooling_time_s",
+          "peak_pressure_bar",
+          "clamp_force_kn",
+          "mold_temperature_c",
+          "barrel_temp_zone2_c",
+          "energy_kwh"
+        ],
+        "context": [
+          "machine_erp_ref",
+          "recipe_id",
+          "lot_id",
+          "cycle_counter"
+        ],
+        "preprocessing": "Ancre moyenne20–79. 8 moyennes signées trailing20 + 8 std20; StandardScaler/PCA16 complète sans whitening appris sur normal; IF globale600/max_samples4096; seuil global budget0.005. Pipeline ResearchFeatures attend137 colonnes préparées. Référence médiane et 1.4826×MAD du train normal par contexte; garde médiane20–59 à 3 échelles. Six contextes synthétiques (3 machines × 2 recettes), aucun mapping terrain implicite. Capteurs finis, continuité et reset par lot requis.",
+        "decision": "Score -score_samples; minimum causal de 3 scores, >= seuil exporté; publication cycle84; historique causal depuis cycle20, pas une fenêtre arbitraire de 20 cycles.",
+        "runtime_compatible": false
+      },
+      "evaluations": [
+        {
+          "phase": "confirmation",
+          "population": "Confirmation01 indépendante: 50 nouveaux jeux61042–61091, graines moyennées par jeu; 900 épisodes distincts. FP par1000 cycles de lots sans dérive.",
+          "dataset_ids": [
+            61042,
+            61043,
+            61044,
+            61045,
+            61046,
+            61047,
+            61048,
+            61049,
+            61050,
+            61051,
+            61052,
+            61053,
+            61054,
+            61055,
+            61056,
+            61057,
+            61058,
+            61059,
+            61060,
+            61061,
+            61062,
+            61063,
+            61064,
+            61065,
+            61066,
+            61067,
+            61068,
+            61069,
+            61070,
+            61071,
+            61072,
+            61073,
+            61074,
+            61075,
+            61076,
+            61077,
+            61078,
+            61079,
+            61080,
+            61081,
+            61082,
+            61083,
+            61084,
+            61085,
+            61086,
+            61087,
+            61088,
+            61089,
+            61090,
+            61091
+          ],
+          "seeds": [
+            42,
+            43,
+            44
+          ],
+          "useful_recall_pct": 61.15,
+          "episode_recall_pct": 64.78,
+          "fp_per_1000_healthy_cycles": 6.004,
+          "support_pct": 79,
+          "distinct_episodes": 900,
+          "interpretation": "Comparaison appariée seulement: summary6 rappel55.81%, FP6.348; gain +5.33pts IC95[3.33;7.30]. Échec du plafond7/50 conservé."
+        }
+      ]
+    },
+    {
+      "candidate_id": "hdt-ewm20-shrink75-b0026-d61032-s42-894120d3ac76",
+      "label": "EWM20/PCA16 — dernier candidat de développement",
+      "representation": "ewm20_shrink75 / ewm20_budget__0.0026",
+      "model_version": "hdt-fixed-confirmation-attempt2",
+      "default": false,
+      "status": "blocked",
+      "scientific_status": "Développement adaptatif seulement; export smoke sur ancien jeu; confirmation02 ABSENTE.",
+      "blocked_reason": "Confirmation02 non exécutée (blocage disque enregistré); smoke61032 ne vaut pas confirmation. Source seule non distribuée; adaptateur absent.",
+      "artifact": {
+        "path": "output/hdt-adaptive-search-2026-09-08/confirmation02-smoke-dev61032/model_61032_42_candidate.joblib",
+        "sha256": "894120d3ac76eaaeeb520c97febee7092feacce96305d12abe138d41509335f9",
+        "dataset": "61032 (ancien jeu de développement, smoke=True)",
+        "seed": 42,
+        "artifact_packaged": false,
+        "distribution": "source_only"
+      },
+      "evidence": [
+        {
+          "path": "output/hdt-adaptive-search-2026-09-08/CANDIDATE2-REVIEW.json",
+          "sha256": "56390de2f97d384e63573577217b517e317718c0a99bd30520f86fc56caa8b45"
+        },
+        {
+          "path": "output/hdt-adaptive-search-2026-09-08/DEV20-21-BUDGET-RESULTS.md",
+          "sha256": "bb441b0050f8a40724c8b41b79d486e7d63a8a9a505bc35687b633c1000e1eb9"
+        },
+        {
+          "path": "output/hdt-adaptive-search-2026-09-08/CONFIRMATION02-PROTOCOL.md",
+          "sha256": "6b8034f25fbf83d931527c76a546696b6b51a9b175b4f25af11138d8fc404a57"
+        },
+        {
+          "path": "output/hdt-adaptive-search-2026-09-08/confirmation02-smoke-dev61032/SMOKE-AUDIT.json",
+          "sha256": "33984f07ec503a82c7d4db79055b08095c1831bcd6cf6ba1a1bb0517fddaf101"
+        }
+      ],
+      "input_contract": {
+        "sensors": [
+          "cycle_time_s",
+          "injection_time_s",
+          "cooling_time_s",
+          "peak_pressure_bar",
+          "clamp_force_kn",
+          "mold_temperature_c",
+          "barrel_temp_zone2_c",
+          "energy_kwh"
+        ],
+        "context": [
+          "machine_erp_ref",
+          "recipe_id",
+          "lot_id",
+          "cycle_counter"
+        ],
+        "preprocessing": "Ancre0.75×moyenne20–79 +0.25×centre historique. EWM span20 adjust=True dès20, reset lot/trou/non-fini; 8 EWM normalisées +8 std20; StandardScaler/PCA16; IF globale600/max_samples4096; entrée préparée137 colonnes ResearchFeatures. Seuil=max(empirique budget0.0026, médiane+IQR×prior3.001317565576611). Prior historique normal61032–61091: jeu cible exclu en développement, prior figé sur60 jeux pour smoke/confirmation prévue. Référence médiane et 1.4826×MAD du train normal par contexte; garde médiane20–59 à 3 échelles. Six contextes synthétiques (3 machines × 2 recettes), aucun mapping terrain implicite. Capteurs finis, continuité et reset par lot requis.",
+        "decision": "Score -score_samples; minimum causal de 3 scores, >= seuil exporté; publication cycle84; historique causal depuis cycle20, pas une fenêtre arbitraire de 20 cycles.",
+        "runtime_compatible": false
+      },
+      "evaluations": [
+        {
+          "phase": "development",
+          "population": "60 jeux déjà observés61032–61091, incluant confirmation01 réutilisée; développement adaptatif, non indépendant. FP par1000 cycles de lots sans dérive.",
+          "dataset_ids": [
+            61032,
+            61033,
+            61034,
+            61035,
+            61036,
+            61037,
+            61038,
+            61039,
+            61040,
+            61041,
+            61042,
+            61043,
+            61044,
+            61045,
+            61046,
+            61047,
+            61048,
+            61049,
+            61050,
+            61051,
+            61052,
+            61053,
+            61054,
+            61055,
+            61056,
+            61057,
+            61058,
+            61059,
+            61060,
+            61061,
+            61062,
+            61063,
+            61064,
+            61065,
+            61066,
+            61067,
+            61068,
+            61069,
+            61070,
+            61071,
+            61072,
+            61073,
+            61074,
+            61075,
+            61076,
+            61077,
+            61078,
+            61079,
+            61080,
+            61081,
+            61082,
+            61083,
+            61084,
+            61085,
+            61086,
+            61087,
+            61088,
+            61089,
+            61090,
+            61091
+          ],
+          "seeds": [
+            42,
+            43,
+            44
+          ],
+          "useful_recall_pct": 58.4259,
+          "episode_recall_pct": null,
+          "fp_per_1000_healthy_cycles": 2.559,
+          "support_pct": 79,
+          "distinct_episodes": null,
+          "interpretation": "Pire FP8.7318; gain vs summary6 +3.1173pts. Choix minimisant le pire FP parmi admissibles, pas rappel maximal."
+        },
+        {
+          "phase": "development",
+          "population": "Sous-population des50 jeux récents61042–61091 (pas50 jeux supplémentaires); développement adaptatif.",
+          "dataset_ids": [
+            61042,
+            61043,
+            61044,
+            61045,
+            61046,
+            61047,
+            61048,
+            61049,
+            61050,
+            61051,
+            61052,
+            61053,
+            61054,
+            61055,
+            61056,
+            61057,
+            61058,
+            61059,
+            61060,
+            61061,
+            61062,
+            61063,
+            61064,
+            61065,
+            61066,
+            61067,
+            61068,
+            61069,
+            61070,
+            61071,
+            61072,
+            61073,
+            61074,
+            61075,
+            61076,
+            61077,
+            61078,
+            61079,
+            61080,
+            61081,
+            61082,
+            61083,
+            61084,
+            61085,
+            61086,
+            61087,
+            61088,
+            61089,
+            61090,
+            61091
+          ],
+          "seeds": [
+            42,
+            43,
+            44
+          ],
+          "useful_recall_pct": 58.8519,
+          "episode_recall_pct": null,
+          "fp_per_1000_healthy_cycles": 2.7356,
+          "support_pct": 79,
+          "distinct_episodes": null,
+          "interpretation": "Pire FP8.7318; gain vs summary6 +3.0370pts. Confirmation02 prévue61092–61141 absente; aucun score confirmatoire."
+        }
+      ]
+    }
+  ]
+}

@@ -6,6 +6,7 @@ import { formatDate, formatNumber, MetricCard, SectionTitle, StatePanel } from '
 import { HdtScoreHistory } from '../components/monitoring/HdtScoreHistory';
 import { HdtSimulator } from '../components/monitoring/HdtSimulator';
 import { ModelMetricsCard } from '../components/monitoring/ModelMetricsCard';
+import { HdtCandidates } from '../components/monitoring/HdtCandidates';
 
 interface HdtHistoryEntry {
   id: string;
@@ -75,7 +76,7 @@ export function ModelMonitoringPage() {
       <section className="surface-card" style={{ padding: '24px', marginBottom: '24px' }} aria-labelledby="version-heading">
         <SectionTitle eyebrow="IDENTITÉ DU MODÈLE" title="Version du modèle" />
         <div className="metric-grid metric-grid-three" style={{ marginTop: '16px', marginBottom: '0', borderBlock: 'none', background: 'transparent' }}>
-          <MetricCard label="Version" value={MODEL_VERSION} detail="Modèle actif" tone="neutral" />
+          <MetricCard label="Version historique par défaut" value={MODEL_VERSION} detail="Référence applicative, pas une attestation du runtime" tone="neutral" />
           <MetricCard label="Date d'entraînement" value={new Date(TRAINING_DATE).toLocaleDateString('fr-FR')} detail="Référence temporelle" tone="neutral" />
           <MetricCard label="Algorithme" value="Isolation Forest" detail="200 arbres, seuil 98e percentile" tone="neutral" />
           <MetricCard label="Horizon" value="20 cycles" detail="Projection de dérive" tone="neutral" />
@@ -83,6 +84,8 @@ export function ModelMonitoringPage() {
           <MetricCard label="Site de référence" value={siteId.toString()} detail="Identifiant pilote" tone="neutral" />
         </div>
       </section>
+
+      <HdtCandidates api={api} />
 
       {/* Offline metrics */}
       <section className="surface-card" style={{ padding: '24px', marginBottom: '24px' }} aria-labelledby="metrics-heading">
