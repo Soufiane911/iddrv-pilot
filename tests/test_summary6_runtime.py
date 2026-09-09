@@ -16,6 +16,61 @@ from ml.summary6.registry import write_package, digest
 GOLDEN = json.loads((Path(__file__).parent / 'test_summary6_fixtures/golden.json').read_text())
 
 
+def assert_interop_features(actual, expected):
+    """Frozen-oracle interoperability only; private-package checks stay exact.
+
+    CI 34369234541's relative error is below two ULPs everywhere in this
+    float64 golden (see docs/finalverification/summary6-environment.md).
+    """
+    actual = np.asarray(actual, dtype=np.float64)
+    expected = np.asarray(expected, dtype=np.float64)
+    assert actual.shape == expected.shape
+    assert np.isfinite(actual).all() and np.isfinite(expected).all()
+    np.testing.assert_array_max_ulp(actual, expected, maxulp=1)
+
+
+@pytest.mark.parametrize('direction', [-np.inf, np.inf])
+def test_interop_features_accept_one_ulp(direction):
+    expected = np.asarray(GOLDEN['features'], dtype=np.float64)
+    assert_interop_features(np.nextafter(expected, direction), expected)
+
+
+@pytest.mark.parametrize('direction', [-np.inf, np.inf])
+def test_interop_features_reject_two_ulp(direction):
+    expected = np.asarray(GOLDEN['features'], dtype=np.float64)
+    actual = expected.copy()
+    actual[0, 0] = np.nextafter(np.nextafter(actual[0, 0], direction), direction)
+    with pytest.raises(AssertionError):
+        assert_interop_features(actual, expected)
+
+
+@pytest.mark.parametrize('delta', [-1e-12, 1e-12])
+def test_interop_features_reject_small_regression(delta):
+    expected = np.asarray(GOLDEN['features'], dtype=np.float64)
+    actual = expected.copy()
+    actual[0, 0] += delta
+    with pytest.raises(AssertionError):
+        assert_interop_features(actual, expected)
+
+
+@pytest.mark.parametrize('value', [np.nan, np.inf, -np.inf])
+@pytest.mark.parametrize('side', ['actual', 'expected', 'both'])
+def test_interop_features_reject_nonfinite(value, side):
+    actual = np.asarray(GOLDEN['features'], dtype=np.float64)
+    expected = actual.copy()
+    if side in ('actual', 'both'):
+        actual[0, 0] = value
+    if side in ('expected', 'both'):
+        expected[0, 0] = value
+    with pytest.raises(AssertionError):
+        assert_interop_features(actual, expected)
+
+
+def test_interop_features_reject_broadcast_shape():
+    with pytest.raises(AssertionError):
+        assert_interop_features(GOLDEN['features'][0], GOLDEN['features'])
+
+
 @pytest.fixture
 def tiny(tmp_path):
     model = IsolationForest(n_estimators=3, max_samples=16, random_state=42).fit(
@@ -36,7 +91,7 @@ def test_frozen_features_and_boundaries(tiny):
     assert by[79]['instant_score'] is not None and by[79]['decision_score'] is None
     assert by[81]['decision_score'] is not None and by[83]['alert'] is None
     assert by[84]['status'] == 'available'
-    np.testing.assert_array_equal([r['features'] for r in results if r['features'] is not None], GOLDEN['features'])
+    assert_interop_features([r['features'] for r in results if r['features'] is not None], GOLDEN['features'])
     for n in range(84, 91):
         assert by[n]['decision_score'] == min(by[k]['instant_score'] for k in range(n-2, n+1))
         assert by[n]['alert'] == (by[n]['decision_score'] >= by[n]['threshold'])

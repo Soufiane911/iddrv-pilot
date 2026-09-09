@@ -76,6 +76,63 @@ Paquet utilisé : runtime `summary6-0c8b4c15cd4df33784468dfcd2057b52261122a8c90d
 pin manifeste indépendant `919fc41c58d1e821f9dcf7e16ee6c317e5966d4ec1c2444ad96045289543f4ff`.
 Il demeure privé hors Git. Traces locales : `/tmp/iddrv-pr8-{install,resolve,full,real,full-real}.log`.
 
+## Correction du comparateur interop — run 34369234541
+
+Base `34e8f0efaa80a21dad1f7ba156ca4929725e967b`. Le log
+`/tmp/iddrv-pr8-failure-34369234541.log` (lignes 337–391) rapporte
+**746 passed, 41 skipped, un échec** : égalité des features du test tiny,
+4 valeurs sur 72, écart absolu maximal `1.11022302e-16`, relatif maximal
+`1.34308227e-16`, sous Linux x64 / Python 3.13.15, dépendances épinglées.
+
+Le golden introduit par `ea54dc70` déclare un oracle indépendant : fonctions
+figées extraites par AST de `evaluate.make_features`, `hdt_methods.features`
+et `feature_study.representations`, export sklearn approuvé, sans utiliser le
+code features du runtime ; source SHA256
+`f70c137b944a04da6c8f1c405c4b217322019e60d3bb1e5d63066947d9a888ad`,
+NumPy 2.2.6 / pandas 2.3.3. Le port `ml/summary6/runtime.py` calcule les
+résidus normalisés par médiane d'ancrage / scale, puis moyenne absolue et
+écart-type glissants sur 20 cycles (`ddof=0`), réduits sur huit capteurs en
+max, RMS (`sqrt(mean(x**2))`) et quantile 0.75. Ces réductions float64
+peuvent varier au dernier bit entre builds/architectures ; le log seul ne
+permet pas d'attribuer l'écart à une opération précise ni au patch Python.
+
+**Borne retenue : 1 ULP, pas 2.** Mesure sur les 72 valeurs golden : plage
+`[0.43745928206432616, 1.314077666699433]`, espacements float64
+`{2**-54, 2**-53, 2**-52}`. Deux appels `np.nextafter` dans chaque direction
+donnent une distance relative minimale de `2.221179821923171e-16`, supérieure
+au maximum relatif publié par CI (`1.34308227e-16`, même avec son arrondi
+d'affichage). Cela borne les différences rapportées à un voisin float64 ;
+aucune mesure ne justifie d'élargir à 2 ULP. Ce raisonnement utilise le résumé
+CI et le golden, pas un nouveau calcul Linux. Sur macOS arm64 / Python 3.13.9,
+le calcul avec le paquet approuvé reste mesuré à **0 ULP** sur les 72 valeurs.
+
+Seul le comparateur features du test tiny utilise désormais
+`assert_array_max_ulp(..., maxulp=1)`, avec formes identiques et finitude
+explicite des deux tableaux ; aucune tolérance relative/absolue large.
+16 cas de contrôle acceptent un voisin dans les deux directions et rejettent
+2 ULP, une perturbation de ±1e-12, NaN/±inf (y compris identiques des deux
+côtés), et une forme diffusable. États, compteurs, causalité, seuils et décisions
+restent stricts. Le golden privé et la comparaison source/paquet des six modèles
+restent **exacts** dans l'environnement approuvé ; l'interop bornée du tiny
+n'assouplit ni le manifeste ni l'environnement de chargement.
+
+Venv isolé ci-dessus réutilisé sans installation. Commande complète :
+
+```sh
+SUMMARY6_TEST_PACKAGE=/Users/soufianehamzaoui/.local/share/iddrv/summary6/0c8b4c15cd4df33784468dfcd2057b52261122a8c90dbb0b1ba4a117b2870702 \
+SUMMARY6_TEST_MANIFEST_SHA256=919fc41c58d1e821f9dcf7e16ee6c317e5966d4ec1c2444ad96045289543f4ff \
+/tmp/iddrv-pr8-clean-venv/bin/python -m pytest -q tests --ignore=tests/e2e -ra
+```
+
+Résultat local : **766 passed, 38 skipped, 2 warnings, 35 subtests passed**
+(log `/tmp/iddrv-pr8-ulp-full-real.log`). Tests privés exécutés, warnings non
+masqués. `git diff --check` réussi. Golden non régénéré, SHA256 inchangé :
+`333b3ee422129cd8da3b5b1ab1e14eb2ef4f16fdea889ecb8500530770513d62`.
+Aucune modification du code `ml/summary6`, des pins, du paquet ou du manifeste.
+Le seul état non suivi préexistant, `frontend/node_modules`, est préservé.
+**Correction non encore testée sur GitHub/Linux** : le prochain run CI reste
+nécessaire ; aucune preuve d'exécution Linux réussie n'est revendiquée.
+
 ## Limites et activation runtime
 
 Le manifeste exige **Python 3.13.9 exactement**, pas simplement 3.13.
