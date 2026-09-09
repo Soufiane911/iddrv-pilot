@@ -22,10 +22,6 @@ from pathlib import Path
 import pandas as pd
 
 OUTPUT_DIR = Path("data/samples")
-OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-
-# Seed pour reproductibilité
-random.seed(42)
 
 
 def _gen_cycle_value(nominal: float, drift_pct: float = 0.05, sigma_pct: float = 0.02) -> float:
@@ -258,6 +254,8 @@ def generate_erp_trs_xlsx(
 
 
 if __name__ == "__main__":
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    random.seed(42)
     print("\n=== GÉNÉRATION DES DONNÉES D'EXEMPLES IDDRV ===\n")
     f1 = generate_arburg_protocol()
     f2 = generate_engel_csv()

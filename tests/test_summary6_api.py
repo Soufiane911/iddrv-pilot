@@ -9,9 +9,12 @@ from backend.app.api.process_drift import router as legacy
 from backend.app.security import Identity, create_session_token
 from backend.app.services import summary6 as service
 
+PRODUCTION_DATA = service.DATA
+PRODUCTION_DATA_PIN = service.MANIFEST_SHA
+
 
 @pytest.fixture
-def client(monkeypatch):
+def client(monkeypatch, summary6_data):
     monkeypatch.setenv('HDT_RUNTIME_MODE', 'summary6_replay')
     monkeypatch.setattr('backend.app.auth_repository.session_is_active', lambda *a: True)
     app = FastAPI()
@@ -115,10 +118,57 @@ def test_worker_suspended(monkeypatch, mode):
     assert runtime_mode() == 'disabled'
 
 
+@pytest.fixture
+def api_tiny(tmp_path):
+    import numpy as np
+    from sklearn.ensemble import IsolationForest
+    from ml.summary6.registry import write_package
+    from ml.summary6 import load_package, UNITS
+    models, contexts = {}, []
+    for machine in ('M1', 'M2', 'M3'):
+        for recipe in ('R1', 'R2'):
+            key = (machine, recipe)
+            models[key] = IsolationForest(n_estimators=3, max_samples=16, random_state=42).fit(
+                np.random.default_rng(42).normal(size=(32, 6)))
+            contexts.append({'key': list(key), 'center': [10.0 * (j + 1) for j in range(len(UNITS))],
+                             'scale': [1.0] * len(UNITS), 'threshold': 0.7})
+    path = tmp_path / 'api-tiny-package'
+    pin = write_package(path, models=models, contexts=contexts, source_sha256='tiny-synthetic',
+                        scientific_status='TINY_SYNTHETIC_TEST_ONLY', provenance={})
+    return load_package(path, expected_manifest_sha256=pin, allow_test_package=True), pin
+
+
+def test_synthetic_package_prefixes(client, monkeypatch, api_tiny):
+    """Real scorer and gzip/JSON parser with tiny test-only forest, not approval evidence."""
+    loaded, pin = api_tiny
+    monkeypatch.setattr(service, 'PACKAGE_ID', loaded.runtime_id)
+    monkeypatch.setattr(service, 'package', lambda: loaded)
+    monkeypatch.setenv('SUMMARY6_MANIFEST_SHA256', pin)
+    previous = []
+    for cutoff in (59, 79, 83, 84, 399):
+        response = client.post(BASE + '/replay', json=body(cutoff), headers=headers())
+        assert response.status_code == 200, response.text
+        value = response.json()
+        assert value['input_count'] == cutoff + 1
+        assert value['series'][:len(previous)] == previous
+        previous = value['series']
+        assert value['latest']['status'] == ('abstained' if cutoff < 84 else 'available')
+        assert value['signals'] == [] and value['live_enabled'] is False
+    for lot in service.catalog()['lots']:
+        payload = body(84)
+        payload['source']['lot_id'] = lot['lot_id']
+        response = client.post(BASE + '/replay', json=payload, headers=headers())
+        assert response.status_code == 200
+        assert response.json()['latest']['status'] == 'available'
+
+
 def test_real_package_prefixes(client, monkeypatch):
     path = os.getenv('SUMMARY6_TEST_PACKAGE')
     if not path:
         pytest.skip('private package not configured')
+    from pathlib import Path
+    monkeypatch.setattr(service, 'DATA', Path(os.getenv('SUMMARY6_TEST_DATA_DIR', str(PRODUCTION_DATA))))
+    monkeypatch.setattr(service, 'MANIFEST_SHA', PRODUCTION_DATA_PIN)
     monkeypatch.setenv('SUMMARY6_PACKAGE_DIR', path)
     monkeypatch.setenv('SUMMARY6_MANIFEST_SHA256', os.environ['SUMMARY6_TEST_MANIFEST_SHA256'])
     previous = []
@@ -138,7 +188,7 @@ def test_real_package_prefixes(client, monkeypatch):
         assert client.post(BASE+'/replay', json=b, headers=headers()).status_code == 200
 
 
-def test_demo_whitelist():
+def test_demo_whitelist(summary6_data):
     import gzip, json, hashlib
     from ml.summary6 import UNITS
     for lot in service.catalog()['lots']:

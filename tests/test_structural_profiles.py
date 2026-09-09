@@ -262,9 +262,9 @@ def test_group_by_fingerprint_clusters_same_structure(tmp_path: Path):
     assert sorted(len(paths) for paths in groups.values()) == [1, 2]
 
 
-def test_default_registry_matches_repository_candidate_profiles():
-    arburg = fingerprint_file("data/samples/arburg_1003_cycles.txt")
-    trs = fingerprint_file("data/samples/erp_trs_fevrier.xlsx")
+def test_default_registry_matches_repository_candidate_profiles(sample_data):
+    arburg = fingerprint_file(sample_data / 'arburg_1003_cycles.txt')
+    trs = fingerprint_file(sample_data / 'erp_trs_fevrier.xlsx')
     registry = load_profile_registry()
 
     arburg_match = registry.match(arburg)
@@ -276,7 +276,7 @@ def test_default_registry_matches_repository_candidate_profiles():
     assert trs_match.profile_id == "erp-trs-sample-v1"
     assert trs_match.record_kind == "production_order"
 
-    report = probe_file("data/samples/erp_trs_fevrier.xlsx")
+    report = probe_file(sample_data / 'erp_trs_fevrier.xlsx')
     assert report["mapping"]["parser_version"] == "erp-trs-v1"
     assert len(report["mapping"]["recognized_columns"]) == 17
     assert report["validation"]["missing_required_fields"] == []

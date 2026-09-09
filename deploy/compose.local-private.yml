@@ -1,0 +1,21 @@
+# Opt-in only; absent host paths fail instead of creating empty directories.
+services:
+  api:
+    environment:
+      HDT_RUNTIME_MODE: summary6_replay
+      SUMMARY6_DATA_DIR: /run/iddrv-private/summary6-data
+      SUMMARY6_PACKAGE_DIR: /run/iddrv-private/summary6-package
+      SUMMARY6_MANIFEST_SHA256: ${SUMMARY6_MANIFEST_SHA256:?Set the approved package manifest SHA256}
+    volumes:
+      - type: bind
+        source: ${SUMMARY6_DATA_DIR:?Set an existing absolute private observations directory}
+        target: /run/iddrv-private/summary6-data
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${SUMMARY6_PACKAGE_DIR:?Set an existing absolute approved package directory}
+        target: /run/iddrv-private/summary6-package
+        read_only: true
+        bind:
+          create_host_path: false

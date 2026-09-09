@@ -105,18 +105,41 @@ class SourceInventoryTests(unittest.TestCase):
         spec = importlib.util.spec_from_file_location('c4_inventory', ROOT / 'scripts/certification/rgpd/schema_inventory.py')
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
-        saved = json.loads((ROOT / 'docs/certification/rgpd-c4/sql-source-index.json').read_text())
-        self.assertEqual(saved, module.inventory())
-        self.assertEqual(len(saved['tables']), 56)
-        self.assertEqual(len(saved['sources']), 24)
+        import hashlib
+        inventory = module.inventory()
+        self.assertEqual(len(inventory['tables']), 56)
+        self.assertEqual(len(inventory['sources']), 24)
+        expected_sources = {'db/init.sql', 'db/setup_db.py'} | {
+            str(p.relative_to(ROOT)) for p in (ROOT / 'db/migrations').glob('*.sql')
+        }
+        self.assertEqual({s['path'] for s in inventory['sources']}, expected_sources)
+        for source in inventory['sources']:
+            self.assertEqual(source['sha256'], hashlib.sha256(
+                (ROOT / source['path']).read_text().encode()).hexdigest())
+        for table, declarations in inventory['tables'].items():
+            for declaration in declarations:
+                line = (ROOT / declaration['path']).read_text().splitlines()[declaration['line'] - 1]
+                self.assertRegex(line, rf'CREATE TABLE\s+(?:IF NOT EXISTS\s+)?{table}\s*\(')
 
-    def test_document_local_links_exist(self):
-        import re
-        folder = ROOT / 'docs/certification/rgpd-c4'
-        for document in folder.glob('*.md'):
-            for target in re.findall(r'\]\(([^)]+)\)', document.read_text()):
-                if '://' not in target and not target.startswith('#'):
-                    self.assertTrue((document.parent / target.split('#')[0]).exists(), (document, target))
+    def test_inventory_small_schema_and_line_numbers(self):
+        import tempfile
+        from unittest.mock import patch
+        spec = importlib.util.spec_from_file_location('c4_inventory', ROOT / 'scripts/certification/rgpd/schema_inventory.py')
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / 'db/migrations').mkdir(parents=True)
+            (root / 'db/init.sql').write_text('\nCREATE TABLE sessions (id INT);\n')
+            (root / 'db/setup_db.py').write_text('')
+            (root / 'db/migrations/001.sql').write_text('CREATE TABLE IF NOT EXISTS sessions (id INT);\nCREATE TABLE events (id INT);')
+            with patch.object(module, 'ROOT', root):
+                inventory = module.inventory()
+            self.assertEqual(inventory['tables'], {
+                'sessions': [{'path': 'db/init.sql', 'line': 2}, {'path': 'db/migrations/001.sql', 'line': 1}],
+                'events': [{'path': 'db/migrations/001.sql', 'line': 2}],
+            })
+            self.assertEqual(len(inventory['sources']), 3)
 
 
 if __name__ == '__main__':

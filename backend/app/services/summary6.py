@@ -9,7 +9,9 @@ from ml.runtime_mode import runtime_mode
 from ml.summary6 import load_package, score_cycles
 
 PACKAGE_ID = 'summary6-0c8b4c15cd4df33784468dfcd2057b52261122a8c90dbb0b1ba4a117b2870702'
-DATA = Path(__file__).resolve().parents[3] / 'data' / 'summary6'
+# Operator-only location; the immutable manifest pin still authenticates its contents.
+DATA = Path(os.environ.get('SUMMARY6_DATA_DIR',
+                           str(Path(__file__).resolve().parents[3] / 'data' / 'summary6'))).expanduser()
 MANIFEST_SHA = 'f0d95e3b88ab5c3cefe50483acac62fa6f674f8e85a9c60b721c0100c06a018b'
 
 
