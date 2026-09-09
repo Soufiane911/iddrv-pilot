@@ -113,6 +113,11 @@ jobs:
       - name: Run Playwright smoke suite
         run: npm run test:e2e -- --project=chromium
 
+      - name: Run isolated accessibility suite
+        run: npx playwright test --config playwright.accessibility.config.ts
+        env:
+          A11Y_PORT: '54179'
+
       - name: Upload Playwright report
         if: always()
         uses: actions/upload-artifact@v4

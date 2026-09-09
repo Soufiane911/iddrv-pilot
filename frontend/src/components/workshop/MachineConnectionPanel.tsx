@@ -27,9 +27,10 @@ function ConnectionForm({ api, machine, value, canConfigure }: { api: ApiClient;
       <label>Référence de secret (facultatif)<input value={draft.secret_ref ?? ''} placeholder="PRESS_606" onChange={event => change({ secret_ref: event.target.value || null })} /></label>
       <label>Fréquence de lecture (secondes)<input type="number" min={1} max={60} required value={draft.poll_interval_s} onChange={event => change({ poll_interval_s: Number(event.target.value) })} /></label>
       <label><input type="checkbox" checked={draft.enabled} onChange={event => change({ enabled: event.target.checked })} />Collecte active</label>
-      <button className="button-secondary" type="button" onClick={() => test.mutate()}>{test.isPending ? 'Test en cours…' : 'Tester la connexion'}</button>
+      <button className="button-secondary" type="button" onClick={event => { if (event.currentTarget.form?.reportValidity()) test.mutate(); }}>{test.isPending ? 'Test en cours…' : 'Tester la connexion'}</button>
       <button className="button-primary" type="submit">{save.isPending ? 'Enregistrement…' : 'Enregistrer la connexion'}</button>
     </fieldset>
+    {busy && <p role="status">{test.isPending ? 'Test de connexion en cours…' : 'Enregistrement de la connexion…'}</p>}
     {result && <p role="status" className={result.ok ? 'helper-status' : 'helper-error'}>{result.ok ? `API joignable · production ${result.source_state === 'running' ? 'observée' : result.source_state === 'stopped' ? 'arrêtée selon la source' : 'inconnue'}. Historique disponible depuis : ${result.oldest_available_at ? date(result.oldest_available_at) : 'aucun cycle disponible'}.` : errors[result.public_error ?? ''] ?? 'Connexion impossible. Vérifiez l’adresse, la référence et les accès.'}{result.sample_valid === false ? ' Le cycle de test contient des mesures à vérifier.' : ''}</p>}
     {message && <p role="alert" className="helper-error">{errors[message.message] ?? message.message}</p>}
     {save.isSuccess && <p role="status">Configuration enregistrée.</p>}

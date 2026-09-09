@@ -42,10 +42,11 @@ export function LoginPage() {
       <p className="muted">Identifiez-vous pour retrouver les sites, les incidents et leurs preuves.</p>
       <form className="login-form" onSubmit={submit}>
         <label htmlFor="login-email">Adresse e-mail</label>
-        <input id="login-email" type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
+        <input id="login-email" aria-describedby={mutation.isError ? 'login-error' : undefined} type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
         <label htmlFor="login-password">Mot de passe</label>
-        <input id="login-password" type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} required />
-        {mutation.isError && <StatePanel tone="error" title="Connexion refusée" text={mutation.error instanceof Error ? mutation.error.message : 'Vérifiez vos identifiants.'} />}
+        <input id="login-password" aria-describedby={mutation.isError ? 'login-error' : undefined} type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} required />
+        {mutation.isError && <div id="login-error"><StatePanel tone="error" title="Connexion refusée" text={mutation.error instanceof Error ? mutation.error.message : 'Vérifiez vos identifiants.'} /></div>}
+        {mutation.isPending && <p role="status">Connexion en cours…</p>}
         {mutation.isSuccess && <StatePanel tone="success" title="Connexion établie" text="Ouverture de votre périmètre…" />}
         <button className="button-primary login-submit" type="submit" disabled={mutation.isPending}>{mutation.isPending ? 'Connexion…' : 'Ouvrir la supervision'}</button>
       </form>
