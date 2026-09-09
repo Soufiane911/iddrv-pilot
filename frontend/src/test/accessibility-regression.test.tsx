@@ -60,6 +60,7 @@ for (const kind of ['presse', 'planning'] as const) {
     const trigger = screen.getByRole('button', { name: 'Ouvrir' });
     await user.click(trigger);
     const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByLabelText(kind === 'presse' ? 'Nom de la presse' : 'Numéro OF')).toHaveFocus();
     const buttons = within(dialog).getAllByRole('button');
     buttons[buttons.length - 1].focus(); await user.tab(); expect(buttons[0]).toHaveFocus();
     await user.tab({ shift: true }); expect(buttons[buttons.length - 1]).toHaveFocus();

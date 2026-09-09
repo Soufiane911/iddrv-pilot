@@ -28,7 +28,25 @@ Référence de travail : [WCAG 2.2](https://www.w3.org/TR/WCAG22/), niveau AA ci
 
 Les noms accessibles des champs auth, presse, sources et planning existaient déjà via labels explicites ou englobants et sont conservés. Les statuts ne reposent pas seulement sur la couleur. Le contraste global, les graphiques et les états désactivés n’ont pas fait l’objet d’un inventaire complet.
 
-## Vérification reproductible
+## Correctif de revue P1/P2 (après `004ade0c`)
+
+- Tests déplacés de `frontend/e2e/` vers `frontend/e2e-accessibility/`, exclus aussi de Vitest. La smoke standard reste en démo/skip-auth ; la suite dédiée les désactive et est exécutée **après** la smoke dans `frontend-e2e`, avec le même Chromium installé, sans secret, port loopback CI dédié `54179`, sans réutilisation de serveur. Les sorties dédiées sont relatives au dépôt (`test-results/accessibility`), sans captures dans un répertoire personnel.
+- Suppression des wrappers devenus inertes et de leur CSS inutilisée ; positionnement des drawers conservé par le CSS du dialogue. La fermeture extérieure exige pointer-down, pointer-up puis click hors du rectangle du dialogue, hors mutation. Un glisser commencé à l’intérieur ne ferme pas. Focus initial : premier champ activable, puis bouton en fallback.
+- Chromium strict (`CI=true`) : standard **36/36** en **39,8 s**, port `54284` ; dédiée **4/4** en **2,5 s**, puis replay `--repeat-each=2` **8/8** en **3,8 s**, port `54283`, sans retry nécessaire. Durées de tests uniquement, pas mesures de performance produit.
+- Routes dédiées : `/sites`, `/login` (HTTP intercepté), `/e2e-accessibility/dialogs.html` (fixture navigateur montant les vrais PressFormDrawer et ProductionAssignmentEditor avec providers/styles réels, persistance simulée). Pour chacun des deux éditeurs : clic intérieur et glisser intérieur→extérieur conservés, clic `(10,100)` ferme au repos, ne ferme pas pendant mutation, Échap bloqué pendant attente puis fermeture/restauration après refus simulé, premier champ focalisé, boucle Tab/Maj+Tab et arrière-plan non focalisable.
+- RTL accessibilité : **29/29** ; suite frontend complète finale : **22 fichiers, 180 réussis, 2 ignorés existants**. `npm run lint` complet, `npx tsc -b` et `git diff --check` réussis. Aucun changement du catalogue/API réalisé.
+- Limite locale smoke : Vite standard refuse les polices provenant du node_modules lié hors racine ; les 36 tests passent avec fallback. La suite dédiée autorise explicitement ce chemin réel et charge les polices. Le lien temporaire est retiré, aucune dépendance installée. Ces vérifications ne prouvent ni parcours backend métier complet, ni performance, ni conformité WCAG globale.
+
+Commandes de revue (depuis frontend, ports libres, serveurs propres) :
+
+    CI=true PLAYWRIGHT_PORT=54284 npm run test:e2e -- --project=chromium
+    CI=true A11Y_PORT=54283 npx playwright test --config playwright.accessibility.config.ts
+    CI=true A11Y_PORT=54283 npx playwright test --config playwright.accessibility.config.ts --repeat-each=2
+    CI=true npm test
+    npm run lint
+    npx tsc -b
+
+## Vérification initiale (historique avant revue)
 
 Preuves locales sans données utilisateur, identifiants réels ou jetons : `/tmp/iddrv-a11y-id/`.
 
@@ -51,7 +69,7 @@ Les configs dédiées exigent `reuseExistingServer: false`, host `127.0.0.1`, `s
 ## Impacts d’intégration et limites
 
 - **Impact commun sur summary6** : la bordure globale input/select/textarea devient plus contrastée y compris dans monitoring et les autres écrans. `Layout` change l’annonce d’erreur et le focus du lien d’évitement pour toutes les routes. Vérifier visuellement les champs de summary6 après fusion. Aucun contrat API changé.
-- AccessibleDialog est nouveau, adopté uniquement dans sites/presse/planning ; drawers restent alignés à droite. Les anciens wrappers restent présents, le dialog natif utilise la top layer au-dessus de la navigation mobile.
+- AccessibleDialog est nouveau, adopté uniquement dans sites/presse/planning ; drawers restent alignés à droite. Les anciens wrappers ont été supprimés lors de la revue ; le dialog natif utilise la top layer au-dessus de la navigation mobile.
 - Le fallback DOM sert jsdom sans top layer : la preuve d’inertie vient du test Chromium `:modal`, pas d’axe/RTL.
 - Aucun lecteur d’écran humain testé. Axe jsdom ne mesure pas le contraste. Ratio documenté limité aux couleurs indiquées.
 - Parcours API réels, expiration/renouvellement session, enregistrement et refus serveur réels non vérifiés dans ce lot.

@@ -67,8 +67,7 @@ export function PressFormDrawer({ api, siteId, open, machine = null, onClose, on
     onClose();
   }
   const editing = Boolean(machine);
-  return <div className="workshop-form-drawer-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) close(); }}>
-    <AccessibleDialog className="workshop-form-drawer" labelledBy="press-form-title" describedBy="press-form-description" onClose={close} busy={create.isPending}>
+  return <AccessibleDialog className="workshop-form-drawer" labelledBy="press-form-title" describedBy="press-form-description" onClose={close} busy={create.isPending}>
       <header><div><p className="eyebrow">PARC MACHINE</p><h2 id="press-form-title">{editing ? 'Modifier la presse' : 'Ajouter une presse'}</h2></div><button className="button-secondary" type="button" onClick={close} disabled={create.isPending}>Fermer</button></header>
       <p className="muted" id="press-form-description">{editing ? 'Modifiez l’identité atelier ou associez la référence ERP à cette presse. La référence ERP est unique dans le site.' : 'La presse est créée immédiatement dans le catalogue. Son mapping source pourra être fait plus tard.'} Appuyez sur Échap pour fermer.</p>
       <form onSubmit={submit}>
@@ -82,6 +81,5 @@ export function PressFormDrawer({ api, siteId, open, machine = null, onClose, on
         {validationError && <p id="press-form-error" className="helper-error" role="alert">{validationError}</p>}
         <div className="workshop-form-actions"><button className="button-secondary" type="button" onClick={close} disabled={create.isPending}>Annuler</button><button className="button-primary" type="submit" disabled={create.isPending}>{create.isPending ? 'Enregistrement…' : editing ? 'Enregistrer les modifications' : 'Ajouter la presse'}</button></div>
       </form>
-    </AccessibleDialog>
-  </div>;
+    </AccessibleDialog>;
 }
