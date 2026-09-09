@@ -15,6 +15,14 @@ def client(monkeypatch):
     monkeypatch.setenv('HDT_RUNTIME_MODE', 'summary6_replay')
     monkeypatch.setattr('backend.app.auth_repository.session_is_active', lambda *a: True)
     app = FastAPI()
+    from backend.app.middleware import RequestContextMiddleware
+    from backend.app.errors import validation_exception_handler, http_exception_handler, unhandled_exception_handler
+    from fastapi import HTTPException
+    from fastapi.exceptions import RequestValidationError
+    app.add_middleware(RequestContextMiddleware)
+    app.add_exception_handler(RequestValidationError, validation_exception_handler)
+    app.add_exception_handler(HTTPException, http_exception_handler)
+    app.add_exception_handler(Exception, unhandled_exception_handler)
     app.include_router(router)
     app.include_router(legacy)
     with TestClient(app) as c:
@@ -87,18 +95,24 @@ def test_historical_post_guard_and_rollback(client, monkeypatch):
     scoring.assert_called_once()
 
 
-def test_worker_suspended(monkeypatch):
+@pytest.mark.parametrize('mode', ['summary6_replay', None, 'unknown'])
+def test_worker_suspended(monkeypatch, mode):
     from ingest.telemetry.scorer import score_pending_once, claim_job, request_recalculation
-    monkeypatch.setenv('HDT_RUNTIME_MODE', 'summary6_replay')
+    if mode is None:
+        monkeypatch.delenv('HDT_RUNTIME_MODE', raising=False)
+    else:
+        monkeypatch.setenv('HDT_RUNTIME_MODE', mode)
     assert score_pending_once(database_url='must-not-connect') == 0
     assert claim_job(None) is None
     from ingest.telemetry.scorer import finish_job
     assert finish_job(None, None, None) is False
     with pytest.raises(ValueError, match='historical_scoring_disabled'):
         request_recalculation(None, site_id=7, prediction_id='a')
-    monkeypatch.delenv('HDT_RUNTIME_MODE')
+    monkeypatch.delenv('HDT_RUNTIME_MODE', raising=False)
     from ml.runtime_mode import historical_enabled
-    assert historical_enabled()
+    assert not historical_enabled()
+    from ml.runtime_mode import runtime_mode
+    assert runtime_mode() == 'disabled'
 
 
 def test_real_package_prefixes(client, monkeypatch):

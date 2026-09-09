@@ -3,7 +3,8 @@ import os
 
 
 def runtime_mode():
-    return os.getenv('HDT_RUNTIME_MODE', 'historical')
+    mode = os.getenv('HDT_RUNTIME_MODE', 'disabled')
+    return mode if mode in {'historical', 'summary6_replay'} else 'disabled'
 
 
 def historical_enabled():

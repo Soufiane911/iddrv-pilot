@@ -54,12 +54,9 @@ function replayWindow(cutoff?: string | null): { start: string; end: string } {
 }
 
 import { RuntimeBoundary } from '../components/monitoring/RuntimeBoundary';
+import { ProcessDriftPanel } from '../components/ProcessDriftPanel';
 
 export function WorkshopPage() {
-  return <RuntimeBoundary><HistoricalWorkshopPage /></RuntimeBoundary>;
-}
-
-function HistoricalWorkshopPage() {
   const { siteId: siteIdParam } = useParams();
   const siteId = Number(siteIdParam);
   const api = useApi();
@@ -298,6 +295,10 @@ function HistoricalWorkshopPage() {
     {sourceDiscoveryLoading ? <StatePanel tone="loading" title="Recherche de la borne source" text="Le dernier horodatage des cycles et incidents est en cours de lecture." /> : null}
     {sourceDiscoveryUnavailable ? <StatePanel tone="warning" title="Replay indisponible" text="Aucun horodatage de donnée source n’est disponible. L’heure d’import n’est pas utilisée comme substitut." action="Réessayer" onAction={() => { sourceCutoffQueries.forEach((query) => query.refetch()); incidentsQuery.refetch(); }} /> : null}
     {!machinesQuery.isPending && !machinesQuery.isError && activeMachines.length === 0 ? setup : null}
+    <RuntimeBoundary siteId={siteId}>
+      {replayReady && <ProcessDriftPanel api={api} siteId={siteId} cycles={processDriftCycles} cyclesLoading={processDriftQuery.isPending} cyclesError={processDriftQuery.error} onRetryCycles={() => processDriftQuery.refetch()} machineName={replayMachine?.name} persistedPrediction={persistedPrediction} readOnly={timeMode === 'direct'} />}
+    </RuntimeBoundary>
+    <p className="muted">Les statuts, incidents et métriques atelier ci-dessous proviennent des sources métier, pas du replay synthétique summary6.</p>
     {workspaceReady ? <>
       {setup}
       <WorkshopWorkspace
@@ -330,6 +331,7 @@ function HistoricalWorkshopPage() {
       range={range}
       replayPercent={replayPercent}
       timeline={timeline}
+      processDriftPanel={null}
       processDriftApi={api}
       processDriftSiteId={siteId}
       processDriftCycles={processDriftCycles}

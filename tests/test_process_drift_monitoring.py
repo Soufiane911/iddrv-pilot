@@ -23,7 +23,8 @@ client = TestClient(app)
 
 
 @pytest.fixture(autouse=True)
-def _clean_monitoring_state():
+def _clean_monitoring_state(monkeypatch):
+    monkeypatch.setenv('HDT_RUNTIME_MODE', 'historical')
     # Reset after each test so the process-wide singleton and the model cache
     # never leak state across tests, while consecutive tests still share a build.
     yield

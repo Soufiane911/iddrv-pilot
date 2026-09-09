@@ -12,4 +12,4 @@ if not state['replay_enabled']:
     raise SystemExit('Summary6 unavailable: '+','.join(state['reasons']))
 print(state)
 PY
-exec python -m uvicorn backend.app.main:app --host 127.0.0.1 --port "${SUMMARY6_PORT:-8096}"
+exec python -m uvicorn backend.app.main:app --workers 1 --host 127.0.0.1 --port "${SUMMARY6_PORT:-8096}"

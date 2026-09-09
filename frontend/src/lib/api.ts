@@ -1122,7 +1122,7 @@ export function createApiClient(baseUrl = import.meta.env.VITE_API_URL ?? '/api/
         ? ({ invalid_credentials: 'Identifiants invalides.', authentication_required: 'Authentification requise.', invalid_token: 'Session invalide.', session_revoked: 'Session expirée.' } as Record<string, string>)[detail] ?? detail.split('_').join(' ')
         : typeof detailRecord?.message === 'string' ? detailRecord.message : undefined;
       const message = error?.message ?? detailMessage ?? (typeof payload === 'string' ? payload : `API indisponible (${response.status})`);
-      throw new ApiRequestError(response.status, message, error?.code ?? detailCode ?? `http_${response.status}`, error?.details ?? detailRecord ?? {});
+      throw new ApiRequestError(response.status, message, error?.code ?? detailCode ?? `http_${response.status}`, { ...(error?.details ?? detailRecord ?? {}), retryAfter: response.headers?.get('Retry-After') });
     }
     return payload as T;
   }

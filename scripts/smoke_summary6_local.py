@@ -3,6 +3,7 @@ Creates ONLY its uniquely named tmpfs container and removes ONLY that container.
 Requires cached Timescale image, Docker and the exact approved Python environment.
 """
 import os
+import json
 from pathlib import Path
 import secrets
 import socket
@@ -18,17 +19,46 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 
+def stop_server(server):
+    if server is None:
+        return
+    server.terminate()
+    try:
+        server.wait(timeout=10)
+    except subprocess.TimeoutExpired:
+        server.kill()
+        server.wait(timeout=10)
+
+
+def remove_owned_container(name, owner):
+    inspected = subprocess.run(['docker', 'inspect', name], capture_output=True, text=True)
+    if inspected.returncode:
+        return
+    info = json.loads(inspected.stdout)[0]
+    if info.get('Config', {}).get('Labels', {}).get('iddrv.summary6.smoke') != owner:
+        raise RuntimeError('smoke_container_ownership_mismatch')
+    subprocess.run(['docker', 'rm', '-f', info['Id']], check=True, stdout=subprocess.DEVNULL)
+
+
 def run():
-    name = 'iddrv-summary6-smoke-' + uuid.uuid4().hex[:12]
+    # Fail before Docker/network for missing, corrupt or incompatible artifacts.
+    os.environ['HDT_RUNTIME_MODE'] = 'summary6_replay'
+    from backend.app.services.summary6 import current
+    if not current()['replay_enabled']:
+        raise RuntimeError('summary6_preflight_unavailable')
+    owner = uuid.uuid4().hex
+    name = 'iddrv-summary6-smoke-' + owner
     password = secrets.token_urlsafe(24)
     server = None
-    started = False
+    attempted = False
+    conn = None
     try:
+        attempted = True
         subprocess.run(['docker', 'run', '-d', '--pull=never', '--name', name,
+                        '--label', 'iddrv.summary6.smoke=' + owner,
                         '--tmpfs', '/var/lib/postgresql/data:rw', '-p', '127.0.0.1::5432',
                         '-e', 'POSTGRES_DB=summary6_smoke', '-e', 'POSTGRES_PASSWORD='+password,
                         'timescale/timescaledb:2.28.2-pg16'], check=True, capture_output=True)
-        started = True
         port = subprocess.check_output(['docker', 'port', name, '5432/tcp'], text=True).strip().split(':')[-1]
         database = f'postgresql://postgres:{password}@127.0.0.1:{port}/summary6_smoke'
         for _ in range(60):
@@ -52,7 +82,7 @@ def run():
         create_user('summary6@example.test', password, 'Summary6 smoke', 'viewer', [site])
         with socket.socket() as sock:
             sock.bind(('127.0.0.1', 0)); api_port = sock.getsockname()[1]
-        server = subprocess.Popen([sys.executable, '-m', 'uvicorn', 'backend.app.main:app', '--host', '127.0.0.1', '--port', str(api_port)],
+        server = subprocess.Popen([sys.executable, '-m', 'uvicorn', 'backend.app.main:app', '--workers', '1', '--host', '127.0.0.1', '--port', str(api_port)],
                                   cwd=ROOT, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         with httpx.Client(base_url=f'http://127.0.0.1:{api_port}', timeout=30) as client:
             for _ in range(60):
@@ -82,12 +112,16 @@ def run():
             with conn.cursor() as cur:
                 cur.execute('SELECT count(*) FROM incidents'); assert cur.fetchone()[0] == before
             print('PASS real localhost HTTP / DB login / site isolation / approved package / cutoffs / no incident writes')
-        conn.close()
     finally:
-        if server:
-            server.terminate(); server.wait(timeout=10)
-        if started:
-            subprocess.run(['docker', 'rm', '-f', name], check=True, stdout=subprocess.DEVNULL)
+        try:
+            stop_server(server)
+        finally:
+            try:
+                if conn is not None:
+                    conn.close()
+            finally:
+                if attempted:
+                    remove_owned_container(name, owner)
 
 
 if __name__ == '__main__':

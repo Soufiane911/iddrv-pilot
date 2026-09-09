@@ -39,12 +39,26 @@ def catalog():
         raise Unavailable('summary6_dataset_unavailable') from None
 
 
+def verify_demo_files():
+    manifest = catalog()
+    try:
+        if len(manifest['lots']) != 6:
+            raise ValueError()
+        for entry in manifest['lots']:
+            raw = (DATA / (entry['lot_id'] + '.jsonl.gz')).read_bytes()
+            if hashlib.sha256(raw).hexdigest() != entry['sha256']:
+                raise ValueError()
+    except Exception:
+        raise Unavailable('summary6_dataset_unavailable') from None
+    return manifest
+
+
 def current():
     loaded = None
     reasons = []
     try:
         loaded = package().runtime_id
-        catalog()
+        verify_demo_files()
     except Unavailable as exc:
         reasons.append(str(exc))
     mode = runtime_mode()
@@ -57,7 +71,7 @@ def current():
 
 
 def replay(source, loaded):
-    manifest = catalog()
+    manifest = verify_demo_files()
     entry = next((x for x in manifest['lots'] if x['lot_id'] == source.lot_id), None)
     if source.dataset_id != manifest['dataset_id'] or entry is None:
         raise ValueError('unknown_demo_dataset_or_lot')

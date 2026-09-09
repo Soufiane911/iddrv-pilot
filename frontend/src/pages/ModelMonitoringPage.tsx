@@ -35,7 +35,7 @@ function loadHistory(): HdtHistoryEntry[] {
 import { RuntimeBoundary } from '../components/monitoring/RuntimeBoundary';
 
 export function ModelMonitoringPage() {
-  return <RuntimeBoundary><HistoricalMonitoringPage /></RuntimeBoundary>;
+  return <><ToolsNavigation /><RuntimeBoundary><HistoricalMonitoringPage /></RuntimeBoundary></>;
 }
 
 function HistoricalMonitoringPage() {
@@ -67,13 +67,12 @@ function HistoricalMonitoringPage() {
 
   return (
     <section className="page page-wide">
-      <ToolsNavigation />
       <div className="page-intro">
         <div>
           <p className="eyebrow">INTELLIGENCE ARTIFICIELLE</p>
-          <h2>Monitoring du modèle HDT</h2>
+          <h2>Monitoring du modèle HDT — profil historique</h2>
           <p className="muted">
-            Supervision du modèle de détection de dérive process (HDT) : version, métriques offline, simulateur interactif et retours terrain.
+            Références historiques HDT : métriques offline, simulateur et retours terrain. La version par défaut ci-dessous n’atteste pas le paquet réellement chargé et ne décrit jamais summary6.
           </p>
         </div>
       </div>

@@ -28,6 +28,7 @@ services:
   api:
     build: { context: .., dockerfile: backend/Dockerfile }
     environment:
+      HDT_RUNTIME_MODE: historical
       DATABASE_URL: postgresql://iddrv_owner:${REFONTE_TEST_DB_PASSWORD}@timescaledb:5432/iddrv_test
       REDIS_URL: redis://redis:6379/0
       APP_ENV: test
@@ -42,6 +43,7 @@ services:
   worker:
     build: { context: .., dockerfile: backend/Dockerfile }
     environment:
+      HDT_RUNTIME_MODE: historical
       WORKER_DATABASE_URL: postgresql://iddrv_owner:${REFONTE_TEST_DB_PASSWORD}@timescaledb:5432/iddrv_test
       DATABASE_URL: postgresql://iddrv_owner:${REFONTE_TEST_DB_PASSWORD}@timescaledb:5432/iddrv_test
       REDIS_URL: redis://redis:6379/0
@@ -52,6 +54,7 @@ services:
   collector:
     build: { context: .., dockerfile: backend/Dockerfile }
     environment:
+      HDT_RUNTIME_MODE: historical
       WORKER_DATABASE_URL: postgresql://iddrv_owner:${REFONTE_TEST_DB_PASSWORD}@timescaledb:5432/iddrv_test
       TELEMETRY_ALLOWED_ORIGINS: http://press-api:8090
       TELEMETRY_ALLOW_HTTP: 'true'
@@ -60,6 +63,7 @@ services:
   scorer:
     build: { context: .., dockerfile: backend/Dockerfile }
     environment:
+      HDT_RUNTIME_MODE: historical
       WORKER_DATABASE_URL: postgresql://iddrv_owner:${REFONTE_TEST_DB_PASSWORD}@timescaledb:5432/iddrv_test
       PROCESS_DRIFT_MODEL_PATH: /app/models/process_drift_hdt_v1.joblib
     depends_on: { migrate: { condition: service_completed_successfully } }

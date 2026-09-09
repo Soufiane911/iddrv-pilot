@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from ..security import Identity, require_roles, require_site
 from ..services import summary6 as service
 from ml.runtime_mode import runtime_mode
+from ..services.summary6_admission import admit
 
 router = APIRouter(prefix='/api/v1/process-drift/summary6', tags=['machine-learning'])
 auth = require_roles('viewer', 'analyst', 'supervisor', 'admin')
@@ -30,18 +31,19 @@ class DemoSource(BaseModel):
 
 class ReplayRequest(BaseModel):
     model_config = ConfigDict(extra='forbid', strict=True)
-    site_id: int = Field(gt=0)
+    site_id: int = Field(gt=0, le=9223372036854775807)
     expected_package_id: str = Field(min_length=1, max_length=100)
     source: Annotated[DemoSource, Field(discriminator='kind')]
 
 
 @router.get('/current')
 def current(identity: Identity = Depends(auth)):
-    return service.current()
+    with admit(identity):
+        return service.current()
 
 
 @router.get('/demo-datasets')
-def datasets(site_id: int = Query(gt=0), identity: Identity = Depends(auth)):
+def datasets(site_id: int = Query(gt=0, le=9223372036854775807), identity: Identity = Depends(auth)):
     authorize_site(identity, site_id)
     try:
         return service.catalog()
@@ -54,6 +56,11 @@ def replay(payload: ReplayRequest, identity: Identity = Depends(auth)):
     authorize_site(identity, payload.site_id)
     if runtime_mode() != 'summary6_replay':
         raise HTTPException(409, 'summary6_profile_not_enabled')
+    with admit(identity):
+        return admitted_replay(payload)
+
+
+def admitted_replay(payload):
     started = time.perf_counter()
     try:
         loaded = service.package()
