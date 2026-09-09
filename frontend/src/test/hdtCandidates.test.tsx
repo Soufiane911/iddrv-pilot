@@ -1,10 +1,19 @@
+/// <reference types="node" />
 import { afterEach, expect, it, vi } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { HdtCandidates } from '../components/monitoring/HdtCandidates';
 import { createApiClient, type HdtCatalog } from '../lib/api';
-import catalog from '../../../models/hdt/catalog.json';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, resolve } from 'node:path';
+
+// Read the versioned source of truth only at test runtime. The production
+// Docker build contains frontend/ alone and must not resolve models/ via tsc.
+const catalog: HdtCatalog = JSON.parse(
+  readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../../../models/hdt/catalog.json'), 'utf8'),
+);
 
 function mount(getHdtCandidates: () => Promise<HdtCatalog>) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
