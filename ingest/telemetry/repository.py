@@ -25,6 +25,7 @@ def _json_safe(value):
 
 
 def store_page(conn, *, connection_id: UUID, page: CyclePage, received_at: datetime) -> CollectionResult:
+    from ml.runtime_mode import historical_enabled
     inserted = duplicates = rejected = conflicts = 0
     inserted_dates = []
     with conn:
@@ -87,9 +88,10 @@ def store_page(conn, *, connection_id: UUID, page: CyclePage, received_at: datet
                 fields.update({column: item.measurements[key] for key, (column, _) in MEASUREMENTS.items() if key in item.measurements})
                 cur.execute(sql.SQL('INSERT INTO machine_cycles ({}) VALUES ({})').format(
                     sql.SQL(',').join(map(sql.Identifier, fields)), sql.SQL(',').join(sql.Placeholder() for _ in fields)), list(fields.values()))
-                cur.execute('''INSERT INTO hdt_scoring_jobs(event_id,machine_id,site_id,model_version,mode,calculation_revision)
-                            VALUES(%s,%s,%s,%s,'live',1)''',
-                            (event_id, connection['machine_id'], connection['site_id'], os.getenv('TELEMETRY_MODEL_VERSION', 'hdt-process-drift-iforest-v1')))
+                if historical_enabled():
+                    cur.execute('''INSERT INTO hdt_scoring_jobs(event_id,machine_id,site_id,model_version,mode,calculation_revision)
+                                VALUES(%s,%s,%s,%s,'live',1)''',
+                                (event_id, connection['machine_id'], connection['site_id'], os.getenv('TELEMETRY_MODEL_VERSION', 'hdt-process-drift-iforest-v1')))
                 inserted += 1
                 inserted_dates.append(item.cycle_ended_at)
             stale = stale or (offset is not None and bool(page.items) and inserted + rejected == 0)
@@ -116,4 +118,4 @@ def store_page(conn, *, connection_id: UUID, page: CyclePage, received_at: datet
                         state=%s,public_error=%s,failure_count=0,next_poll_at=%s + (CASE WHEN %s THEN 0 ELSE poll_interval_s END)*interval '1 second',updated_at=%s WHERE id=%s''',
                         (received_at, received_at, last_cycle, last_cycle, 'contract_error' if conflicts else 'collecting',
                          'event_content_conflict' if conflicts else None, received_at, page.has_more, received_at, str(connection_id)))
-    return CollectionResult(inserted, duplicates, rejected, cursor, inserted, conflicts, 'contract_error' if conflicts else 'collecting')
+    return CollectionResult(inserted, duplicates, rejected, cursor, inserted if historical_enabled() else 0, conflicts, 'contract_error' if conflicts else 'collecting')

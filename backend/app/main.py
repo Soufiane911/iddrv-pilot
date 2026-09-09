@@ -48,6 +48,8 @@ app.include_router(investigations_router)
 app.include_router(workspace_router)
 app.include_router(scrap_risk_router)
 app.include_router(process_drift_router)
+from .api.summary6 import router as summary6_router
+app.include_router(summary6_router)
 app.include_router(erp_imports_router)
 app.include_router(machine_management_router)
 app.include_router(machine_connections_router)
@@ -82,6 +84,10 @@ def live() -> dict[str, str]:
 
 
 def check_model_artifact() -> bool:
+    from ml.runtime_mode import runtime_mode
+    if runtime_mode() != 'historical':
+        from .services.summary6 import current
+        return current()['replay_enabled']
     try:
         _model_artifact()
         return True

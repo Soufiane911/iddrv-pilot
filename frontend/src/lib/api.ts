@@ -635,7 +635,32 @@ export interface HdtPrediction {
   reason?: string | null;
 }
 
+export interface Summary6Current {
+  selected_package_id: string; loaded_package_id: string | null;
+  active_mode: string; readiness: 'ready' | 'not_ready';
+  replay_enabled: boolean; live_enabled: false; reasons: string[];
+}
+export interface Summary6Datasets {
+  dataset_id: string; synthetic: true; lots: { lot_id: string; count: number }[];
+}
+export interface Summary6Result {
+  runtime_id: string; cycle_counter: number; status: 'available' | 'abstained';
+  reason: string | null; instant_score: number | null; decision_score: number | null;
+  threshold: number | null; alert: boolean | null; signals: [];
+}
+export interface Summary6Response {
+  site_id: number; package_id: string; manifest_sha256: string; active_mode: string;
+  input_count: number; through_cycle: number; evaluated_through: string;
+  latest: Summary6Result; series: Summary6Result[];
+}
+export interface Summary6Input {
+  site_id: number; expected_package_id: string;
+  source: { kind: 'demo_dataset'; dataset_id: string; lot_id: string; through_cycle: number };
+}
 export interface ApiClient {
+  getSummary6Current(): Promise<Summary6Current>;
+  getSummary6Datasets(siteId: number): Promise<Summary6Datasets>;
+  replaySummary6(input: Summary6Input): Promise<Summary6Response>;
   getMachineConnection(machineId: number): Promise<MachineConnection | null>;
   saveMachineConnection(machineId: number, input: MachineConnectionInput): Promise<MachineConnection>;
   testMachineConnection(machineId: number, input: MachineConnectionInput): Promise<MachineConnectionTest>;
@@ -1138,6 +1163,9 @@ export function createApiClient(baseUrl = import.meta.env.VITE_API_URL ?? '/api/
   }
 
   return {
+    getSummary6Current: () => request<Summary6Current>('/process-drift/summary6/current'),
+    getSummary6Datasets: (siteId) => request<Summary6Datasets>(`/process-drift/summary6/demo-datasets?site_id=${siteId}`),
+    replaySummary6: (input) => request<Summary6Response>('/process-drift/summary6/replay', { method: 'POST', body: input }),
     async getHealth() {
       const healthRoot = import.meta.env.VITE_HEALTH_URL ? normaliseBaseUrl(import.meta.env.VITE_HEALTH_URL) : apiBase.replace(/\/api(?:\/v1)?$/, '') || '/api';
       const payload = await request<Record<string, unknown>>('/health', {}, healthRoot);
@@ -1423,6 +1451,9 @@ function demoMachineCycles(machineId: number, asOf?: string, limit = 20): Machin
 
 /** A deterministic client used by component tests and an explicit demo mode. */
 export const mockApiClient: ApiClient = {
+  getSummary6Current: async () => ({ selected_package_id: '', loaded_package_id: null, active_mode: 'historical', readiness: 'not_ready', replay_enabled: false, live_enabled: false, reasons: ['mock_not_executable'] }),
+  getSummary6Datasets: async () => { throw new Error('Replay exige une API authentifiée réelle.'); },
+  replaySummary6: async () => { throw new Error('Replay exige une API authentifiée réelle.'); },
   getHealth: async () => ({ status: 'ok', service: 'iddrv-demo', database: 'ok', checkedAt: DEMO_DATE, message: 'API de démonstration connectée.' }),
   getReadiness: async () => ({ status: 'ready', service: 'iddrv-demo', database: 'ok', redis: 'ok', model: 'ok', checkedAt: DEMO_DATE }),
   getSites: async () => DEMO_SITES,

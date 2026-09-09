@@ -53,7 +53,13 @@ function replayWindow(cutoff?: string | null): { start: string; end: string } {
   };
 }
 
+import { RuntimeBoundary } from '../components/monitoring/RuntimeBoundary';
+
 export function WorkshopPage() {
+  return <RuntimeBoundary><HistoricalWorkshopPage /></RuntimeBoundary>;
+}
+
+function HistoricalWorkshopPage() {
   const { siteId: siteIdParam } = useParams();
   const siteId = Number(siteIdParam);
   const api = useApi();

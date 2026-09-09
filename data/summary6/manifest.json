@@ -1,0 +1,39 @@
+{
+  "dataset_id": "synthetic-61007-l15-v1",
+  "synthetic": true,
+  "source": "output/hdt-feature-hypotheses-2026-09-07/run01/confirmation/dataset_61007/observations.csv.gz",
+  "source_sha256": "03953646a5eae466ddbd1e86e7295a0a9670442161b461284cc7c78a396b4e6e",
+  "selection": "M1/M2/M3 x R1/R2, L15, counters 0..399; no outcome selection",
+  "lots": [
+    {
+      "lot_id": "M1-R1-L15",
+      "sha256": "6425246a8ce7441643801260b9bc2a1dd37b6e2e405324dd26d0d36729522a61",
+      "count": 400
+    },
+    {
+      "lot_id": "M1-R2-L15",
+      "sha256": "d485a568c2ad7a3bbd3155e6f3b39e6082b8933e48ae4a1c698af31cc6e1d370",
+      "count": 400
+    },
+    {
+      "lot_id": "M2-R1-L15",
+      "sha256": "33b9bb9a461b9a9bd03475b1ecaa20ed31e872a27482589e7f3be861520bcc61",
+      "count": 400
+    },
+    {
+      "lot_id": "M2-R2-L15",
+      "sha256": "8ff04708a06cd2e112deb2e7253289d4ebe9582812993322ec2d220c159d9a20",
+      "count": 400
+    },
+    {
+      "lot_id": "M3-R1-L15",
+      "sha256": "4665135df13e1ebf305dd40200305082ddb2b29b6db86024713052161737a7c9",
+      "count": 400
+    },
+    {
+      "lot_id": "M3-R2-L15",
+      "sha256": "02affaa6f8543ce78b2e35e32d09f6a3453de852f57515fefaf7753e8e061dae",
+      "count": 400
+    }
+  ]
+}

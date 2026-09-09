@@ -43,6 +43,9 @@ def score_process_drift(payload: ProcessDriftRequest,
     identity: Identity = Depends(require_roles("viewer", "analyst", "supervisor", "admin"))):
     from ..services.process_drift import score_history
     require_site(identity,payload.site_id)
+    from ml.runtime_mode import historical_enabled
+    if not historical_enabled():
+        raise HTTPException(409, 'historical_scoring_disabled: use summary6/replay; live_not_connected')
     started = time.perf_counter()
     outcome = score_history([cycle.model_dump() for cycle in payload.cycles],artifact=_model_artifact,mode='historical')
     if outcome.status != 'scored':
