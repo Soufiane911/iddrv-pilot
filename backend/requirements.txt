@@ -1,3 +1,5 @@
+-c ../constraints-numerical.txt
+
 fastapi>=0.117,<0.118
 uvicorn[standard]>=0.30,<1
 psycopg2-binary>=2.9
@@ -8,9 +10,9 @@ pandas>=2.0
 openpyxl>=3.1
 xlrd>=2.0,<3
 redis>=5.0,<7
-# Pinned to the versions used to train models/*.joblib (pickle compatibility).
-scikit-learn==1.7.2
-joblib==1.5.2
+# Versions are shared with training/ingest in ../constraints-numerical.txt.
+scikit-learn
+joblib
 
 python-multipart>=0.0.20,<1
 
