@@ -4,15 +4,17 @@
 **/__pycache__
 frontend/node_modules
 frontend/dist
-data/raw
-data/archive
-data/quarantine
-data/inbox
-data/processing
-data/scenarios/**/ground_truth.json
+# Local observations and documentation must not enter the build context.
+data
+docs
+REPORT_ALIGNMENT.md
+.gitignore
+.venv
 tests/e2e/report.*
 *.pyc
 .env
+.env.*
+!.env.example
 
 .superpowers
 .playwright-cli

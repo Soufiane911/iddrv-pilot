@@ -23,7 +23,7 @@ from ml.process_drift import (
 )
 
 
-DATA_DIR = Path("data/scenarios/industrial_demo")
+from scripts.generate_training_fixture import CYCLES_PER_MACHINE, MACHINES
 
 
 def test_hdt_contract_is_future_and_does_not_use_current_quality_columns():
@@ -36,34 +36,34 @@ def test_hdt_contract_is_future_and_does_not_use_current_quality_columns():
     assert HORIZON_CYCLES == 20
 
 
-def test_load_cycle_files_returns_raw_cycles_without_derived_columns():
-    frame = load_cycle_files(DATA_DIR)
+def test_load_cycle_files_returns_raw_cycles_without_derived_columns(training_data):
+    frame = load_cycle_files(training_data)
 
-    assert len(frame) == 38_313
+    assert len(frame) == CYCLES_PER_MACHINE * len(MACHINES)
     assert TARGET_COLUMN not in frame.columns
     assert not set(ANOMALY_FEATURES).intersection(frame.columns)
 
 
-def test_prepare_frame_rejects_already_prepared_data():
-    frame = load_cycle_files(DATA_DIR)
+def test_prepare_frame_rejects_already_prepared_data(training_data):
+    frame = load_cycle_files(training_data)
     prepared = prepare_frame(frame)
 
     with pytest.raises(ValueError, match="already prepared"):
         prepare_frame(prepared)
 
 
-def test_prepare_frame_drops_only_terminal_horizon_per_machine():
-    frame = load_cycle_files(DATA_DIR)
+def test_prepare_frame_drops_only_terminal_horizon_per_machine(training_data):
+    frame = load_cycle_files(training_data)
 
     prepared = prepare_frame(frame)
 
-    assert len(prepared) == 38_253
+    assert len(prepared) == (CYCLES_PER_MACHINE - HORIZON_CYCLES) * len(MACHINES)
     assert frame["machine_erp_ref"].nunique() == 3
     assert len(frame) - len(prepared) == HORIZON_CYCLES * 3
 
 
-def test_temporal_split_is_strict_inside_each_machine():
-    prepared = prepare_frame(load_cycle_files(DATA_DIR))
+def test_temporal_split_is_strict_inside_each_machine(training_data):
+    prepared = prepare_frame(load_cycle_files(training_data))
 
     train_frame, test_frame = temporal_split(prepared)
 
@@ -75,8 +75,8 @@ def test_temporal_split_is_strict_inside_each_machine():
         assert train_machine["timestamp"].max() < test_machine["timestamp"].min()
 
 
-def test_hdt_training_is_temporal_reproducible_and_packaged(tmp_path):
-    frame = load_cycle_files(DATA_DIR)
+def test_hdt_training_is_temporal_reproducible_and_packaged(tmp_path, training_data):
+    frame = load_cycle_files(training_data)
     result = train(frame)
 
     assert result.train_rows > 1000
@@ -124,16 +124,16 @@ def test_hdt_training_is_temporal_reproducible_and_packaged(tmp_path):
     }
 
 
-def test_hdt_runtime_features_do_not_require_future_labels():
-    frame = load_cycle_files(DATA_DIR).drop(columns=[SOURCE_OUTCOME_COLUMN])
+def test_hdt_runtime_features_do_not_require_future_labels(training_data):
+    frame = load_cycle_files(training_data).drop(columns=[SOURCE_OUTCOME_COLUMN])
     runtime = prepare_inference_frame(frame.head(25))
     assert TARGET_COLUMN not in runtime.columns
     assert SOURCE_OUTCOME_COLUMN not in runtime.columns
     assert "cooling_time_s_volatility_20" in runtime.columns
 
 
-def test_hdt_prediction_rejects_incomplete_feature_contract():
-    result = train(load_cycle_files(DATA_DIR))
+def test_hdt_prediction_rejects_incomplete_feature_contract(training_data):
+    result = train(load_cycle_files(training_data))
     try:
         predict(result.artifact, pd.DataFrame({"cycle_time_s": [1.0]}))
     except ValueError as exc:

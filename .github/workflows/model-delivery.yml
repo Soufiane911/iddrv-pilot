@@ -14,11 +14,15 @@ jobs:
         run: python -m pip install -r backend/requirements.txt pytest==8.4.2
       - name: Data, preparation, training, artifact and reproducibility tests
         run: python -m pytest -q tests/test_process_drift.py tests/test_model_artifact_compatibility.py tests/test_training_scripts.py tests/test_model_delivery.py
-      - name: Train, evaluate, validate, package candidate (no deployment)
-        run: python scripts/package_process_drift.py --data-dir data/scenarios/industrial_demo --output candidate
+      - name: Generate bounded synthetic contract input (not production qualification)
+        run: python -m scripts.generate_training_fixture --output "$RUNNER_TEMP/synthetic-training"
+      - name: Exercise packaging only (synthetic, no deployment)
+        run: |
+          python scripts/package_process_drift.py --data-dir "$RUNNER_TEMP/synthetic-training" --output candidate
+          cp "$RUNNER_TEMP/synthetic-training/provenance.json" candidate/SYNTHETIC-TEST-ONLY.json
       - uses: actions/upload-artifact@v4
         with:
-          name: process-drift-candidate-${{ github.sha }}
+          name: process-drift-synthetic-test-only-${{ github.sha }}
           path: candidate/
           retention-days: 7
           if-no-files-found: error

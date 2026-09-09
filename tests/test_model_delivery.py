@@ -61,9 +61,9 @@ def test_dataset_integrity_allows_variable_csv_names(tmp_path):
     (['2025-01-01T00:00:00+00:00', '2025-01-01T01:00:00+01:00'], 'Duplicate'),
     (['NaT', 'NaT'], 'NaT'),
 ])
-def test_invalid_timestamps_rejected_before_training(tmp_path, monkeypatch, timestamps, message):
+def test_invalid_timestamps_rejected_before_training(tmp_path, monkeypatch, timestamps, message, training_data):
     from unittest.mock import Mock
-    raw = delivery.load_cycle_files(ROOT / 'data/scenarios/industrial_demo').iloc[:2].copy()
+    raw = delivery.load_cycle_files(training_data).iloc[:2].copy()
     raw['machine_erp_ref'] = 'same-machine'
     raw['timestamp'] = timestamps
     monkeypatch.setattr(delivery, 'load_cycle_files', lambda _: raw)
@@ -75,8 +75,8 @@ def test_invalid_timestamps_rejected_before_training(tmp_path, monkeypatch, time
     assert not (tmp_path / 'candidate').exists()
 
 
-def test_package_roundtrip_reproducible_and_no_overwrite(tmp_path):
-    dataset = ROOT / 'data/scenarios/industrial_demo'
+def test_package_roundtrip_reproducible_and_no_overwrite(tmp_path, training_data):
+    dataset = training_data
     first = package(dataset, tmp_path / 'first')
     second = package(dataset, tmp_path / 'second')
     assert first == second

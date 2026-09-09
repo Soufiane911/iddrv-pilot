@@ -12,7 +12,6 @@ COPY db /app/db
 COPY ingest /app/ingest
 COPY ml /app/ml
 COPY models /app/models
-# Text-only synthetic replay observations, never the private model binary.
-COPY data/summary6 /app/data/summary6
+# Optional replay observations are operator-provisioned read-only, never image content.
 RUN mkdir -p /var/lib/iddrv/inbox /var/lib/iddrv/processing /var/lib/iddrv/archive /var/lib/iddrv/quarantine /var/lib/iddrv/raw
 EXPOSE 8000

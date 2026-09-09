@@ -26,6 +26,36 @@ Le pipeline IDDRV :
 - **Trace** chaque import avec un passeport (hash, confiance, anomalies)
 - **Supervise** en continu : monitoring, détection de dérive process et estimation du risque rebut
 
+## Données locales et installation sans démonstration
+
+Les observations et documents locaux ne sont pas distribués par Git. Un clone
+ne contient pas `data/` et l'image backend ne l'embarque pas. L'application
+s'installe sans démo ; le replay Summary6 reste `not_ready` tant que son package
+approuvé et ses observations authentifiées sont absents. Aucun modèle ni dataset
+n'est téléchargé ou fabriqué automatiquement pour rendre cette readiness verte.
+
+Pour utiliser les données conservées localement, définir côté opérateur
+`SUMMARY6_DATA_DIR` (chemin absolu du dossier contenant `manifest.json` et les lots),
+`SUMMARY6_PACKAGE_DIR`, `SUMMARY6_MANIFEST_SHA256` et
+`HDT_RUNTIME_MODE=summary6_replay` avant de lancer l'API. Le pin des observations
+et les contrôles du package restent obligatoires ; aucun chemin ne provient des
+requêtes utilisateur. Avec Docker Compose, ajouter explicitement
+`-f deploy/compose.local-private.yml` après `-f docker-compose.yml` (et les autres
+fichiers de configuration du déploiement). Cet override monte les deux dossiers
+en lecture seule et refuse de créer des dossiers hôtes manquants.
+
+Les tests génèrent leurs entrées CSV/XLSX/gzip dans des répertoires temporaires.
+Le workflow de packaging utilise un signal synthétique borné et publie un
+artefact **SYNTHETIC-TEST-ONLY**, pas un modèle qualifié pour la production.
+Les imports réels restent alimentés par les données provisionnées par l'opérateur.
+
+Attention : les exclusions Git locales ne se transmettent pas aux clones.
+Configurer `.git/info/exclude` ou un fichier global `core.excludesFile` avant de
+créer des secrets/données locaux (notamment `.env`, `.venv`, `data/`, sorties et
+`node_modules`). Vérifier `git status` et le diff indexé avant tout commit ;
+ne jamais utiliser `git add -f` pour publier ces fichiers. L'historique antérieur
+n'est pas purgé par leur retrait du suivi.
+
 ## 2. Architecture
 
 ```

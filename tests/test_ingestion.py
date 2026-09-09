@@ -130,40 +130,25 @@ def test_row_transformation():
 # Test 4 : Profiler — Fichier Arburg généré
 # ─────────────────────────────────────────────────────────────
 
-def test_profiler_arburg():
-    print("\n📋 Test 4: Profiler sur fichier Arburg généré")
-    sample_path = Path("data/samples/arburg_1003_cycles.txt")
-
-    if not sample_path.exists():
-        print("  ⚠️  Fichier sample non trouvé — génération...")
-        os.chdir(str(Path(__file__).parent.parent))
-        exec(open("ingest/generate_samples.py").read())
-
-    if sample_path.exists():
-        profile = profile_file(str(sample_path))
-        assert_equal("Délimiteur détecté = ';'", profile.delimiter, ";")
-        assert_equal("Non transposé", profile.is_transposed, False)
-        assert_equal("Constructeur = arburg", profile.brand_detected, "arburg")
-        assert_true("Au moins 8 colonnes", profile.column_count >= 8)
-        assert_true("Ligne données > ligne 2", profile.data_start_row > 2)
-    else:
-        print("  ⚠️  Impossible de créer le fichier sample (pandas requis)")
+def test_profiler_arburg(sample_data):
+    sample_path = sample_data / 'arburg_1003_cycles.txt'
+    profile = profile_file(str(sample_path))
+    assert_equal("Délimiteur détecté = ';'", profile.delimiter, ";")
+    assert_equal("Non transposé", profile.is_transposed, False)
+    assert_equal("Constructeur = arburg", profile.brand_detected, "arburg")
+    assert_true("Au moins 8 colonnes", profile.column_count >= 8)
+    assert_true("Ligne données > ligne 2", profile.data_start_row > 2)
 
 
 # ─────────────────────────────────────────────────────────────
 # Test 5 : Profiler — Fichier transposé généré
 # ─────────────────────────────────────────────────────────────
 
-def test_profiler_transposed():
-    print("\n📋 Test 5: Profiler sur fichier transposé (Tubes)")
-    sample_path = Path("data/samples/transposed_606_tubes.txt")
-
-    if sample_path.exists():
-        profile = profile_file(str(sample_path))
-        assert_equal("Transposé détecté = True", profile.is_transposed, True)
-        assert_in("Encodage = utf-16 ou utf-16-le", profile.encoding, ["utf-16", "utf-16-le"])
-    else:
-        print("  ⚠️  Fichier transposé non trouvé (lancer generate_samples.py)")
+def test_profiler_transposed(sample_data):
+    sample_path = sample_data / 'transposed_606_tubes.txt'
+    profile = profile_file(str(sample_path))
+    assert_equal("Transposé détecté = True", profile.is_transposed, True)
+    assert_in("Encodage = utf-16 ou utf-16-le", profile.encoding, ["utf-16", "utf-16-le"])
 
 
 # ─────────────────────────────────────────────────────────────
@@ -215,11 +200,11 @@ def test_reconciliation_logic():
 # Test 7 : Loader — Timestamps réels machine
 # ─────────────────────────────────────────────────────────────
 
-def test_loader_machine_timestamps():
+def test_loader_machine_timestamps(sample_data):
     print("\n📋 Test 7: Timestamps machine depuis les fichiers sources")
 
-    arburg_rows, _, _ = load_file("data/samples/arburg_1003_cycles.txt")
-    engel_rows, _, _ = load_file("data/samples/engel_152_cycles.csv")
+    arburg_rows, _, _ = load_file(str(sample_data / 'arburg_1003_cycles.txt'))
+    engel_rows, _, _ = load_file(str(sample_data / 'engel_152_cycles.csv'))
 
     assert_true("Arburg charge au moins une ligne", len(arburg_rows) > 0)
     assert_true("Engel charge au moins une ligne", len(engel_rows) > 0)
@@ -231,10 +216,10 @@ def test_loader_machine_timestamps():
 # Test 8 : Loader — ERP/TRS complet
 # ─────────────────────────────────────────────────────────────
 
-def test_loader_erp_orders_complete():
+def test_loader_erp_orders_complete(sample_data):
     print("\n📋 Test 8: Lecture ERP/TRS avec dates de début et fin")
 
-    orders = read_erp_trs_xlsx("data/samples/erp_trs_fevrier.xlsx")
+    orders = read_erp_trs_xlsx(str(sample_data / 'erp_trs_fevrier.xlsx'))
 
     assert_true("ERP charge des ordres", len(orders) > 0)
     first = orders[0]

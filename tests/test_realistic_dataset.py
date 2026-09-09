@@ -1,13 +1,18 @@
 """
-Tests de validation du dataset industriel de démonstration.
+Contrats du générateur synthétique (aucune preuve sur un dataset privé).
+Les fichiers sont créés en répertoire temporaire, jamais lus depuis data/.
 """
 
 import json
 import os
+import random
+import sys
+import numpy as np
+import pytest
 import pandas as pd
 from datetime import datetime, timedelta
 
-BASE = "data/scenarios/industrial_demo"
+BASE = "unused-until-generated-fixture"
 ORDERS_FILE = f"{BASE}/erp_orders.xlsx"
 CYCLES_FILES = {
     "152": f"{BASE}/machine_cycles_152.csv",
@@ -21,6 +26,30 @@ GROUND_TRUTH_FILE = f"{BASE}/ground_truth.json"
 README_FILE = f"{BASE}/README.md"
 
 VALID_MACHINES = {"152", "1003", "606"}
+
+
+@pytest.fixture(scope='module', autouse=True)
+def generated_scenario(tmp_path_factory):
+    from ingest import generate_realistic_scenario as generator
+    folder = tmp_path_factory.mktemp('generated-scenario')
+    random_state, numpy_state = random.getstate(), np.random.get_state()
+    try:
+        with pytest.MonkeyPatch.context() as patch:
+            patch.setattr(generator, 'OUTPUT', str(folder))
+            generator.main()
+            module = sys.modules[__name__]
+            for key, value in list(vars(module).items()):
+                if key.endswith('_FILE'):
+                    patch.setattr(module, key, str(folder / os.path.basename(value)))
+            patch.setattr(module, 'CYCLES_FILES', {
+                mid: str(folder / f'machine_cycles_{mid}.csv') for mid in VALID_MACHINES
+            })
+            # Explicit upper bound: no unbounded production-data generation/training.
+            assert sum(len(pd.read_csv(p)) for p in CYCLES_FILES.values()) < 50_000
+            yield folder
+    finally:
+        random.setstate(random_state)
+        np.random.set_state(numpy_state)
 
 
 def _normalize_machine_ref(val):
@@ -284,43 +313,9 @@ def test_15_s006_dimensional_drift():
 
 
 def run_all():
-    tests = [
-        ("01 - Fichiers existent", test_01_all_files_exist),
-        ("02 - Colonnes ERP", test_02_orders_have_required_columns),
-        ("03 - Cycles références OF", test_03_cycles_have_valid_order_refs),
-        ("04 - Qualité références OF", test_04_quality_checks_have_valid_order_refs),
-        ("05 - Maintenance machines", test_05_maintenance_refs_valid_machine),
-        ("06 - 6 scénarios GT", test_06_ground_truth_has_6_scenarios),
-        ("07 - Preuves scénarios", test_07_scenarios_have_evidence),
-        ("08 - Cycles dans fenêtre", test_08_cycles_within_order_window),
-        ("09 - 5+ types défauts", test_09_at_least_5_defect_types),
-        ("10 - Données imparfaites", test_10_imperfect_data_exists),
-        ("11 - 3 machines ERP", test_11_orders_cover_all_machines),
-        ("12 - Défauts qualité/cycles", test_12_quality_defect_types_match_cycles),
-        ("13 - Timestamps maintenance", test_13_maintenance_events_have_timestamps),
-        ("14 - Preuves fenêtre ±2h", test_14_scenario_evidence_within_window),
-        ("15 - Drift S006", test_15_s006_dimensional_drift),
-    ]
-    passed, failed = 0, 0
-    for name, fn in tests:
-        try:
-            fn()
-            passed += 1
-        except AssertionError as e:
-            print(f"ECHEC [{name}]: {e}")
-            failed += 1
-        except Exception as e:
-            print(f"ERREUR [{name}]: {type(e).__name__}: {e}")
-            failed += 1
-    total = passed + failed
-    print(f"\n{'='*50}")
-    print(f"Résultat: {passed}/{total} tests réussis")
-    if failed:
-        print(f"ÉCHEC: {failed} test(s) en échec")
-        exit(1)
-    else:
-        print("SUCCÈS: Tous les tests passent")
+    # Keep the standalone entrypoint while using the same temporary fixtures as CI.
+    return pytest.main([__file__, '-q'])
 
 
 if __name__ == "__main__":
-    run_all()
+    sys.exit(run_all())

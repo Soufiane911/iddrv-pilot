@@ -14,11 +14,7 @@ import numpy as np
 import pandas as pd
 
 SEED = 42
-np.random.seed(SEED)
-random.seed(SEED)
-
 OUTPUT = "data/scenarios/industrial_demo"
-os.makedirs(OUTPUT, exist_ok=True)
 
 MACHINES = {
     "152":  {"name": "Presse 152",  "type": "small"},
@@ -711,6 +707,9 @@ Dataset industriel fictif pour tester un agent capable de correler donnees ERP, 
 
 
 def main():
+    os.makedirs(OUTPUT, exist_ok=True)
+    np.random.seed(SEED)
+    random.seed(SEED)
     print("="*60)
     print("Generation du dataset industriel de demonstration")
     print("="*60)

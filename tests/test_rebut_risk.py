@@ -13,7 +13,7 @@ from ml.rebut_risk import (
 )
 
 
-DATA_DIR = Path("data/scenarios/industrial_demo")
+from ml.rebut_risk import temporal_split
 
 
 def test_training_contract_uses_process_features_only():
@@ -24,14 +24,17 @@ def test_training_contract_uses_process_features_only():
     assert "part_quality_status" not in FEATURE_COLUMNS
 
 
-def test_rebut_risk_training_is_temporal_and_reproducible(tmp_path):
-    frame = load_cycle_files(DATA_DIR)
+def test_rebut_risk_training_is_temporal_and_reproducible(tmp_path, training_data):
+    frame = load_cycle_files(training_data)
     result = train(frame)
 
-    assert result.train_rows == 25542
-    assert result.test_rows == 12771
-    assert result.train_scraps == 590
-    assert result.test_scraps == 207
+    assert result.train_rows == 2400
+    assert result.test_rows == 1200
+    assert result.train_scraps == 300
+    assert result.test_scraps == 150
+    first, second = temporal_split(frame)
+    assert len(first) + len(second) == len(frame)
+    assert first['timestamp'].max() < second['timestamp'].min()
     assert result.train_end < result.test_start
     assert 0 <= result.metrics["average_precision"] <= 1
     assert 0 <= result.metrics["roc_auc"] <= 1
@@ -57,8 +60,8 @@ def test_rebut_risk_training_is_temporal_and_reproducible(tmp_path):
     assert metadata_path.read_text(encoding="utf-8").find("chronological_2_3_train_1_3_test") >= 0
 
 
-def test_prediction_rejects_missing_feature():
-    frame = load_cycle_files(DATA_DIR)
+def test_prediction_rejects_missing_feature(training_data):
+    frame = load_cycle_files(training_data)
     result = train(frame)
     try:
         predict(result.artifact, pd.DataFrame({"cycle_time_s": [1.0]}))
