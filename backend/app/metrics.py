@@ -66,6 +66,29 @@ PROCESS_DRIFT_INFERENCE_SECONDS = Histogram(
 )
 
 
+SUMMARY6_REPLAY_RESULTS = Counter('iddrv_summary6_replay_results_total',
+    'Synthetic replay requests only; not live predictions', ['status', 'reason'])
+SUMMARY6_REPLAY_SECONDS = Histogram('iddrv_summary6_replay_seconds', 'Synthetic replay request latency')
+SUMMARY6_RAW_SCORE = Histogram('iddrv_summary6_replay_raw_score', 'Uncalibrated latest raw replay score')
+SUMMARY6_DECISION_SCORE = Histogram('iddrv_summary6_replay_decision_score', 'Latest replay min3 score')
+SUMMARY6_ALERTS = Counter('iddrv_summary6_replay_alerts_total', 'Synthetic replay alerts, never incidents')
+
+
+def record_summary6(result, duration_s):
+    # No user-controlled labels, site IDs, lot IDs or unbounded package names.
+    reasons = {'warmup', 'publication_warmup', 'incomplete_prefix', 'incomplete_sensors',
+               'unknown_context', 'anchor_out_of_guard'}
+    reason = result['reason'] if result['reason'] in reasons else 'none'
+    SUMMARY6_REPLAY_RESULTS.labels(result['status'], reason).inc()
+    SUMMARY6_REPLAY_SECONDS.observe(duration_s)
+    if result['instant_score'] is not None:
+        SUMMARY6_RAW_SCORE.observe(result['instant_score'])
+    if result['decision_score'] is not None:
+        SUMMARY6_DECISION_SCORE.observe(result['decision_score'])
+    if result['alert'] is True:
+        SUMMARY6_ALERTS.inc()
+
+
 def record_request(method: str, status_code: int, duration_s: float) -> None:
     REQUEST_TOTAL.labels(method=method).inc()
     HTTP_STATUS.labels(status_code=str(status_code)).inc()

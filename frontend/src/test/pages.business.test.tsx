@@ -271,7 +271,7 @@ describe('ModelMonitoringPage', () => {
   it('affiche le simulateur HDT avec le bouton désactivé tant que les cycles sont vides', async () => {
     renderApp('/monitoring');
     await screen.findByRole('heading', { name: /Monitoring du modèle HDT/i });
-    expect(screen.getByRole('heading', { name: /Simulateur interactif HDT/i })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /Simulateur interactif HDT/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Calculer le score HDT/i })).toBeDisabled();
   });
 });

@@ -32,14 +32,20 @@ function loadHistory(): HdtHistoryEntry[] {
   }
 }
 
+import { RuntimeBoundary } from '../components/monitoring/RuntimeBoundary';
+
 export function ModelMonitoringPage() {
+  return <><ToolsNavigation /><RuntimeBoundary><HistoricalMonitoringPage /></RuntimeBoundary></>;
+}
+
+function HistoricalMonitoringPage() {
   const api = useApi();
   const [historyKey, setHistoryKey] = useState(0);
 
   const sitesQuery = useQuery({ queryKey: ['monitoring-sites'], queryFn: api.getSites });
   const incidentsQuery = useQuery({ queryKey: ['monitoring-incidents'], queryFn: () => api.getIncidents({}) });
 
-  const siteId = sitesQuery.data?.[0]?.id ?? 1;
+  const siteId = sitesQuery.data?.[0]?.id;
 
   const history = useMemo(() => loadHistory(), [historyKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -61,13 +67,12 @@ export function ModelMonitoringPage() {
 
   return (
     <section className="page page-wide">
-      <ToolsNavigation />
       <div className="page-intro">
         <div>
           <p className="eyebrow">INTELLIGENCE ARTIFICIELLE</p>
-          <h2>Monitoring du modèle HDT</h2>
+          <h2>Monitoring du modèle HDT — profil historique</h2>
           <p className="muted">
-            Supervision du modèle de détection de dérive process (HDT) : version, métriques offline, simulateur interactif et retours terrain.
+            Références historiques HDT : métriques offline, simulateur et retours terrain. La version par défaut ci-dessous n’atteste pas le paquet réellement chargé et ne décrit jamais summary6.
           </p>
         </div>
       </div>
@@ -81,7 +86,7 @@ export function ModelMonitoringPage() {
           <MetricCard label="Algorithme" value="Isolation Forest" detail="200 arbres, seuil 98e percentile" tone="neutral" />
           <MetricCard label="Horizon" value="20 cycles" detail="Projection de dérive" tone="neutral" />
           <MetricCard label="Fenêtre de volatilité" value="20 cycles" detail="Calcul des signaux" tone="neutral" />
-          <MetricCard label="Site de référence" value={siteId.toString()} detail="Identifiant pilote" tone="neutral" />
+          <MetricCard label="Site de référence" value={siteId?.toString() ?? 'Non résolu'} detail="Identifiant pilote" tone="neutral" />
         </div>
       </section>
 
@@ -100,7 +105,7 @@ export function ModelMonitoringPage() {
 
       {/* Simulator */}
       <section style={{ marginBottom: '24px' }}>
-        <HdtSimulator api={api} siteId={siteId} onResult={handleSimulatorResult} />
+        {siteId !== undefined && <HdtSimulator api={api} siteId={siteId} onResult={handleSimulatorResult} />}
       </section>
 
       {/* History */}

@@ -41,6 +41,7 @@ services:
     image: ghcr.io/${GHCR_OWNER:?GHCR_OWNER is required}/iddrv-api:${IMAGE_TAG:?IMAGE_TAG is required}
     restart: unless-stopped
     environment:
+      HDT_RUNTIME_MODE: ${HDT_RUNTIME_MODE:-disabled}
       DATABASE_URL: ${API_DATABASE_URL:?API_DATABASE_URL is required}
       API_DATABASE_URL: ${API_DATABASE_URL:?API_DATABASE_URL is required}
       TELEMETRY_ALLOWED_ORIGINS: ${TELEMETRY_ALLOWED_ORIGINS:-}
@@ -69,6 +70,7 @@ services:
     image: ghcr.io/${GHCR_OWNER:?GHCR_OWNER is required}/iddrv-api:${IMAGE_TAG:?IMAGE_TAG is required}
     restart: unless-stopped
     environment:
+      HDT_RUNTIME_MODE: ${HDT_RUNTIME_MODE:-disabled}
       DATABASE_URL: ${WORKER_DATABASE_URL:?WORKER_DATABASE_URL is required}
       WORKER_DATABASE_URL: ${WORKER_DATABASE_URL:?WORKER_DATABASE_URL is required}
       REDIS_URL: redis://redis:6379/0
@@ -98,6 +100,7 @@ services:
     image: ghcr.io/${GHCR_OWNER:?GHCR_OWNER is required}/iddrv-api:${IMAGE_TAG:?IMAGE_TAG is required}
     restart: unless-stopped
     environment:
+      HDT_RUNTIME_MODE: ${HDT_RUNTIME_MODE:-disabled}
       WORKER_DATABASE_URL: ${WORKER_DATABASE_URL:?WORKER_DATABASE_URL is required}
       TELEMETRY_ALLOWED_ORIGINS: ${TELEMETRY_ALLOWED_ORIGINS:-}
       TELEMETRY_ALLOW_HTTP: ${TELEMETRY_ALLOW_HTTP:-false}
@@ -118,6 +121,7 @@ services:
     image: ghcr.io/${GHCR_OWNER:?GHCR_OWNER is required}/iddrv-api:${IMAGE_TAG:?IMAGE_TAG is required}
     restart: unless-stopped
     environment:
+      HDT_RUNTIME_MODE: ${HDT_RUNTIME_MODE:-disabled}
       WORKER_DATABASE_URL: ${WORKER_DATABASE_URL:?WORKER_DATABASE_URL is required}
       PROCESS_DRIFT_MODEL_PATH: /app/models/process_drift_hdt_v1.joblib
       SCORER_HEARTBEAT_PATH: /tmp/iddrv-scorer-heartbeat

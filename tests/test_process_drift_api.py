@@ -52,7 +52,8 @@ def _viewer(site_ids: tuple[int, ...] = (1,)) -> Identity:
 
 
 @pytest.fixture(autouse=True)
-def _clear_process_drift_model_cache():
+def _clear_process_drift_model_cache(monkeypatch):
+    monkeypatch.setenv('HDT_RUNTIME_MODE', 'historical')
     process_drift._model_artifact.cache_clear()
     yield
     process_drift._model_artifact.cache_clear()

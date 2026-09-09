@@ -19,9 +19,11 @@ comme validé en production.
 ## Exécuter l'entraînement
 
 L'environnement de référence est Python 3.13.x avec scikit-learn 1.7.2 et
-joblib 1.5.2. Ces versions sont épinglées dans `requirements.txt` et
-`backend/requirements.txt` pour éviter les avertissements de désérialisation
-scikit-learn.
+joblib 1.5.2. La pile numérique est épinglée dans `constraints-numerical.txt`,
+chargé par `requirements.txt` et `backend/requirements.txt` (CI, entraînement,
+ingest et image backend), pour éviter la dérive des dépendances transitives.
+Pour le paquet privé summary6, Python **3.13.9 exactement** est requis ; voir
+[environnement et vérification](../docs/finalverification/summary6-environment.md).
 
 ```bash
 .venv/bin/python scripts/train_process_drift.py \
