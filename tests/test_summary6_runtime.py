@@ -159,3 +159,58 @@ def test_approved_export_all_six_models_exact():
         np.testing.assert_array_equal(packaged.contexts[key]['center'], original['reference'][key][0])
         np.testing.assert_array_equal(packaged.contexts[key]['scale'], original['reference'][key][1])
         assert packaged.contexts[key]['threshold'] == original['thresholds'][key]
+
+
+@pytest.mark.parametrize('sensor', tuple(GOLDEN['cycles'][0]['sensors']))
+@pytest.mark.parametrize('value', [1e308, 10**30, 10**400])
+def test_extreme_numbers_are_causal(tiny, sensor, value):
+    import warnings
+    cycles = copy.deepcopy(GOLDEN['cycles'])
+    before = score_cycles(cycles[:-1], package=tiny[0])
+    cycles[-1]['sensors'][sensor] = value
+    with warnings.catch_warnings():
+        warnings.simplefilter('error')
+        results = score_cycles(cycles, package=tiny[0])
+    assert results[:-1] == before
+    last = results[-1]
+    if value == 10**400:
+        assert last['reason'] == 'incomplete_sensors'
+    elif value == 1e308:
+        assert last['reason'] == 'numerical_failure'
+    else:
+        assert last['status'] == 'available'
+    if last['status'] == 'abstained':
+        assert all(last[k] is None for k in ('features', 'instant_score', 'decision_score', 'alert'))
+        for counter in (91, 92):
+            row = copy.deepcopy(GOLDEN['cycles'][-1])
+            row['cycle_counter'] = counter
+            cycles.append(row)
+        extended = score_cycles(cycles, package=tiny[0])
+        assert extended[:-2] == results
+        assert all(r['reason'] == last['reason'] and r['features'] is None for r in extended[-2:])
+
+
+@pytest.mark.parametrize('sensor', tuple(GOLDEN['cycles'][0]['sensors']))
+def test_bool_sensor_rejected(tiny, sensor):
+    cycles = copy.deepcopy(GOLDEN['cycles'])
+    cycles[-1]['sensors'][sensor] = True
+    with pytest.raises(ContractError):
+        score_cycles(cycles, package=tiny[0])
+
+
+def test_finite_moments_rms_overflow_abstains(tiny):
+    from dataclasses import replace
+    import warnings
+    p = tiny[0]
+    contexts = copy.deepcopy(p.contexts)
+    contexts[('M1', 'R1')].update(center=[0.]*8, scale=[1.]*8)
+    p = replace(p, contexts=contexts)
+    cycles = copy.deepcopy(GOLDEN['cycles'])
+    for row in cycles:
+        row['sensors'] = {s: (0. if row['cycle_counter'] < 60 else 1e155) for s in row['sensors']}
+    with warnings.catch_warnings():
+        warnings.simplefilter('error')
+        results = score_cycles(cycles, package=p)
+    assert all(r['reason'] == 'numerical_failure' for r in results if r['cycle_counter'] >= 79)
+    assert all(r['features'] is None for r in results)
+    assert score_cycles(cycles[:-1], package=p) == results[:-1]

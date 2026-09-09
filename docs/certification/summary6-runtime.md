@@ -54,7 +54,17 @@ Imports : `from ml.summary6 import load_package, score_cycles, UNITS`.
    Aucune probabilité de défaut, horizon de qualité ou explication inventée.
    L'API devra ajouter ses IDs de requête/contexte sans changer cette sémantique.
    `reason` : `warmup`, `publication_warmup`, `incomplete_prefix`,
-   `incomplete_sensors`, `unknown_context`, `anchor_out_of_guard`, ou null.
+   `incomplete_sensors`, `unknown_context`, `anchor_out_of_guard`,
+   `numerical_failure`, ou null.
+   Conversion numérique contrôlée avant finitude : entiers JSON représentables
+   acceptés, dépassement de float (ex. `10**400`) traité comme mesure non finie,
+   donc `incomplete_sensors`, jamais TypeError/500. Booléens toujours refusés.
+   `numerical_failure` : débordement/non-finitude de l'ancre/garde, résidus,
+   huit moyennes ou huit écarts-types, six agrégats (dont RMS) ou scoring.
+   Abstention persistante dès le cycle causal, scores/features/alerte nulls,
+   sans effacer le passé. Aucun agrégat partiel à sept capteurs n'est autorisé.
+   Les avertissements arithmétiques sont convertis en erreurs contrôlées,
+   jamais ignorés; aucune limite métier arbitraire n'est ajoutée.
    Contexte inconnu : seuil et scores null. Une mesure manquante invalide le
    reste du préfixe de ce lot, pas les résultats antérieurs. Restaurer un préfixe
    corrigé exige un replay explicitement révisé, pas une correction silencieuse.
@@ -94,12 +104,16 @@ incompatibilités sklearn. Aucun entraînement lourd ou campagne exécuté.
 
 ## Livraison privée et reproduction
 
-Paquet final hors Git : `/tmp/iddrv-summary6-package-f7bb05e3-final`.
+Paquet durci hors Git : `/tmp/iddrv-summary6-package-hardened-0925d84d5446`.
 - `manifest.json` : 5 431 octets, SHA256
-  `eb29f9b7d0299085be6c6ad38ec98d77649ead10b9b1fe84029880cc2270da84`.
-- `models.joblib` : 12 076 732 octets, SHA256
-  `284779391f392cac7dab35141dae9139866b24d60f24851770875adb485f7244`.
-- Runtime : `summary6-6940a3bcd35d0cea0ad4980644168f22b3908fbd71fc5ff038b721bc6cdacff6`.
+  `919fc41c58d1e821f9dcf7e16ee6c317e5966d4ec1c2444ad96045289543f4ff`.
+- `models.joblib` : 12 067 926 octets, SHA256
+  `3de68e2dba256aab7e6d79d2acd6e0e74b915a20efe3046e5cbfeb22a696f915`.
+- Runtime : `summary6-0c8b4c15cd4df33784468dfcd2057b52261122a8c90dbb0b1ba4a117b2870702`.
+
+Copie durable privée effectuée dans un nouveau dossier nommé par l'identité
+sans préfixe; permissions dossier0700/fichiers0600 et SHA des deux copies
+vérifiés. Anciens paquets conservés sans modification.
 
 « Compact » = modèles seuls + JSON; forêt non élaguée, toujours ~12 MB, aucun
 binaire dans le patch. Parent : copier les DEUX fichiers vers un répertoire
@@ -113,7 +127,7 @@ conserver cette identité, ne pas annoncer une reproductibilité binaire.
 
 Commande exécutée :
 
-    python scripts/package_summary6.py --destination /tmp/iddrv-summary6-package-f7bb05e3-final
+    python3 scripts/package_summary6.py --destination /tmp/iddrv-summary6-package-hardened-0925d84d5446
 
 Environnement effectivement testé/pinné : Python 3.13.9, sklearn 1.7.2,
 numpy 2.2.6, pandas 2.3.3, scipy 1.16.3, joblib 1.5.2. Les métadonnées recherche
@@ -125,9 +139,11 @@ ne prouve pas toutes plateformes/versions; loader strict, pas warning ignoré.
 
 Commande réelle, paquet approuvé :
 
-    SUMMARY6_TEST_PACKAGE=/tmp/iddrv-summary6-package-f7bb05e3-final SUMMARY6_TEST_MANIFEST_SHA256=eb29f9b7d0299085be6c6ad38ec98d77649ead10b9b1fe84029880cc2270da84 python -m pytest -q tests/test_summary6_runtime.py tests/test_summary6_package.py
+    SUMMARY6_TEST_PACKAGE=/tmp/iddrv-summary6-package-hardened-0925d84d5446 SUMMARY6_TEST_MANIFEST_SHA256=919fc41c58d1e821f9dcf7e16ee6c317e5966d4ec1c2444ad96045289543f4ff python3 -m pytest -q tests/test_summary6_runtime.py tests/test_summary6_package.py
 
-Résultat : **20 passed**. Sans variables : **18 passed, 2 skipped**.
+Résultat durci : **53 passed**. Sans variables : **51 passed, 2 skipped**.
+33 nouveaux cas : `1e308`, `10**30`, `10**400` et booléens pour chacun des
+huit capteurs, passé invariant, RMS débordant malgré moments finis.
 CI : forêt tiny explicitement synthétique 3 arbres/16 observations par arbre,
 fixture JSON limitée issue du lot synthétique M1-R1-L15, cycles20..90. Les six
 features golden ont été générées par extraction AST des fonctions gelées,

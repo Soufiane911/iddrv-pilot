@@ -5,7 +5,8 @@
 Profil serveur explicite `HDT_RUNTIME_MODE=summary6_replay`. Sans variable, le
 profil `historical` reste le défaut de rollback. Aucun déploiement GitHub,
 activation globale, migration live, modification des épisodes ou changement
-scientifique du moteur. `ml/summary6` reste byte-identique à la phase 1.
+scientifique du moteur. Le durcissement numérique P2 de `ml/summary6` change
+l'identité du paquet, pas les calculs nominaux golden ni le modèle choisi.
 
 Monitoring **et Atelier** passent par `/summary6/current` avant de monter leurs
 composants historiques. Dans ce profil, Atelier est volontairement remplacé par
@@ -27,8 +28,8 @@ Lire aussi [summary6-runtime.md](summary6-runtime.md), notamment confirmation
 scientifique échouée et limites de certification. Le paquet local durable n'est
 pas distribué par Git. Variables **serveur uniquement**, aucune variable VITE :
 
-    export SUMMARY6_PACKAGE_DIR=/Users/soufianehamzaoui/.local/share/iddrv/summary6/6940a3bcd35d0cea0ad4980644168f22b3908fbd71fc5ff038b721bc6cdacff6
-    export SUMMARY6_MANIFEST_SHA256=eb29f9b7d0299085be6c6ad38ec98d77649ead10b9b1fe84029880cc2270da84
+    export SUMMARY6_PACKAGE_DIR=/chemin/prive/summary6/0c8b4c15cd4df33784468dfcd2057b52261122a8c90dbb0b1ba4a117b2870702
+    export SUMMARY6_MANIFEST_SHA256=919fc41c58d1e821f9dcf7e16ee6c317e5966d4ec1c2444ad96045289543f4ff
     # Configurer API_DATABASE_URL, SESSION_SECRET et les comptes autorisés.
     bash scripts/launch_summary6_replay.sh
 
@@ -82,7 +83,10 @@ Réponse : identité effective et pin manifeste, site, mode, provenance synthét
 contexte/unités, timestamp de coupure, compteur, input_count, latest et série
 bornée. Les noms moteur `instant_score`, `decision_score`, `threshold`,
 `status=available|abstained`, `reason`, `alert` nullable sont préservés.
-Abstention200 ne signifie jamais `alert:false`. `signals=[]`, aucun faux horizon
+Abstention200 ne signifie jamais `alert:false`. `numerical_failure` indique
+un calcul non fini/débordant, avec abstention causale persistante et aucun
+agrégat partiel; voir le contrat moteur. Entiers hors float :
+`incomplete_sensors`, booléens refusés. `signals=[]`, aucun faux horizon
 qualité. Pas de DB write, job, incident, correction ni métrique historique.
 
 Métriques Prometheus dédiées `iddrv_summary6_replay_*` : résultats/raisons à
@@ -117,7 +121,12 @@ pointant sur le paquet privé approuvé :
 
     python -m pytest -q tests/test_summary6_api.py tests/test_summary6_runtime.py tests/test_summary6_package.py tests/test_process_drift_api.py tests/test_telemetry_collector.py tests/test_telemetry_contract.py tests/test_telemetry_http.py
 
-**83 passed, 13 skipped** (tests collecteur DB existants non activés). Contrats,
+Après durcissement et reconditionnement : **116 passed, 13 skipped**
+(tests collecteur DB existants non activés), dont53 tests moteur/paquet avec
+vrai paquet, golden strictement égaux et comparaison des six modèles à la
+source approuvée. Sans paquet :51 tests moteur/paquet,2 skips explicites.
+Le smoke HTTP ci-dessous reste la preuve antérieure; non rejoué pour cette
+nouvelle identité (TestClient réel paquet rejoué). Contrats,
 auth/signatures (repository sessions stub dans TestClient), isolation, identité409,
 hash invalide avant joblib503, cutoff59/79/83/84/399, causalité de série et six
 contextes, absence de champs interdits, garde worker/POST et rollback historique.

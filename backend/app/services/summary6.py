@@ -8,7 +8,7 @@ from pathlib import Path
 from ml.runtime_mode import runtime_mode
 from ml.summary6 import load_package, score_cycles
 
-PACKAGE_ID = 'summary6-6940a3bcd35d0cea0ad4980644168f22b3908fbd71fc5ff038b721bc6cdacff6'
+PACKAGE_ID = 'summary6-0c8b4c15cd4df33784468dfcd2057b52261122a8c90dbb0b1ba4a117b2870702'
 DATA = Path(__file__).resolve().parents[3] / 'data' / 'summary6'
 MANIFEST_SHA = 'f0d95e3b88ab5c3cefe50483acac62fa6f674f8e85a9c60b721c0100c06a018b'
 
