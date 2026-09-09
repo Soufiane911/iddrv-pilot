@@ -9,6 +9,7 @@ from functools import lru_cache
 from fastapi import APIRouter, Depends, HTTPException
 
 from ml import monitoring
+from ml.hdt_registry import Catalog, load_catalog
 
 from .. import metrics
 from ..schemas import ProcessDriftRequest, ProcessDriftResponse
@@ -24,6 +25,17 @@ def _model_artifact():
     # its existing environment/test invalidation behavior.
     from ..services.process_drift import model_artifact
     return model_artifact.__wrapped__()
+
+
+@router.get("/candidates", response_model=Catalog)
+def process_drift_candidates(
+    identity: Identity = Depends(require_roles("viewer", "analyst", "supervisor", "admin")),
+):
+    # Global, non-site research metadata; no model loading or runtime selection.
+    try:
+        return load_catalog()
+    except (OSError, ValueError):
+        raise HTTPException(503, "hdt_catalog_unavailable") from None
 
 
 @router.post("", response_model=ProcessDriftResponse)

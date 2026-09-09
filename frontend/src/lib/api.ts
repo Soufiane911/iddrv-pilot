@@ -172,6 +172,27 @@ export interface MachineCycle {
   [feature: string]: unknown;
 }
 
+export interface HdtCatalog {
+  schema_version: 1;
+  notice: string;
+  candidates: HdtCandidate[];
+}
+
+export interface HdtCandidate {
+  candidate_id: string;
+  label: string;
+  representation: string;
+  model_version: string;
+  default: boolean;
+  status: 'executable' | 'research_only' | 'blocked';
+  scientific_status: string;
+  blocked_reason: string | null;
+  artifact: { path: string; sha256: string; artifact_packaged: boolean; distribution: 'packaged' | 'source_only'; dataset: string; seed: number | null };
+  evidence: { path: string; sha256: string }[];
+  input_contract: { sensors: string[]; context: string[]; preprocessing: string; decision: string; runtime_compatible: boolean };
+  evaluations: { phase: 'confirmation' | 'development'; population: string; dataset_ids: number[]; seeds: number[]; useful_recall_pct: number; episode_recall_pct: number | null; fp_per_1000_healthy_cycles: number; support_pct: number; distinct_episodes: number | null; interpretation: string }[];
+}
+
 export interface ProcessDriftInput {
   site_id: number;
   cycles: ProcessDriftCycle[];
@@ -644,6 +665,7 @@ export interface ApiClient {
   getInvestigation(runId: string): Promise<InvestigationRun>;
   runInvestigation(incidentId: string, asOf?: string): Promise<Investigation>;
   predictScrapRisk(input: ScrapRiskInput): Promise<ScrapRisk>;
+  getHdtCandidates(): Promise<HdtCatalog>;
   predictProcessDrift(input: ProcessDriftInput): Promise<ProcessDriftPrediction>;
   submitFeedback(incidentId: string, verdict: string, comment?: string): Promise<Feedback>;
   getImports(): Promise<ImportPassport[]>;
@@ -1265,6 +1287,7 @@ export function createApiClient(baseUrl = import.meta.env.VITE_API_URL ?? '/api/
     async predictScrapRisk(input) {
       return request<ScrapRisk>('/scrap-risk', { method: 'POST', body: input });
     },
+    async getHdtCandidates() { return request<HdtCatalog>('/process-drift/candidates'); },
     async predictProcessDrift(input) {
       return request<ProcessDriftPrediction>('/process-drift', { method: 'POST', body: input });
     },
@@ -1451,6 +1474,7 @@ export const mockApiClient: ApiClient = {
   getInvestigation: async (runId) => ({ run_id: runId, incident_id: DEMO_INCIDENT.id, status: 'completed', dataCutoff: DEMO_INCIDENT.data_cutoff, hypotheses: [{ cause_code: 'low_barrel_temperature_zone_2', label: 'Température zone 2 trop basse', confidence: 0.87, supporting_evidence_ids: ['ev-scrap', 'ev-temp', 'ev-note'], contradicting_evidence_ids: [], missing_data: [], next_check: 'inspect_barrel_zone_2_heating' }], evidence: await mockApiClient.getEvidence(DEMO_INCIDENT.id) }),
   runInvestigation: async () => ({ incident: DEMO_INCIDENT, run_id: 'run-s001-demo', hypotheses: [{ cause_code: 'low_barrel_temperature_zone_2', label: 'Température zone 2 trop basse', confidence: 0.87, supporting_evidence_ids: ['ev-scrap', 'ev-temp', 'ev-note'], contradicting_evidence_ids: [], missing_data: [], next_check: 'inspect_barrel_zone_2_heating' }], evidence: await mockApiClient.getEvidence('s001-demo') }),
   predictScrapRisk: async () => ({ model_version: 'rebut-risk-logistic-v1', risk_probability: 0.08, predicted_scrap: false, threshold: 0.5 }),
+  getHdtCandidates: async () => ({ schema_version: 1, notice: 'Mode démonstration : catalogue serveur non chargé.', candidates: [] }),
   predictProcessDrift: async (input) => {
     const machineErpRef = String(input.cycles.find((cycle) => typeof cycle.machine_erp_ref === 'string')?.machine_erp_ref ?? '152');
     const driftDetected = machineErpRef === '152';

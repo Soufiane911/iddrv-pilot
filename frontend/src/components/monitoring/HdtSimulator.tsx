@@ -261,6 +261,8 @@ export function HdtSimulator({ api, siteId, onResult }: Props) {
             </div>
           </div>
 
+          <p>Modèle réellement retourné par cette inférence : <code>{prediction.model_version}</code></p>
+
           {prediction.signals.length > 0 && (
             <div style={{ marginTop: '12px' }}>
               <span style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: 'var(--color-muted-foreground)', letterSpacing: '.05em' }}>SIGNAUX CONTRIBUTIFS</span>
