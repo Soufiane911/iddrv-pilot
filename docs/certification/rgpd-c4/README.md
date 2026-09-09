@@ -1,4 +1,17 @@
-# Chantier C4 RGPD — pièces de travail
+# C4 — dossier minimal à présenter
+
+## Périmètre retenu
+
+À la demande du porteur du projet, ce chantier se limite aux quatre pièces ci-dessous. Les annexes et tests déjà produits sont conservés comme justificatifs, pas comme un programme supplémentaire à réaliser.
+
+| Pièce minimale | Contenu attendu | Document existant |
+|---|---|---|
+| Modélisation | Modèles Merise cohérents avec la base présentée, choix du SGBD | [Modèles](modeles.md) |
+| Installation et import | Commandes, dépendances, création de la base/API et insertion réellement vérifiées | [README du projet](../../../README.md), preuves des chantiers données/CI à relier |
+| Registre | Traitements réellement concernés, données/finalités, responsable, destinataires, justification et conservation renseignés sans invention | [Registre](registre.md) et [fiches](registre.json) |
+| Tri/conservation | Quoi conserver, supprimer ou anonymiser, quand et par qui ; exceptions et fréquence | [Procédure](conservation-exercice.md) |
+
+La grille accepte des traitements de tri **automatisés ou non** : aucun ordonnanceur ni outil de purge de production n'est ajouté. Le simulateur SQLite est une annexe pédagogique, pas une condition supplémentaire ni une preuve de purge de la base applicative. Les décisions encore inconnues restent visibles ; ce périmètre minimal ne vaut pas attestation juridique.
 
 Référence inspectée `59a4846b`, branche de départ iddrv-pilot. Aucune compétence auto-validée, aucune attestation de conformité exhaustive. Aucun schéma, migration, serveur, collecteur, CI, frontend ou modèle ML modifié. Aucun accès base utilisateur, secret ou donnée réelle.
 
@@ -37,17 +50,13 @@ git diff --check
 
 Résultat de cette session : **11 tests réussis** (dates UTC/frontière, politique fail-closed, dry-run sans écritures après seed, suppression précise, autre site, FK, audit/référence croisée, rollback, confirmation, sorties expurgées, index sources/liens docs). Les commandes CLI dry-run et exécution synthétique ont également été exécutées : candidats 1 dossier/1 fichier, retenu 1 dossier audité, avant 6/6, après dry-run 6/6 et exécution 5/5. `git diff --check` sans erreur. Les tests d'index doivent être régénérés/revus si le schéma autorité change, pas neutralisés pour accepter une divergence.
 
-## Checklist de clôture humaine / prochaine preuve
+## Les quatre points à terminer
 
-- [ ] Nommer responsable de traitement, propriétaire de chaque fiche et contact droits/DPO éventuel.
-- [ ] Approuver finalités/bases juridiques, catégories/personnes, analyse d'impact requise ou non avec motif.
-- [ ] Recenser hébergeur réel, destinataires/exportataires, sous-traitants, contrats, localisations/transferts et garanties.
-- [ ] Arrêter durées active/archive, déclencheurs, exceptions et fréquence pour chaque fiche ; pas de valeur implicite.
-- [ ] Vérifier habilitations réelles, comptes partagés, accès SQL/fichiers/sauvegardes, révocation multi-site, sécurité TLS/cookies et logs.
-- [ ] Compléter/revoir MCD/MLD/dictionnaire exhaustifs et tester MPD 001–022 sur PostgreSQL/Timescale neuf ; conserver preuve catalogue/contraintes expurgée.
-- [ ] Relier import métier versionné et documentation racine, commandes, dépendances et test d'insertion réel synthétique (propriétaire C1/C2).
-- [ ] Relier installation API/DB reproduite aux preuves CI/deploy sans double intervention sur ressources.
-- [ ] Concevoir adaptation de tri réelle (si autorisée) avec propriétaire backend : schéma courant, triggers, snapshots, agrégats et copies fichiers ; pas de changement autorisé par ce simulateur.
-- [ ] Tester restauration synthétique multi-supports, non-réintroduction, exercice des droits et incident de confidentialité ; approuver le lot réel séparément.
+- [ ] Relire les modèles et couvrir les données de la base effectivement présentée ; le dictionnaire actuel est ciblé, pas exhaustif.
+- [ ] Rattacher une preuve d'installation API/base et d'import au commit présenté, avec commandes et dépendances ; réutiliser les exécutions des autres chantiers au lieu de les refaire sans besoin.
+- [ ] Compléter et valider les champs inconnus du registre pour le contexte réel ou fictif déclaré : responsable, finalités/justifications, destinataires et durées. Ne pas présenter une décision fictive comme celle d'une entreprise réelle.
+- [ ] Valider une procédure de tri applicable avec fréquence, responsable et exceptions. Une procédure manuelle documentée est possible ; aucune suppression réelle n'est autorisée par ce dossier.
 
-**Besoin remonté au parent :** les triggers immuables, les références auteur obligatoires et les dépendances historiques ne permettent pas une purge universelle. Une stratégie de dissociation/pseudonymisation ou un changement de schéma éventuel nécessite arbitrage responsable/juridique + architecture ; aucun contournement livré. Le chantier ouvre C4 mais ne le déclare pas satisfait.
+**Hors chantier immédiat :** automatisation de purge de production, refonte des migrations, campagne complète d'exercice des droits et restauration multi-supports. Ces travaux ne sont pas déclarés inutiles juridiquement : leur nécessité dépend du contexte réel, mais ils ne sont pas ajoutés automatiquement à la liste de développement C4.
+
+Les triggers immuables et références auteur doivent être pris en compte dans toute procédure appliquée. Aucun contournement n'est livré. C4 reste incomplet tant que les quatre pièces et les critères détaillés ci-dessus ne sont pas effectivement justifiés.
