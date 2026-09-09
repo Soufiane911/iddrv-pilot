@@ -10,7 +10,7 @@ Consultation en lecture seule de l’API publique GitHub (runs, jobs et annotati
 - [CI antérieure 34358036273](https://github.com/Soufiane911/iddrv-pilot/actions/runs/34358036273), SHA `82da50c0` : frontend **Run tests failure**. Annotation `frontend/src/test/workshopSetup.test.tsx:62` : attendu `erp_ref: ERP-608`, reçu `erp_ref: null`, `name: Presse sans ERPERP-608`. Cela localise une saisie reçue dans le champ nom plutôt que la référence ; la cause racine (focus, sélecteur, concurrence ou autre) n’est pas démontrée.
 - [Delivery antérieure 34358311023](https://github.com/Soufiane911/iddrv-pilot/actions/runs/34358311023) : build et deploy **skipped**, mais rapport **failure**. Défaut reproduit par le chemin shell original qui exigeait build success avant d’examiner la CI amont.
 
-Les téléchargements `/actions/jobs/{id}/logs` retournent **HTTP 403** sans authentification. Les annotations ne suffisent pas à expliquer l’échec Docker ni à certifier une cause de flakiness frontend. Aucun changement CI/frontend ni affaiblissement des tests.
+Les téléchargements `/actions/jobs/{id}/logs` retournent **HTTP 403** sans authentification. Les annotations seules ne suffisent pas à expliquer l’échec Docker ni à certifier une cause de flakiness frontend. La reproduction Docker locale ci-dessous établit un défaut concret du build Web ; sans les logs distants, elle ne prouve pas que ce soit l’unique erreur du run GitHub. Les assertions frontend restent inchangées.
 
 ## Contrat corrigé
 
@@ -36,4 +36,27 @@ Un rapport informatif réussi après une CI échouée n’est pas une CI verte n
 
 `tests/test_delivery_reporting.py` exécute le vrai bloc bash du rapport avec des contextes GitHub explicitement simulés : matrice 4×4×4×3 (success/failure/cancelled/skipped, promotion true/false/vide), vérification du câblage workflow_run/needs, résumé, codes retour et injections shell dans chacun des cinq champs. Aucun build, réseau, Docker ou SSH dans ces tests. Pas de nouvelle dépendance de test.
 
-Aucun push, workflow déclenché, publication d’image, déploiement, accès aux secrets ou modification des permissions. Le correctif doit être revu puis validé par un futur run autorisé ; l’échec Docker Web existant reste à investiguer avec les logs accessibles à un mainteneur.
+Aucun push, workflow déclenché, publication d’image, déploiement, accès aux secrets ou modification des permissions. Le correctif doit être revu puis validé par un futur run autorisé ; les logs distants restent nécessaires pour confirmer le diagnostic du run historique.
+
+## Build Web : cause reproduite et correction ciblée
+
+Sur la base `5e937412` (sources frontend de main `59a4846b`), le vrai `frontend/Dockerfile`, cible `build`, échoue localement avec code 2 :
+
+`src/test/hdtCandidates.test.tsx(7,21): error TS2307: Cannot find module '../../../models/hdt/catalog.json' or its corresponding type declarations.`
+
+`COPY frontend ./` place uniquement le frontend dans `/app`. `tsc -b` inclut `src/test` ; l’import statique du catalogue exige donc un fichier hors du contexte frontend, absent dans l’image. Les tests exécutés à la racine du dépôt ne détectaient pas cette différence.
+
+Correction : lecture du catalogue versionné via `node:fs`, chemin relatif au fichier de test (`fileURLToPath(import.meta.url)`), uniquement à l’exécution Vitest. Le type `HdtCatalog` est conservé ; ce typage de fixture JSON ne constitue pas une validation de schéma runtime. Aucune copie du catalogue, aucune suppression/exclusion de tests, aucune modification du Dockerfile ni ajout de modèles/binaires dans l’image. Le chemin évite aussi la transformation Vite des expressions `new URL(littéral, import.meta.url)` en URL d’asset navigateur.
+
+Régression manuelle reproductible : `cd frontend && npm run test:build-context`. Le script copie le frontend dans un répertoire temporaire sans `models/`, réutilise uniquement les dépendances installées, exécute le vrai `npm run build` puis nettoie sa copie. Ce contrôle échoue avec TS2307 sur l’ancien test et réussit après correction ; il n’est pas ajouté automatiquement à la CI.
+
+Vérifications locales après correction :
+
+- Test catalogue : **4/4** ; suite frontend complète : **175 réussis, 2 ignorés**, 21 fichiers.
+- `npm run lint` : succès ; `npm run build` (TypeScript + Vite) avec le dépôt complet : succès.
+- `npm run test:build-context` sans racine `models/` : succès.
+- Vrai Docker build complet (Node puis nginx), même Dockerfile inchangé : succès, image locale `iddrv-web-regression:after-5e937412`. Aucun push ni prune. Les deux avertissements Docker sur le nom `VITE_SKIP_AUTH` préexistaient ; aucune valeur secrète fournie.
+
+Sécurité du contexte : inspection de `.dockerignore` avant Docker. Il exclut notamment `frontend/node_modules`, `frontend/dist`, `.git`, `.env` et plusieurs répertoires de données, mais ne garantit pas l’exclusion de tous les outputs/worktrees/fichiers privés. Aucun contexte racine n’a donc été envoyé : contexte temporaire construit exclusivement avec `git archive HEAD frontend`, puis les trois fichiers frontend corrigés. Aucun catalogue, modèle, expérience, donnée privée ou secret transféré.
+
+Journaux locaux avant/après sous `/tmp/iddrv-web-{before,after,tests,all-tests,lint,build,isolated,regression-before}.log` : commandes sans credentials ni secrets ; pas de logs distants téléchargés. Cette vérification atteste le build local, pas une livraison ni un déploiement.
