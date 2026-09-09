@@ -1,0 +1,443 @@
+{
+  "scope": "lexical declarations; migrations NOT executed",
+  "sources": [
+    {
+      "path": "db/init.sql",
+      "sha256": "4e72a74fca834bfb7dfac725451444581e2df0ba170aeadcac2a82a8d0e663f9"
+    },
+    {
+      "path": "db/migrations/001_multisite_and_status.sql",
+      "sha256": "4d80f29c2eed50188e28dd7faf9e2805d814866211c69e298804c1542cfcd5e0"
+    },
+    {
+      "path": "db/migrations/002_realistic_dataset.sql",
+      "sha256": "cc24f7101b740a55b8222fb091623de205cb50ad66ed30163d5b3bda9593794a"
+    },
+    {
+      "path": "db/migrations/003_diagnostic_contract.sql",
+      "sha256": "d644715dab79fb1c330ff3f7d5db811f1f50c943d063711608c56afcfb6cb107"
+    },
+    {
+      "path": "db/migrations/004_automation_and_control_plane.sql",
+      "sha256": "32edfe36418d02605b966c09829f705939851a01a9e0316c9917761bad6a19cc"
+    },
+    {
+      "path": "db/migrations/005_g7_import_workspace.sql",
+      "sha256": "29b0713fa5d81fe87e6ae4aefc261b22c55257644966861850a3e74838389fb5"
+    },
+    {
+      "path": "db/migrations/006_site_isolation.sql",
+      "sha256": "451d417d47ca52a955902beb004b1fbb28b893069377d74e7f37724efa73bab0"
+    },
+    {
+      "path": "db/migrations/007_ingestion_site_scope.sql",
+      "sha256": "6108c37b4bf0592b3e73f841fdfe92c3b17697573028024fd81dffadb99f6e7d"
+    },
+    {
+      "path": "db/migrations/008_runtime_incident_detection.sql",
+      "sha256": "f1912b8a5345f7f5737722c4325e74760083ac15b6116001debf85f98fe7db62"
+    },
+    {
+      "path": "db/migrations/009_context_site_scope.sql",
+      "sha256": "5451c09c66aeac2df5df55c6d0dfbefd8956f7469f52a27bc9b00fd7e20b5f35"
+    },
+    {
+      "path": "db/migrations/010_machine_site_invariants.sql",
+      "sha256": "aa10fb037c3a0914f613a868d2908afee717c699e2a19a3964778f12a7ff6e27"
+    },
+    {
+      "path": "db/migrations/011_machine_alias_site_scope.sql",
+      "sha256": "2c88971e3603f23744cf8987849fb0060ee0913328ea0e79ed2fefed9f9ccf73"
+    },
+    {
+      "path": "db/migrations/012_feedback_read_index.sql",
+      "sha256": "7549f66a623c0f6c9cc9b176900ea7de0efabb9a659bad3e7308bf51473c0234"
+    },
+    {
+      "path": "db/migrations/013_erp_declarations.sql",
+      "sha256": "489c87f84430349bd2a20a99004b89e3dae7fb1f9adf8949767177ca40c74813"
+    },
+    {
+      "path": "db/migrations/014_machine_telemetry.sql",
+      "sha256": "2a3318812073bfd2968feea471f3527d0b59a4a496425a2d112ddaef3f07da47"
+    },
+    {
+      "path": "db/migrations/015_cycle_context_history.sql",
+      "sha256": "57c854b8fc77ac0dcd682eeebf378fe15f06da536acea933c09aafc3c09c02f9"
+    },
+    {
+      "path": "db/migrations/016_hdt_predictions.sql",
+      "sha256": "ddb7c92d46ec579514d94067bbf57981b1b120cb5be35586edeaf75242e0b43f"
+    },
+    {
+      "path": "db/migrations/017_context_cycle_identity.sql",
+      "sha256": "2a7655cff1d5c5d5db7ced566fb8c8f2b066990afdb0dba7d7672f46c4190d21"
+    },
+    {
+      "path": "db/migrations/018_continuity_recovery.sql",
+      "sha256": "dcf1388604d2bf2d45d3c3fef02bc3e4a07b27cafcb440f330397e3709877b64"
+    },
+    {
+      "path": "db/migrations/019_site_lifecycle.sql",
+      "sha256": "1b171afeede3fb8542a5ff2d85809b0a603ac92eeb0bc91f68d78b467bf6ab10"
+    },
+    {
+      "path": "db/migrations/020_workshop_planning.sql",
+      "sha256": "0a634617720739ff17e4cd24a8c142a9d307522f926fdd87e9df7475812ff14b"
+    },
+    {
+      "path": "db/migrations/021_site_sources_and_event_receipts.sql",
+      "sha256": "5aeb00d52d95fbe7bd3759401a04d6c822c3affe63a4f06353bcceca0f88bf32"
+    },
+    {
+      "path": "db/migrations/022_site_machine_lifecycle.sql",
+      "sha256": "a0b99e8a395b726c63f1b2688f10007f742ab296f8b81813ca377b092aaac639"
+    },
+    {
+      "path": "db/setup_db.py",
+      "sha256": "0952adc36d667549d941e4281dc31784358bcbe9f7819269b09902ce6c5cf7eb"
+    }
+  ],
+  "tables": {
+    "action_proposal_decisions": [
+      {
+        "line": 86,
+        "path": "db/migrations/004_automation_and_control_plane.sql"
+      }
+    ],
+    "action_proposals": [
+      {
+        "line": 35,
+        "path": "db/migrations/003_diagnostic_contract.sql"
+      }
+    ],
+    "continuity_recovery_reviews": [
+      {
+        "line": 3,
+        "path": "db/migrations/018_continuity_recovery.sql"
+      }
+    ],
+    "cycle_context_links": [
+      {
+        "line": 8,
+        "path": "db/migrations/015_cycle_context_history.sql"
+      }
+    ],
+    "cycle_event_receipts": [
+      {
+        "line": 62,
+        "path": "db/migrations/021_site_sources_and_event_receipts.sql"
+      }
+    ],
+    "data_quality_issues": [
+      {
+        "line": 159,
+        "path": "db/init.sql"
+      }
+    ],
+    "diagnostic_evidence": [
+      {
+        "line": 17,
+        "path": "db/migrations/003_diagnostic_contract.sql"
+      }
+    ],
+    "diagnostic_hypotheses": [
+      {
+        "line": 24,
+        "path": "db/migrations/003_diagnostic_contract.sql"
+      }
+    ],
+    "diagnostic_runs": [
+      {
+        "line": 11,
+        "path": "db/migrations/003_diagnostic_contract.sql"
+      }
+    ],
+    "erp_declaration_revisions": [
+      {
+        "line": 30,
+        "path": "db/migrations/013_erp_declarations.sql"
+      }
+    ],
+    "erp_declarations": [
+      {
+        "line": 19,
+        "path": "db/migrations/013_erp_declarations.sql"
+      }
+    ],
+    "erp_import_requests": [
+      {
+        "line": 72,
+        "path": "db/migrations/013_erp_declarations.sql"
+      }
+    ],
+    "evidence_vault": [
+      {
+        "line": 143,
+        "path": "db/init.sql"
+      }
+    ],
+    "feedback": [
+      {
+        "line": 30,
+        "path": "db/migrations/003_diagnostic_contract.sql"
+      }
+    ],
+    "hdt_predictions": [
+      {
+        "line": 5,
+        "path": "db/migrations/016_hdt_predictions.sql"
+      }
+    ],
+    "hdt_scoring_jobs": [
+      {
+        "line": 61,
+        "path": "db/migrations/014_machine_telemetry.sql"
+      }
+    ],
+    "import_job_events": [
+      {
+        "line": 149,
+        "path": "db/migrations/004_automation_and_control_plane.sql"
+      }
+    ],
+    "import_jobs": [
+      {
+        "line": 123,
+        "path": "db/migrations/004_automation_and_control_plane.sql"
+      }
+    ],
+    "import_passports": [
+      {
+        "line": 93,
+        "path": "db/init.sql"
+      }
+    ],
+    "import_rejections": [
+      {
+        "line": 130,
+        "path": "db/init.sql"
+      }
+    ],
+    "import_session_files": [
+      {
+        "line": 14,
+        "path": "db/migrations/005_g7_import_workspace.sql"
+      }
+    ],
+    "import_sessions": [
+      {
+        "line": 2,
+        "path": "db/migrations/005_g7_import_workspace.sql"
+      }
+    ],
+    "incidents": [
+      {
+        "line": 2,
+        "path": "db/migrations/003_diagnostic_contract.sql"
+      }
+    ],
+    "machine_aliases": [
+      {
+        "line": 45,
+        "path": "db/init.sql"
+      }
+    ],
+    "machine_connections": [
+      {
+        "line": 3,
+        "path": "db/migrations/014_machine_telemetry.sql"
+      }
+    ],
+    "machine_cycles": [
+      {
+        "line": 175,
+        "path": "db/init.sql"
+      }
+    ],
+    "machine_layouts": [
+      {
+        "line": 23,
+        "path": "db/migrations/004_automation_and_control_plane.sql"
+      }
+    ],
+    "machine_source_events": [
+      {
+        "line": 36,
+        "path": "db/migrations/014_machine_telemetry.sql"
+      }
+    ],
+    "machine_stream_offsets": [
+      {
+        "line": 29,
+        "path": "db/migrations/014_machine_telemetry.sql"
+      }
+    ],
+    "machines": [
+      {
+        "line": 28,
+        "path": "db/init.sql"
+      }
+    ],
+    "maintenance_events": [
+      {
+        "line": 14,
+        "path": "db/migrations/002_realistic_dataset.sql"
+      }
+    ],
+    "operator_notes": [
+      {
+        "line": 20,
+        "path": "db/migrations/002_realistic_dataset.sql"
+      }
+    ],
+    "planning_audit_events": [
+      {
+        "line": 87,
+        "path": "db/migrations/020_workshop_planning.sql"
+      }
+    ],
+    "planning_slots": [
+      {
+        "line": 48,
+        "path": "db/migrations/020_workshop_planning.sql"
+      }
+    ],
+    "process_drift_episode_predictions": [
+      {
+        "line": 30,
+        "path": "db/migrations/016_hdt_predictions.sql"
+      }
+    ],
+    "process_drift_episodes": [
+      {
+        "line": 24,
+        "path": "db/migrations/016_hdt_predictions.sql"
+      }
+    ],
+    "production_lines": [
+      {
+        "line": 10,
+        "path": "db/migrations/004_automation_and_control_plane.sql"
+      }
+    ],
+    "production_order_observation_sources": [
+      {
+        "line": 26,
+        "path": "db/migrations/015_cycle_context_history.sql"
+      }
+    ],
+    "production_order_revisions": [
+      {
+        "line": 60,
+        "path": "db/migrations/013_erp_declarations.sql"
+      }
+    ],
+    "production_orders": [
+      {
+        "line": 56,
+        "path": "db/init.sql"
+      }
+    ],
+    "quality_checks": [
+      {
+        "line": 2,
+        "path": "db/migrations/002_realistic_dataset.sql"
+      }
+    ],
+    "schema_migrations": [
+      {
+        "line": 399,
+        "path": "db/setup_db.py"
+      }
+    ],
+    "schema_version": [
+      {
+        "line": 6,
+        "path": "db/migrations/001_multisite_and_status.sql"
+      }
+    ],
+    "semantic_mapping_decisions": [
+      {
+        "line": 29,
+        "path": "db/migrations/005_g7_import_workspace.sql"
+      }
+    ],
+    "sessions": [
+      {
+        "line": 68,
+        "path": "db/migrations/004_automation_and_control_plane.sql"
+      }
+    ],
+    "shifts": [
+      {
+        "line": 79,
+        "path": "db/init.sql"
+      }
+    ],
+    "site_shift_calendars": [
+      {
+        "line": 11,
+        "path": "db/migrations/013_erp_declarations.sql"
+      }
+    ],
+    "site_source_credentials": [
+      {
+        "line": 25,
+        "path": "db/migrations/021_site_sources_and_event_receipts.sql"
+      }
+    ],
+    "site_sources": [
+      {
+        "line": 7,
+        "path": "db/migrations/021_site_sources_and_event_receipts.sql"
+      }
+    ],
+    "sites": [
+      {
+        "line": 15,
+        "path": "db/init.sql"
+      },
+      {
+        "line": 16,
+        "path": "db/migrations/001_multisite_and_status.sql"
+      }
+    ],
+    "source_machine_mappings": [
+      {
+        "line": 39,
+        "path": "db/migrations/021_site_sources_and_event_receipts.sql"
+      }
+    ],
+    "staging_import_rows": [
+      {
+        "line": 115,
+        "path": "db/init.sql"
+      }
+    ],
+    "user_site_roles": [
+      {
+        "line": 60,
+        "path": "db/migrations/004_automation_and_control_plane.sql"
+      }
+    ],
+    "users": [
+      {
+        "line": 48,
+        "path": "db/migrations/004_automation_and_control_plane.sql"
+      }
+    ],
+    "work_order_allocations": [
+      {
+        "line": 29,
+        "path": "db/migrations/020_workshop_planning.sql"
+      }
+    ],
+    "work_orders": [
+      {
+        "line": 8,
+        "path": "db/migrations/020_workshop_planning.sql"
+      }
+    ]
+  }
+}
