@@ -7,6 +7,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "test:build-context": "node scripts/check-build-context.mjs",
     "lint": "eslint . --max-warnings 0",
     "test": "vitest run --config vitest.config.ts",
     "test:e2e": "playwright test"
